@@ -163,6 +163,23 @@ async def historico(
     return {"series": series}
 
 
+@router.get("/apuracao/lideres-por-municipio")
+async def lideres_por_municipio(
+    cargo: int = Query(...),
+    uf: str = Query(...),
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Retorna líder por município da UF.
+
+    Pré-requisito: o poller precisa coletar snapshots com abrangência
+    a nível de município (ex.: 'SP:3550308' para São Paulo capital).
+    Enquanto isso não estiver ativo, retorna {} — o mapa fica cinza mas
+    ainda navegável.
+    """
+    # Placeholder: sem dados por município ainda. Estrutura preparada.
+    return {"municipios": {}, "aviso": "coleta por município ainda não ativa"}
+
+
 @router.get("/apuracao/lideres-por-uf")
 async def lideres_por_uf(
     cargo: int = Query(...),

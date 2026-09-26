@@ -1,4 +1,4 @@
-import { renderMapaBrasil, onCliqueUF } from "/static/mapa-br.js";
+import { renderMapa } from "/static/mapa-br.js";
 
 const PALETA = ["#f0b429", "#3b82f6", "#ec4899", "#10b981", "#a855f7", "#f97316"];
 const TZ = "America/Sao_Paulo";
@@ -380,63 +380,84 @@ async function atualizarPainelTotais() {
 
 // ============ mapa ============
 async function atualizarMapa() {
-  // Busca líder por UF no backend. Enquanto não há endpoint dedicado,
-  // usa dados agregados do snapshot atual quando o cargo for nacional,
-  // ou destaca apenas a UF ativa quando estadual.
-  let dadosPorUF = {};
+  const container = $("mapa-brasil");
+  const leg = $("mapa-legenda");
+
+  // Modo Brasil: mapa dos 27 estados
+  if (state.abrangencia === "BR") {
+    const dadosPorUF = {};
+    try {
+      const r = await fetch(`/api/apuracao/lideres-por-uf?cargo=${state.cargo}`);
+      if (r.ok) {
+        const j = await r.json();
+        for (const [uf, d] of Object.entries(j.ufs || {})) {
+          dadosPorUF[uf] = {
+            valor: d.votos || 0,
+            cor: PALETA[d.cor_idx % PALETA.length] || "#f0b429",
+            nome_lider: d.nome_lider,
+            votos: d.votos,
+          };
+        }
+      }
+    } catch (e) {}
+    await renderMapa(container, "BR", dadosPorUF, {
+      onClickArea: (sigla) => {
+        state.abrangencia = sigla;
+        $("sel-uf").value = sigla;
+        onFiltroChange();
+      },
+    });
+    renderLegenda(leg, dadosPorUF, {
+      tituloVazio: "Mapa por UF",
+      tituloCheio: "Líderes por UF",
+      dica: "Cada UF colorida pelo candidato líder daquele estado. Clique para ver o mapa do município.",
+    });
+    return;
+  }
+
+  // Modo UF: mapa dos municípios daquela UF
+  const dadosPorMun = {};
   try {
-    const r = await fetch(`/api/apuracao/lideres-por-uf?cargo=${state.cargo}`);
+    const r = await fetch(`/api/apuracao/lideres-por-municipio?cargo=${state.cargo}&uf=${state.abrangencia}`);
     if (r.ok) {
       const j = await r.json();
-      // j.ufs = { "SP": { sq_candidato, nome_lider, votos, cor_idx }, ... }
-      for (const [uf, d] of Object.entries(j.ufs || {})) {
-        dadosPorUF[uf] = {
+      for (const [mun, d] of Object.entries(j.municipios || {})) {
+        dadosPorMun[mun] = {
           valor: d.votos || 0,
-          cor: PALETA[d.cor_idx % PALETA.length] || "#f0b429",
+          cor: PALETA[(d.cor_idx || 0) % PALETA.length],
           nome_lider: d.nome_lider,
           votos: d.votos,
         };
       }
     }
-  } catch (e) { /* backend ainda sem dados; segue com destaque simples */ }
-
-  if (Object.keys(dadosPorUF).length === 0 && state.abrangencia !== "BR") {
-    dadosPorUF[state.abrangencia] = { valor: 1, cor: "#f0b429", nome_lider: "UF selecionada" };
-  }
-
-  await renderMapaBrasil($("mapa-brasil"), dadosPorUF);
-  onCliqueUF((sigla) => {
-    // Em qualquer cargo, clique em UF filtra a apuração pra aquele estado.
-    // Presidente: vê como o líder nacional está indo naquela UF.
-    // Estaduais: vê a apuração daquele estado.
-    state.abrangencia = sigla;
-    $("sel-uf").value = sigla;
-    onFiltroChange();
+  } catch (e) {}
+  await renderMapa(container, state.abrangencia, dadosPorMun, {
+    onClickArea: (nomeMun) => {
+      toast(`${nomeMun}: coleta por município ainda não ativa`, "warn");
+    },
   });
+  renderLegenda(leg, dadosPorMun, {
+    tituloVazio: `Municípios de ${state.abrangencia}`,
+    tituloCheio: `Líderes por município (${state.abrangencia})`,
+    dica: "Cada município colorido pelo candidato líder. Volte para 'Brasil' para ver o mapa nacional.",
+  });
+}
 
-  // Legenda dinâmica: se há líderes por UF, mostra por candidato
-  const leg = $("mapa-legenda");
+function renderLegenda(leg, dados, texto) {
   const nomes = new Map();
-  for (const [uf, d] of Object.entries(dadosPorUF)) {
-    if (d.nome_lider && d.nome_lider !== "UF selecionada") {
-      nomes.set(d.nome_lider, d.cor);
-    }
+  for (const d of Object.values(dados)) {
+    if (d.nome_lider) nomes.set(d.nome_lider, d.cor);
   }
   if (nomes.size) {
-    leg.innerHTML = `<h3>Líderes por UF</h3>` +
+    leg.innerHTML = `<h3>${texto.tituloCheio}</h3>` +
       Array.from(nomes.entries()).map(([n, c]) =>
         `<div class="leg-item"><span class="leg-cor" style="background:${c}"></span>${n}</div>`
       ).join("") +
       `<div class="leg-item"><span class="leg-cor" style="background:#1e2531"></span>Sem dados</div>`;
   } else {
-    leg.innerHTML = `
-      <h3>Mapa por UF</h3>
-      <div class="leg-item"><span class="leg-cor" style="background:#f0b429"></span> UF ativa</div>
-      <div class="leg-item"><span class="leg-cor" style="background:#1e2531"></span> Sem dados</div>
-      <p style="color:var(--muted);font-size:12px;margin-top:12px">
-        No dia da apuração, cada UF será colorida pelo candidato líder.
-        Clique numa UF para filtrar (cargo estadual).
-      </p>`;
+    leg.innerHTML = `<h3>${texto.tituloVazio}</h3>
+      <div class="leg-item"><span class="leg-cor" style="background:#1e2531"></span>Sem dados</div>
+      <p style="color:var(--muted);font-size:12px;margin-top:12px">${texto.dica}</p>`;
   }
 }
 
