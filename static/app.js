@@ -1,4 +1,4 @@
-import { renderMapaBrasil } from "/static/mapa-br.js";
+import { renderMapaBrasil, onCliqueUF } from "/static/mapa-br.js";
 
 const PALETA = ["#f0b429", "#3b82f6", "#ec4899", "#10b981", "#a855f7", "#f97316"];
 const TZ = "America/Sao_Paulo";
@@ -368,35 +368,66 @@ async function atualizarPainelTotais() {
 }
 
 // ============ mapa ============
-function atualizarMapa() {
-  // Placeholder: sem dados por UF ainda. Colore quem lidera na UF selecionada.
-  const corPorUF = {};
-  if (state.abrangencia !== "BR") {
-    corPorUF[state.abrangencia] = "#f0b429";
-  }
-  renderMapaBrasil($("mapa-brasil"), corPorUF);
-  const leg = $("mapa-legenda");
-  leg.innerHTML = `
-    <h3>Legenda</h3>
-    <div class="leg-item"><span class="leg-cor" style="background:#f0b429"></span> UF ativa</div>
-    <div class="leg-item"><span class="leg-cor" style="background:#1e2531"></span> Sem dados</div>
-    <p style="color:var(--muted);font-size:12px;margin-top:12px">
-      No dia da apuração, cada UF será colorida pelo candidato líder do cargo selecionado.
-    </p>`;
-  // clique em UF muda a abrangência (se cargo permitir)
-  $("mapa-brasil").querySelectorAll("g[data-uf]").forEach(g => {
-    g.style.cursor = "pointer";
-    g.onclick = () => {
-      if (state.cargo === 1) {
-        toast("Presidente é nacional. Troque para outro cargo para filtrar por UF.", "warn");
-        return;
+async function atualizarMapa() {
+  // Busca líder por UF no backend. Enquanto não há endpoint dedicado,
+  // usa dados agregados do snapshot atual quando o cargo for nacional,
+  // ou destaca apenas a UF ativa quando estadual.
+  let dadosPorUF = {};
+  try {
+    const r = await fetch(`/api/apuracao/lideres-por-uf?cargo=${state.cargo}`);
+    if (r.ok) {
+      const j = await r.json();
+      // j.ufs = { "SP": { sq_candidato, nome_lider, votos, cor_idx }, ... }
+      for (const [uf, d] of Object.entries(j.ufs || {})) {
+        dadosPorUF[uf] = {
+          valor: d.votos || 0,
+          cor: PALETA[d.cor_idx % PALETA.length] || "#f0b429",
+          nome_lider: d.nome_lider,
+          votos: d.votos,
+        };
       }
-      const uf = g.dataset.uf;
-      state.abrangencia = uf;
-      $("sel-uf").value = uf;
-      onFiltroChange();
-    };
+    }
+  } catch (e) { /* backend ainda sem dados; segue com destaque simples */ }
+
+  if (Object.keys(dadosPorUF).length === 0 && state.abrangencia !== "BR") {
+    dadosPorUF[state.abrangencia] = { valor: 1, cor: "#f0b429", nome_lider: "UF selecionada" };
+  }
+
+  await renderMapaBrasil($("mapa-brasil"), dadosPorUF);
+  onCliqueUF((sigla) => {
+    if (state.cargo === 1) {
+      toast("Presidente é nacional. Troque para outro cargo para filtrar por UF.", "warn");
+      return;
+    }
+    state.abrangencia = sigla;
+    $("sel-uf").value = sigla;
+    onFiltroChange();
   });
+
+  // Legenda dinâmica: se há líderes por UF, mostra por candidato
+  const leg = $("mapa-legenda");
+  const nomes = new Map();
+  for (const [uf, d] of Object.entries(dadosPorUF)) {
+    if (d.nome_lider && d.nome_lider !== "UF selecionada") {
+      nomes.set(d.nome_lider, d.cor);
+    }
+  }
+  if (nomes.size) {
+    leg.innerHTML = `<h3>Líderes por UF</h3>` +
+      Array.from(nomes.entries()).map(([n, c]) =>
+        `<div class="leg-item"><span class="leg-cor" style="background:${c}"></span>${n}</div>`
+      ).join("") +
+      `<div class="leg-item"><span class="leg-cor" style="background:#1e2531"></span>Sem dados</div>`;
+  } else {
+    leg.innerHTML = `
+      <h3>Mapa por UF</h3>
+      <div class="leg-item"><span class="leg-cor" style="background:#f0b429"></span> UF ativa</div>
+      <div class="leg-item"><span class="leg-cor" style="background:#1e2531"></span> Sem dados</div>
+      <p style="color:var(--muted);font-size:12px;margin-top:12px">
+        No dia da apuração, cada UF será colorida pelo candidato líder.
+        Clique numa UF para filtrar (cargo estadual).
+      </p>`;
+  }
 }
 
 // ============ eventos ============

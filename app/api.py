@@ -162,6 +162,56 @@ async def historico(
     return {"series": series}
 
 
+@router.get("/apuracao/lideres-por-uf")
+async def lideres_por_uf(
+    cargo: int = Query(...),
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Retorna, para cada UF onde há snapshot desse cargo, quem está em 1º.
+
+    Usado pelo mapa do frontend: colore cada UF pelo candidato líder.
+    Para Presidente (nacional), o cargo pode não ter recorte por UF —
+    nesse caso volta {} e o mapa fica todo cinza.
+    """
+    # Último snapshot por UF/cargo — subquery com max(coletado_em) por UF
+    from sqlalchemy import func
+    subq = (
+        select(
+            Snapshot.abrangencia.label("abr"),
+            func.max(Snapshot.coletado_em).label("ts"),
+        )
+        .where(Snapshot.cod_cargo == cargo, Snapshot.suspeito.is_(False),
+               Snapshot.abrangencia != "BR")
+        .group_by(Snapshot.abrangencia)
+        .subquery()
+    )
+    q = (
+        select(
+            Snapshot.abrangencia, SnapshotCandidato.sq_candidato,
+            SnapshotCandidato.votos, Candidato.nome_urna,
+        )
+        .join(SnapshotCandidato, SnapshotCandidato.snapshot_id == Snapshot.id)
+        .join(Candidato, Candidato.sq_candidato == SnapshotCandidato.sq_candidato)
+        .join(subq, and_(subq.c.abr == Snapshot.abrangencia,
+                         subq.c.ts == Snapshot.coletado_em))
+        .where(Snapshot.cod_cargo == cargo, SnapshotCandidato.posicao == 1)
+    )
+    r = await sess.execute(q)
+    # Atribui uma cor a cada candidato distinto (cor_idx estável)
+    ufs: dict[str, dict[str, Any]] = {}
+    sq_para_idx: dict[str, int] = {}
+    for row in r.all():
+        if row.sq_candidato not in sq_para_idx:
+            sq_para_idx[row.sq_candidato] = len(sq_para_idx)
+        ufs[row.abrangencia] = {
+            "sq_candidato": row.sq_candidato,
+            "nome_lider": row.nome_urna,
+            "votos": row.votos,
+            "cor_idx": sq_para_idx[row.sq_candidato],
+        }
+    return {"ufs": ufs}
+
+
 @router.get("/eventos")
 async def eventos(
     cargo: int = Query(...),

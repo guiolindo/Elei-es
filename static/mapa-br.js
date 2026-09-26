@@ -1,42 +1,89 @@
-// Mapa do Brasil por UF — SVG simplificado (retângulos rotulados).
-// Layout aproximado geograficamente, cada estado é um bloco clicável.
-export const MAPA_UFS = [
-  // sigla, x, y, w, h
-  ["RR",  110, 30,  60, 60],
-  ["AP",  200, 30,  60, 60],
-  ["AM",  40,  95, 130, 90],
-  ["PA",  180, 95, 110, 90],
-  ["MA",  300, 95,  70, 65],
-  ["CE",  375, 95,  55, 55],
-  ["RN",  435, 95,  50, 40],
-  ["PB",  435, 140, 50, 30],
-  ["PE",  375, 155, 110, 30],
-  ["AL",  445, 190, 40, 30],
-  ["SE",  400, 190, 40, 30],
-  ["PI",  300, 165,  70, 70],
-  ["BA",  310, 240, 120, 100],
-  ["AC",   0, 165,  70, 60],
-  ["RO",   75, 190,  90, 60],
-  ["TO",  225, 195,  75, 90],
-  ["MT",  105, 255, 120, 90],
-  ["MS",  170, 350, 100, 65],
-  ["GO",  240, 290,  70, 70],
-  ["DF",  280, 305,  22, 20],
-  ["MG",  310, 345, 100, 80],
-  ["ES",  415, 375,  40, 55],
-  ["RJ",  380, 435,  70, 30],
-  ["SP",  290, 425,  90, 55],
-  ["PR",  245, 485,  90, 45],
-  ["SC",  260, 535,  85, 35],
-  ["RS",  205, 575, 130, 70],
-];
+// Mapa real do Brasil por UF usando ECharts + GeoJSON dos 27 estados.
+// Registra o mapa uma vez, depois qualquer render é só passar novos dados.
 
-export function renderMapaBrasil(container, corPorUF) {
-  const w = 550, h = 680;
-  let paths = "";
-  for (const [sigla, x, y, ww, hh] of MAPA_UFS) {
-    const cor = corPorUF[sigla] || "#1e2531";
-    paths += `<g data-uf="${sigla}"><rect x="${x}" y="${y}" width="${ww}" height="${hh}" rx="6" ry="6" fill="${cor}" stroke="#0f1218" stroke-width="1.5"><title>${sigla}</title></rect><text x="${x+ww/2}" y="${y+hh/2+4}" text-anchor="middle" fill="#fff" font-size="12" font-weight="700" style="pointer-events:none;font-family:'JetBrains Mono',monospace">${sigla}</text></g>`;
-  }
-  container.innerHTML = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`;
+let _mapaChart = null;
+let _registrado = false;
+
+async function registrarMapa() {
+  if (_registrado) return;
+  const r = await fetch("/static/br-ufs.geojson");
+  const geo = await r.json();
+  echarts.registerMap("brasil", geo);
+  _registrado = true;
+}
+
+/**
+ * @param {HTMLElement} container elemento onde o mapa será desenhado
+ * @param {Object} dadosPorUF   { "SP": { valor: number, cor?: string, nome_lider?: string, votos?: number }, ... }
+ * @param {Object} opts         { titulo?: string, corPadrao?: string }
+ */
+export async function renderMapaBrasil(container, dadosPorUF = {}, opts = {}) {
+  await registrarMapa();
+
+  if (_mapaChart) _mapaChart.dispose();
+  _mapaChart = echarts.init(container, null, { renderer: "canvas" });
+  window.addEventListener("resize", () => _mapaChart && _mapaChart.resize());
+
+  const seriesData = Object.entries(dadosPorUF).map(([sigla, d]) => ({
+    name: sigla,
+    value: d.valor ?? 0,
+    itemStyle: d.cor ? { color: d.cor } : undefined,
+    _extra: d,
+  }));
+
+  _mapaChart.setOption({
+    backgroundColor: "transparent",
+    tooltip: {
+      trigger: "item",
+      backgroundColor: "#161b24",
+      borderColor: "#303a4d",
+      textStyle: { color: "#ecf0f7" },
+      formatter: (p) => {
+        const d = p.data?._extra || {};
+        if (!d.nome_lider) return `<b>${p.name}</b><br>Sem dados`;
+        return `<b>${p.name}</b><br>Líder: <b>${d.nome_lider}</b><br>Votos: ${(d.votos || 0).toLocaleString("pt-BR")}`;
+      },
+    },
+    visualMap: seriesData.length && seriesData[0].itemStyle
+      ? undefined  // já usamos cores fixas por candidato
+      : {
+          show: false,
+          min: 0, max: 100,
+          inRange: { color: ["#1e2531", "#f0b429"] },
+        },
+    series: [{
+      type: "map",
+      map: "brasil",
+      nameProperty: "sigla",
+      roam: false,
+      zoom: 1.2,
+      label: {
+        show: true, color: "#ecf0f7", fontSize: 10, fontWeight: 700,
+        formatter: (p) => p.name,
+      },
+      itemStyle: {
+        areaColor: opts.corPadrao || "#1e2531",
+        borderColor: "#0f1218",
+        borderWidth: 1,
+      },
+      emphasis: {
+        itemStyle: { areaColor: "#f0b429", borderColor: "#f0b429" },
+        label: { color: "#000" },
+      },
+      select: {
+        itemStyle: { areaColor: "#f97316" },
+        label: { color: "#000" },
+      },
+      data: seriesData,
+    }],
+  });
+
+  return _mapaChart;
+}
+
+/** Handler de clique em UF. cb(sigla) é chamado a cada clique. */
+export function onCliqueUF(cb) {
+  if (!_mapaChart) return;
+  _mapaChart.off("click");
+  _mapaChart.on("click", (p) => { if (p.name) cb(p.name); });
 }
