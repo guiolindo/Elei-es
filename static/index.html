@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Content-Security-Policy"
+ content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:;">
+<title>Apuração 2026</title>
+<link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+<header class="topbar">
+  <h1>Apuração <span>2026</span></h1>
+  <div class="filtros">
+    <label>Cargo
+      <select id="sel-cargo">
+        <option value="1">Presidente</option>
+        <option value="3">Governador</option>
+        <option value="5">Senador</option>
+      </select>
+    </label>
+    <label>UF
+      <select id="sel-uf"><option value="BR">Brasil</option></select>
+    </label>
+    <button id="btn-notif" title="Ativar notificações">🔔</button>
+  </div>
+</header>
+
+<section class="painel-superior" id="painel-totais">
+  <div><span class="rot">Apurado</span><span class="val" id="pct-apurado">—</span></div>
+  <div><span class="rot">Seções</span><span class="val" id="secoes">—</span></div>
+  <div><span class="rot">Comparecimento</span><span class="val" id="comparecimento">—</span></div>
+  <div><span class="rot">Brancos/Nulos</span><span class="val" id="brancos-nulos">—</span></div>
+  <div><span class="rot">Último snapshot</span><span class="val" id="ultimo">—</span></div>
+</section>
+
+<main>
+  <section class="lista" id="lista-candidatos"></section>
+  <section class="comparacao oculto" id="comparacao">
+    <div class="cards-lado">
+      <div class="card" id="card-a"></div>
+      <div class="card centro">
+        <div class="rot">Diferença</div>
+        <div class="val-big" id="dif-abs">—</div>
+        <div class="rot">pontos %</div>
+        <div class="val" id="dif-pct">—</div>
+      </div>
+      <div class="card" id="card-b"></div>
+    </div>
+    <div class="graficos">
+      <div class="graf" id="graf-votos"></div>
+      <div class="graf" id="graf-pct"></div>
+      <div class="graf" id="graf-dif"></div>
+      <div class="graf" id="graf-banda"></div>
+    </div>
+    <button class="fechar" id="btn-fechar">Fechar comparação</button>
+  </section>
+  <aside class="timeline" id="timeline">
+    <h3>Eventos</h3>
+    <ul id="lista-eventos"></ul>
+  </aside>
+</main>
+
+<div id="toasts"></div>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

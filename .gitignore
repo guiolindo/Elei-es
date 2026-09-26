@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+static/candidatos/*.jpg
+!static/candidatos/.gitkeep
+.DS_Store

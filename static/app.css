@@ -1,0 +1,97 @@
+:root {
+  --bg: #0e1116;
+  --card: #171b23;
+  --card-2: #1e2430;
+  --fg: #e6edf3;
+  --muted: #9aa4b2;
+  --a: #E69F00;   /* Okabe-Ito */
+  --b: #56B4E9;
+  --ok: #009E73;
+  --warn: #D55E00;
+  --danger: #CC79A7;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+}
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 22px; background: var(--card); border-bottom: 1px solid #262c38;
+}
+.topbar h1 { margin: 0; font-size: 20px; letter-spacing: .5px; }
+.topbar h1 span { color: var(--a); }
+.filtros { display: flex; gap: 10px; align-items: center; }
+.filtros select, .filtros button {
+  background: var(--card-2); color: var(--fg); border: 1px solid #2b3242;
+  padding: 6px 10px; border-radius: 6px; font-size: 14px;
+}
+.painel-superior {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px;
+  background: #262c38;
+}
+.painel-superior > div {
+  background: var(--card); padding: 12px 16px; display: flex; flex-direction: column;
+}
+.painel-superior .rot { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+.painel-superior .val { font-size: 20px; font-weight: 600; margin-top: 2px; }
+main {
+  display: grid; grid-template-columns: 1fr 300px; gap: 16px;
+  padding: 16px 22px;
+}
+.lista {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;
+}
+.candidato {
+  background: var(--card); border: 1px solid #262c38; border-radius: 10px;
+  padding: 12px; display: flex; gap: 12px; cursor: pointer; transition: border-color .15s;
+}
+.candidato:hover { border-color: var(--a); }
+.candidato.sel-a { border-color: var(--a); box-shadow: 0 0 0 2px var(--a) inset; }
+.candidato.sel-b { border-color: var(--b); box-shadow: 0 0 0 2px var(--b) inset; }
+.candidato img { width: 64px; height: 84px; object-fit: cover; border-radius: 6px; background: #2a3140; }
+.candidato .info { flex: 1; }
+.candidato .nome { font-weight: 600; }
+.candidato .meta { color: var(--muted); font-size: 12px; }
+.candidato .votos { font-size: 18px; font-weight: 700; margin-top: 4px; }
+.candidato .barra { height: 6px; background: #2a3140; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.candidato .barra > div { height: 100%; background: var(--a); }
+.timeline {
+  background: var(--card); border-radius: 10px; padding: 12px 14px; min-height: 200px;
+}
+.timeline h3 { margin: 0 0 8px 0; font-size: 14px; text-transform: uppercase; color: var(--muted); }
+.timeline ul { list-style: none; padding: 0; margin: 0; }
+.timeline li { padding: 8px 0; border-bottom: 1px dashed #2a3140; font-size: 13px; }
+.timeline li:last-child { border-bottom: none; }
+.timeline li time { color: var(--muted); font-size: 11px; display: block; }
+
+.comparacao { grid-column: 1 / -1; background: var(--card); border-radius: 12px; padding: 18px; }
+.comparacao.oculto { display: none; }
+.cards-lado {
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: 20px; align-items: center;
+}
+.card { background: var(--card-2); border-radius: 10px; padding: 14px; text-align: center; }
+.card.centro { padding: 24px; }
+.card img { width: 100px; height: 130px; object-fit: cover; border-radius: 8px; }
+.card .nome { font-size: 18px; font-weight: 600; margin-top: 6px; }
+.card .meta { color: var(--muted); font-size: 13px; }
+.card .votos { font-size: 26px; font-weight: 700; margin-top: 6px; }
+.card .pct { color: var(--muted); font-size: 14px; }
+.card#card-a { border-top: 3px solid var(--a); }
+.card#card-b { border-top: 3px solid var(--b); }
+.val-big { font-size: 34px; font-weight: 800; margin: 4px 0; }
+.graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+.graf { background: var(--card-2); border-radius: 10px; height: 300px; padding: 8px; }
+.fechar { margin-top: 12px; background: transparent; color: var(--muted); border: 1px solid #2b3242; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+
+#toasts { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 999; }
+.toast { background: var(--card-2); border-left: 4px solid var(--ok); padding: 12px 16px; border-radius: 6px; max-width: 340px; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+.toast.warn { border-left-color: var(--warn); }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; }
+  .painel-superior { grid-template-columns: repeat(2, 1fr); }
+  .cards-lado { grid-template-columns: 1fr; }
+  .graficos { grid-template-columns: 1fr; }
+}
