@@ -13,6 +13,7 @@ const state = {
   ultimoSnapshot: null,
   graficos: {},
   ws: null,
+  filtro: { texto: "", partido: "", ordenar: "votos" },
 };
 
 // ============ helpers ============
@@ -66,19 +67,64 @@ async function carregarCandidatos() {
   cands.forEach(c => (state.ficha[c.sq_candidato] = c));
   // filtra selecionados que não pertencem mais ao filtro atual
   state.selecionados = state.selecionados.filter(sq => state.ficha[sq]);
+  atualizarFiltroPartidos();
   renderLista();
   atualizarChipCount();
+}
+
+function candidatosFiltrados() {
+  const t = state.filtro.texto.trim().toLowerCase();
+  const p = state.filtro.partido;
+  const votosPorSq = new Map(
+    (state.ultimoSnapshot?.candidatos || []).map(c => [c.sq_candidato, c.votos])
+  );
+  let arr = state.candidatos.filter(c => {
+    if (p && String(c.partido) !== p) return false;
+    if (!t) return true;
+    return (
+      (c.nome_urna || "").toLowerCase().includes(t) ||
+      String(c.numero).includes(t) ||
+      String(c.partido).includes(t)
+    );
+  });
+  const ord = state.filtro.ordenar;
+  arr.sort((a, b) => {
+    if (ord === "nome") return (a.nome_urna || "").localeCompare(b.nome_urna || "");
+    if (ord === "numero") return a.numero - b.numero;
+    // votos (padrão)
+    return (votosPorSq.get(b.sq_candidato) || 0) - (votosPorSq.get(a.sq_candidato) || 0);
+  });
+  return arr;
+}
+
+function atualizarFiltroPartidos() {
+  const sel = $("filtro-partido");
+  const partidos = [...new Set(state.candidatos.map(c => String(c.partido)))].sort((a, b) => +a - +b);
+  const atual = sel.value;
+  sel.innerHTML = `<option value="">Todos os partidos</option>` +
+    partidos.map(p => `<option value="${p}">Partido ${p}</option>`).join("");
+  if (partidos.includes(atual)) sel.value = atual;
 }
 
 function renderLista() {
   const el = $("lista-candidatos");
   el.innerHTML = "";
+  const filtrados = candidatosFiltrados();
+  $("chip-total").textContent =
+    filtrados.length === state.candidatos.length
+      ? `${state.candidatos.length} candidatos`
+      : `${filtrados.length} de ${state.candidatos.length}`;
   if (state.candidatos.length === 0) {
     el.innerHTML = `<p style="grid-column:1/-1;color:var(--muted);text-align:center;padding:40px">
       Nenhum candidato encontrado para este cargo/UF.</p>`;
     return;
   }
-  for (const c of state.candidatos) {
+  if (filtrados.length === 0) {
+    el.innerHTML = `<p style="grid-column:1/-1;color:var(--muted);text-align:center;padding:40px">
+      Nenhum candidato bate com o filtro atual.</p>`;
+    return;
+  }
+  for (const c of filtrados) {
     const sel = state.selecionados.indexOf(c.sq_candidato);
     const div = document.createElement("div");
     div.className = "candidato" + (sel >= 0 ? " selecionado" : "");
@@ -554,6 +600,24 @@ async function boot() {
   $("btn-comparar").addEventListener("click", abrirComparacao);
   $("btn-notif").addEventListener("click", pedirNotificacoes);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharModal(); });
+
+  // filtros da lista
+  let buscaTimer;
+  $("busca-nome").addEventListener("input", (e) => {
+    clearTimeout(buscaTimer);
+    buscaTimer = setTimeout(() => {
+      state.filtro.texto = e.target.value;
+      renderLista();
+    }, 150);
+  });
+  $("filtro-partido").addEventListener("change", (e) => {
+    state.filtro.partido = e.target.value;
+    renderLista();
+  });
+  $("ordenar").addEventListener("change", (e) => {
+    state.filtro.ordenar = e.target.value;
+    renderLista();
+  });
 
   try {
     const ufs = await get("/api/ufs");

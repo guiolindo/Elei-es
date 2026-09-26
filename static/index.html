@@ -89,6 +89,19 @@
     </div>
   </div>
 
+  <div class="filtro-lista">
+    <input type="search" id="busca-nome" placeholder="🔍 Buscar por nome, número ou partido…">
+    <select id="filtro-partido">
+      <option value="">Todos os partidos</option>
+    </select>
+    <select id="ordenar">
+      <option value="votos">Ordenar por votos</option>
+      <option value="numero">Ordenar por número</option>
+      <option value="nome">Ordenar por nome</option>
+    </select>
+    <span class="chip-count" id="chip-total">—</span>
+  </div>
+
   <section class="grid-candidatos" id="lista-candidatos"></section>
 
   <section class="comparacao oculto" id="comparacao">

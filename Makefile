@@ -21,5 +21,8 @@ seed:
 poll-once:
 	docker compose run --rm app python -m poller.once --cargo 1 --abrangencia BR
 
+sync-candidatos:
+	docker compose run --rm app python -m poller.candidatos_tse
+
 test:
 	python -m pytest tests/ -v

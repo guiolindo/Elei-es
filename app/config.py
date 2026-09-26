@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     eleicao_cod_1t: int = 619
     eleicao_cod_2t: int = 620
     poll_interval_seconds: int = 20
+    # Base do endpoint de listagem de candidatos (divulga do TSE).
+    # Formato: {base}/{ano}/{uf}/{cod_eleicao}/{cargo}/candidatos
+    tse_divulga_base: str = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidatura/listar"
     vapid_public_key: str = ""
     vapid_private_key: str = ""
     vapid_claim_email: str = "admin@example.com"

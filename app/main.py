@@ -17,6 +17,7 @@ from app.api import router, ws_router
 from app.config import get_settings
 from app.ws import broadcaster
 from poller.service import loop as poller_loop
+from poller.candidatos_tse import sincronizar_candidatos
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -26,20 +27,38 @@ log = logging.getLogger("app")
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 
+async def _sync_candidatos_loop():
+    """Sincroniza candidatos oficiais do TSE a cada 6h.
+
+    Nas semanas antes da eleição o TSE atualiza a lista com frequência
+    (impugnações, substituições). Após a apuração começar, as mudanças
+    são raras — mas continuar rodando é barato e mantém fotos em dia.
+    """
+    while True:
+        try:
+            n = await sincronizar_candidatos(baixar_fotos=True)
+            log.info("sync_candidatos: %d atualizações", n)
+        except Exception:
+            log.exception("sync_candidatos falhou")
+        await asyncio.sleep(6 * 3600)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    task: asyncio.Task | None = None
+    tasks: list[asyncio.Task] = []
     if not getattr(app.state, "poller_disabled", False):
-        task = asyncio.create_task(poller_loop(broadcaster=broadcaster))
-        log.info("poller iniciado (intervalo=%ss)", settings.poll_interval_seconds)
+        tasks.append(asyncio.create_task(poller_loop(broadcaster=broadcaster)))
+        tasks.append(asyncio.create_task(_sync_candidatos_loop()))
+        log.info("poller + sync candidatos iniciados (intervalo=%ss)", settings.poll_interval_seconds)
     try:
         yield
     finally:
-        if task:
-            task.cancel()
+        for t in tasks:
+            t.cancel()
+        for t in tasks:
             try:
-                await task
+                await t
             except (asyncio.CancelledError, Exception):
                 pass
 

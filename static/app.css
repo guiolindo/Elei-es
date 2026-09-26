@@ -147,6 +147,21 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   padding: 8px 14px; border-radius: 999px; font-size: 13px; color: var(--fg-2);
 }
 
+/* ============ Filtro da lista ============ */
+.filtro-lista {
+  display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+}
+.filtro-lista input, .filtro-lista select {
+  background: var(--bg-2); color: var(--fg);
+  border: 1px solid var(--line-2); border-radius: 10px;
+  padding: 10px 14px; font-size: 14px; font-family: inherit;
+}
+.filtro-lista input { flex: 1; min-width: 240px; }
+.filtro-lista input:focus, .filtro-lista select:focus {
+  outline: none; border-color: var(--a);
+  box-shadow: 0 0 0 3px rgba(240,180,41,.15);
+}
+
 /* ============ Cards de candidatos ============ */
 .grid-candidatos {
   display: grid;
