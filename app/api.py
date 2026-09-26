@@ -36,7 +36,8 @@ async def listar_candidatos(
     sess: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
     stmt = select(Candidato).where(Candidato.cod_cargo == cargo)
-    if uf:
+    # Presidente é nacional: candidatos têm uf=NULL. Ignora o filtro de UF.
+    if uf and cargo != 1:
         stmt = stmt.where(Candidato.uf == uf)
     r = await sess.execute(stmt.order_by(Candidato.numero))
     return [

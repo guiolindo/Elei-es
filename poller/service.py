@@ -39,10 +39,18 @@ class AlvoColeta:
         return "eleicao_cod_1t" if self.turno == 1 else "eleicao_cod_2t"
 
 
-ALVOS_PADRAO: list[AlvoColeta] = [
-    AlvoColeta(1, 1, "BR"),  # Presidente
-    AlvoColeta(1, 3, "SP"),  # Governador SP (exemplo)
+_UFS = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT",
+    "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO",
+    "RR", "SC", "SP", "SE", "TO",
 ]
+
+ALVOS_PADRAO: list[AlvoColeta] = (
+    [AlvoColeta(1, 1, "BR")]                       # Presidente nacional
+    + [AlvoColeta(1, 1, uf) for uf in _UFS]        # Presidente por UF (mapa)
+    + [AlvoColeta(1, 3, uf) for uf in _UFS]        # Governador de cada UF
+    + [AlvoColeta(1, 5, uf) for uf in _UFS]        # Senador de cada UF
+)
 
 
 async def _snapshot_ja_existe(sess: AsyncSession, sha: str) -> bool:
@@ -183,13 +191,21 @@ async def processar_alvo(
 
 
 async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
+    """Loop principal. Processa alvos em paralelo (limitado por semáforo)
+    para não explodir o TSE — o Brasil todo cabe em uma iteração curta.
+    """
     settings = get_settings()
     alvos = alvos or ALVOS_PADRAO
+    sem = asyncio.Semaphore(6)  # até 6 requisições concorrentes
+
+    async def _um(client, alvo):
+        async with sem:
+            try:
+                await processar_alvo(client, alvo, broadcaster)
+            except Exception:
+                log.exception("erro processando %s", alvo)
+
     async with httpx.AsyncClient() as client:
         while True:
-            for alvo in alvos:
-                try:
-                    await processar_alvo(client, alvo, broadcaster)
-                except Exception:
-                    log.exception("erro processando %s", alvo)
+            await asyncio.gather(*[_um(client, a) for a in alvos])
             await asyncio.sleep(settings.poll_interval_seconds)

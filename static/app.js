@@ -42,14 +42,13 @@ function cargoRequerUF(cargo) {
 
 function ajustarUFParaCargo() {
   const selUF = $("sel-uf");
+  selUF.disabled = false;
   if (state.cargo === 1) {
-    // Presidente → Brasil obrigatório
-    state.abrangencia = "BR";
-    selUF.value = "BR";
-    selUF.disabled = true;
+    // Presidente: nacional por padrão, mas pode filtrar por UF pra ver
+    // como o candidato nacional está indo naquele estado.
+    if (!state.abrangencia) { state.abrangencia = "BR"; selUF.value = "BR"; }
   } else {
-    // Outros cargos → UF obrigatória. Se estava em BR, escolhe SP.
-    selUF.disabled = false;
+    // Governador/Senador/Deputado precisam de UF. Se estava BR, cai em SP.
     if (state.abrangencia === "BR") {
       state.abrangencia = "SP";
       selUF.value = "SP";
@@ -61,6 +60,7 @@ function ajustarUFParaCargo() {
 async function carregarCandidatos() {
   const uf = state.abrangencia === "BR" ? "" : `&uf=${state.abrangencia}`;
   const cands = await get(`/api/candidatos?cargo=${state.cargo}${uf}`);
+  atualizarSubtitulo();
   state.candidatos = cands;
   state.ficha = {};
   cands.forEach(c => (state.ficha[c.sq_candidato] = c));
@@ -123,6 +123,17 @@ function toggleSelecionar(sq) {
   }
   renderLista();
   atualizarChipCount();
+}
+
+function atualizarSubtitulo() {
+  const cargoNome = { 1: "Presidente", 3: "Governador", 5: "Senador", 6: "Deputado Federal", 7: "Deputado Estadual" }[state.cargo] || "";
+  const abr = state.abrangencia === "BR" ? "Brasil" : state.abrangencia;
+  $("titulo-lista").textContent = `${cargoNome} · ${abr}`;
+  if (state.cargo === 1 && state.abrangencia !== "BR") {
+    $("sub-lista").innerHTML = `Votos dos candidatos presidenciais <strong>no estado ${abr}</strong>. Selecione até <strong>4</strong> para comparar.`;
+  } else {
+    $("sub-lista").innerHTML = `Selecione até <strong>4 candidatos</strong> para comparar lado a lado.`;
+  }
 }
 
 function atualizarChipCount() {
@@ -395,10 +406,9 @@ async function atualizarMapa() {
 
   await renderMapaBrasil($("mapa-brasil"), dadosPorUF);
   onCliqueUF((sigla) => {
-    if (state.cargo === 1) {
-      toast("Presidente é nacional. Troque para outro cargo para filtrar por UF.", "warn");
-      return;
-    }
+    // Em qualquer cargo, clique em UF filtra a apuração pra aquele estado.
+    // Presidente: vê como o líder nacional está indo naquela UF.
+    // Estaduais: vê a apuração daquele estado.
     state.abrangencia = sigla;
     $("sel-uf").value = sigla;
     onFiltroChange();

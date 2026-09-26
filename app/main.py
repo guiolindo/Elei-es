@@ -19,6 +19,8 @@ from app.ws import broadcaster
 from poller.service import loop as poller_loop
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 log = logging.getLogger("app")
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])

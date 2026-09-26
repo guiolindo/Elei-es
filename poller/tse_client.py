@@ -35,7 +35,7 @@ async def buscar_json(
         try:
             r = await client.get(url, timeout=15.0)
             if r.status_code == 404:
-                log.warning("json não encontrado (404): %s", url)
+                log.debug("json ainda não publicado (404): %s", url)
                 return None
             r.raise_for_status()
             content = r.content
