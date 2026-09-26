@@ -44,34 +44,37 @@ PARTIDOS = [
     (50, "PSOL", "Partido Socialismo e Liberdade"),
 ]
 
-CANDIDATOS = [
-    # Presidente
-    ("PR2026_01", "Fulano da Silva", "FULANO", 13, 1, None, 13),
-    ("PR2026_02", "Ciclano de Souza", "CICLANO", 22, 1, None, 22),
-    ("PR2026_03", "Beltrano Rocha", "BELTRANO", 12, 1, None, 12),
-    ("PR2026_04", "Sicrano Almeida", "SICRANO", 45, 1, None, 45),
-    # Governador SP
-    ("GO2026_SP_01", "Ana Paulista", "ANA", 13, 3, "SP", 13),
-    ("GO2026_SP_02", "Bruno Bandeira", "BRUNO", 22, 3, "SP", 22),
-    ("GO2026_SP_03", "Carla Ipiranga", "CARLA", 10, 3, "SP", 10),
-    # Governador RJ
-    ("GO2026_RJ_01", "Diego Copacabana", "DIEGO", 13, 3, "RJ", 13),
-    ("GO2026_RJ_02", "Eva Flamengo", "EVA", 22, 3, "RJ", 22),
-    # Governador MG
-    ("GO2026_MG_01", "Fábio Belo Horizonte", "FÁBIO", 45, 3, "MG", 45),
-    ("GO2026_MG_02", "Gisele Ouro Preto", "GISELE", 22, 3, "MG", 22),
-    # Senador SP
-    ("SE2026_SP_01", "Helena Pinheiros", "HELENA", 130, 5, "SP", 13),
-    ("SE2026_SP_02", "Igor Consolação", "IGOR", 220, 5, "SP", 22),
-    # Deputado Federal SP (alguns)
-    ("DF2026_SP_01", "João Anhangabaú", "JOÃO", 1300, 6, "SP", 13),
-    ("DF2026_SP_02", "Kátia Sé", "KÁTIA", 2200, 6, "SP", 22),
-    ("DF2026_SP_03", "Lucas Vale do Anhangabaú", "LUCAS", 4500, 6, "SP", 45),
-    ("DF2026_SP_04", "Maria Bexiga", "MARIA", 5000, 6, "SP", 50),
-    # Deputado Estadual SP
-    ("DE2026_SP_01", "Nuno Liberdade", "NUNO", 13001, 7, "SP", 13),
-    ("DE2026_SP_02", "Olga Bela Vista", "OLGA", 22002, 7, "SP", 22),
-]
+def _construir_candidatos():
+    """Gera dataset de exemplo para desenvolvimento: candidatos presidenciais
+    nacionais + 3 candidatos a governador, 2 a senador, 2 a deputado federal
+    e 2 a deputado estadual em cada uma das 27 UFs.
+    """
+    cands = [
+        # Presidente (nacional)
+        ("PR2026_01", "Fulano da Silva",   "FULANO",   13, 1, None, 13),
+        ("PR2026_02", "Ciclano de Souza",  "CICLANO",  22, 1, None, 22),
+        ("PR2026_03", "Beltrano Rocha",    "BELTRANO", 12, 1, None, 12),
+        ("PR2026_04", "Sicrano Almeida",   "SICRANO",  45, 1, None, 45),
+    ]
+    # Nomes-base para variar por UF sem duplicar
+    base_gov = [("Ana", 13, 13), ("Bruno", 22, 22), ("Carla", 45, 45)]
+    base_sen = [("Helena", 130, 13), ("Igor", 220, 22)]
+    base_dfe = [("João", 1300, 13), ("Kátia", 2200, 22)]
+    base_dea = [("Nuno", 13001, 13), ("Olga", 22002, 22)]
+
+    for uf in [s for s, _n, _i in UFS]:
+        for i, (nome, num, part) in enumerate(base_gov, start=1):
+            cands.append((f"GO2026_{uf}_{i:02d}", f"{nome} de {uf}", nome.upper(), num, 3, uf, part))
+        for i, (nome, num, part) in enumerate(base_sen, start=1):
+            cands.append((f"SE2026_{uf}_{i:02d}", f"{nome} de {uf}", nome.upper(), num, 5, uf, part))
+        for i, (nome, num, part) in enumerate(base_dfe, start=1):
+            cands.append((f"DF2026_{uf}_{i:02d}", f"{nome} de {uf}", nome.upper(), num, 6, uf, part))
+        for i, (nome, num, part) in enumerate(base_dea, start=1):
+            cands.append((f"DE2026_{uf}_{i:02d}", f"{nome} de {uf}", nome.upper(), num, 7, uf, part))
+    return cands
+
+
+CANDIDATOS = _construir_candidatos()
 
 
 async def main() -> None:
