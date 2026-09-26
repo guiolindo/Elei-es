@@ -45,14 +45,32 @@ PARTIDOS = [
 ]
 
 CANDIDATOS = [
-    # sq, nome, urna, numero, cargo, uf, partido
+    # Presidente
     ("PR2026_01", "Fulano da Silva", "FULANO", 13, 1, None, 13),
     ("PR2026_02", "Ciclano de Souza", "CICLANO", 22, 1, None, 22),
     ("PR2026_03", "Beltrano Rocha", "BELTRANO", 12, 1, None, 12),
     ("PR2026_04", "Sicrano Almeida", "SICRANO", 45, 1, None, 45),
+    # Governador SP
     ("GO2026_SP_01", "Ana Paulista", "ANA", 13, 3, "SP", 13),
     ("GO2026_SP_02", "Bruno Bandeira", "BRUNO", 22, 3, "SP", 22),
     ("GO2026_SP_03", "Carla Ipiranga", "CARLA", 10, 3, "SP", 10),
+    # Governador RJ
+    ("GO2026_RJ_01", "Diego Copacabana", "DIEGO", 13, 3, "RJ", 13),
+    ("GO2026_RJ_02", "Eva Flamengo", "EVA", 22, 3, "RJ", 22),
+    # Governador MG
+    ("GO2026_MG_01", "Fábio Belo Horizonte", "FÁBIO", 45, 3, "MG", 45),
+    ("GO2026_MG_02", "Gisele Ouro Preto", "GISELE", 22, 3, "MG", 22),
+    # Senador SP
+    ("SE2026_SP_01", "Helena Pinheiros", "HELENA", 130, 5, "SP", 13),
+    ("SE2026_SP_02", "Igor Consolação", "IGOR", 220, 5, "SP", 22),
+    # Deputado Federal SP (alguns)
+    ("DF2026_SP_01", "João Anhangabaú", "JOÃO", 1300, 6, "SP", 13),
+    ("DF2026_SP_02", "Kátia Sé", "KÁTIA", 2200, 6, "SP", 22),
+    ("DF2026_SP_03", "Lucas Vale do Anhangabaú", "LUCAS", 4500, 6, "SP", 45),
+    ("DF2026_SP_04", "Maria Bexiga", "MARIA", 5000, 6, "SP", 50),
+    # Deputado Estadual SP
+    ("DE2026_SP_01", "Nuno Liberdade", "NUNO", 13001, 7, "SP", 13),
+    ("DE2026_SP_02", "Olga Bela Vista", "OLGA", 22002, 7, "SP", 22),
 ]
 
 

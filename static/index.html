@@ -4,64 +4,171 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Content-Security-Policy"
- content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:;">
-<title>Apuração 2026</title>
+ content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ws: wss:;">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<title>Apuração 2026 · Brasil</title>
 <link rel="stylesheet" href="/static/app.css" />
 </head>
 <body>
-<header class="topbar">
-  <h1>Apuração <span>2026</span></h1>
-  <div class="filtros">
-    <label>Cargo
-      <select id="sel-cargo">
-        <option value="1">Presidente</option>
-        <option value="3">Governador</option>
-        <option value="5">Senador</option>
-      </select>
-    </label>
-    <label>UF
-      <select id="sel-uf"><option value="BR">Brasil</option></select>
-    </label>
-    <button id="btn-notif" title="Ativar notificações">🔔</button>
-  </div>
+
+<header class="hero">
+  <div class="hero-bg"></div>
+  <nav class="nav">
+    <div class="brand">
+      <div class="logo">🗳️</div>
+      <div>
+        <div class="brand-title">Apuração <span>2026</span></div>
+        <div class="brand-sub">Eleições Gerais · Brasil</div>
+      </div>
+    </div>
+    <div class="filtros">
+      <div class="filtro-grupo">
+        <label>Cargo</label>
+        <select id="sel-cargo">
+          <option value="1">Presidente</option>
+          <option value="3">Governador</option>
+          <option value="5">Senador</option>
+          <option value="6">Deputado Federal</option>
+          <option value="7">Deputado Estadual</option>
+        </select>
+      </div>
+      <div class="filtro-grupo">
+        <label>Abrangência</label>
+        <select id="sel-uf">
+          <option value="BR">Brasil</option>
+        </select>
+      </div>
+      <button class="btn-ghost" id="btn-notif" title="Ativar notificações">
+        <span class="ico">🔔</span>
+      </button>
+    </div>
+  </nav>
+
+  <section class="stats">
+    <div class="stat">
+      <div class="stat-label">Apurado</div>
+      <div class="stat-value" id="pct-apurado">—</div>
+      <div class="stat-progress"><div id="prog-apurado"></div></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Seções</div>
+      <div class="stat-value" id="secoes">—</div>
+      <div class="stat-sub" id="secoes-sub">totalizadas / total</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Comparecimento</div>
+      <div class="stat-value" id="comparecimento">—</div>
+      <div class="stat-sub">eleitores</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Brancos · Nulos</div>
+      <div class="stat-value" id="brancos-nulos">—</div>
+      <div class="stat-sub">votos inválidos</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Último snapshot</div>
+      <div class="stat-value" id="ultimo">—</div>
+      <div class="stat-sub" id="conexao">
+        <span class="dot"></span> <span id="conexao-label">conectando…</span>
+      </div>
+    </div>
+  </section>
 </header>
 
-<section class="painel-superior" id="painel-totais">
-  <div><span class="rot">Apurado</span><span class="val" id="pct-apurado">—</span></div>
-  <div><span class="rot">Seções</span><span class="val" id="secoes">—</span></div>
-  <div><span class="rot">Comparecimento</span><span class="val" id="comparecimento">—</span></div>
-  <div><span class="rot">Brancos/Nulos</span><span class="val" id="brancos-nulos">—</span></div>
-  <div><span class="rot">Último snapshot</span><span class="val" id="ultimo">—</span></div>
-</section>
+<main class="page">
+  <div class="page-header">
+    <div>
+      <h2 id="titulo-lista">Candidatos</h2>
+      <p class="sub" id="sub-lista">Selecione até <strong>4 candidatos</strong> para comparar lado a lado.</p>
+    </div>
+    <div class="acoes">
+      <span class="chip-count" id="chip-count">0 selecionado(s)</span>
+      <button class="btn-primary" id="btn-comparar" disabled>Comparar →</button>
+    </div>
+  </div>
 
-<main>
-  <section class="lista" id="lista-candidatos"></section>
+  <section class="grid-candidatos" id="lista-candidatos"></section>
+
   <section class="comparacao oculto" id="comparacao">
-    <div class="cards-lado">
-      <div class="card" id="card-a"></div>
-      <div class="card centro">
-        <div class="rot">Diferença</div>
-        <div class="val-big" id="dif-abs">—</div>
-        <div class="rot">pontos %</div>
-        <div class="val" id="dif-pct">—</div>
+    <div class="comp-header">
+      <h2>Comparação</h2>
+      <button class="btn-ghost" id="btn-fechar">✕ Fechar</button>
+    </div>
+
+    <div class="cards-comp" id="cards-comp"></div>
+
+    <div class="dif-panel" id="dif-panel">
+      <div class="dif-item">
+        <div class="dif-label">Diferença absoluta (líder × 2º)</div>
+        <div class="dif-value" id="dif-abs">—</div>
       </div>
-      <div class="card" id="card-b"></div>
+      <div class="dif-item">
+        <div class="dif-label">Diferença em pontos %</div>
+        <div class="dif-value" id="dif-pct">—</div>
+      </div>
+      <div class="dif-item">
+        <div class="dif-label">Probabilidade matemática</div>
+        <div class="dif-value" id="dif-prob">—</div>
+        <div class="dif-hint" id="dif-prob-hint"></div>
+      </div>
     </div>
-    <div class="graficos">
-      <div class="graf" id="graf-votos"></div>
-      <div class="graf" id="graf-pct"></div>
-      <div class="graf" id="graf-dif"></div>
-      <div class="graf" id="graf-banda"></div>
+
+    <div class="grid-graficos">
+      <div class="graf-card">
+        <div class="graf-title">Votos absolutos ao longo do tempo</div>
+        <div class="graf" id="graf-votos"></div>
+      </div>
+      <div class="graf-card">
+        <div class="graf-title">% dos votos válidos</div>
+        <div class="graf" id="graf-pct"></div>
+      </div>
+      <div class="graf-card">
+        <div class="graf-title">Diferença acumulada (A − B)</div>
+        <div class="graf" id="graf-dif"></div>
+      </div>
+      <div class="graf-card">
+        <div class="graf-title">Faixa de vitória matemática</div>
+        <div class="graf" id="graf-banda"></div>
+      </div>
     </div>
-    <button class="fechar" id="btn-fechar">Fechar comparação</button>
   </section>
-  <aside class="timeline" id="timeline">
-    <h3>Eventos</h3>
-    <ul id="lista-eventos"></ul>
-  </aside>
+
+  <section class="mapa-secao" id="mapa-secao">
+    <div class="page-header">
+      <div>
+        <h2>Mapa por UF</h2>
+        <p class="sub">Liderança de cada estado. Passe o mouse para ver detalhes.</p>
+      </div>
+    </div>
+    <div class="mapa-wrap">
+      <div id="mapa-brasil" class="mapa"></div>
+      <div class="mapa-legenda" id="mapa-legenda"></div>
+    </div>
+  </section>
+
+  <section class="timeline-secao">
+    <div class="page-header">
+      <div>
+        <h2>Linha do tempo</h2>
+        <p class="sub">Eventos matematicamente definidos.</p>
+      </div>
+    </div>
+    <ul class="timeline" id="lista-eventos">
+      <li class="vazio">Nenhum evento ainda. Aguardando apuração começar.</li>
+    </ul>
+  </section>
 </main>
 
+<!-- Modal de detalhes do candidato -->
+<div class="modal oculto" id="modal-cand" aria-modal="true" role="dialog">
+  <div class="modal-back"></div>
+  <div class="modal-card" id="modal-card"></div>
+</div>
+
 <div id="toasts"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script type="module" src="/static/app.js"></script>
 </body>
