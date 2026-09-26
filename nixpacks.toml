@@ -1,0 +1,10 @@
+# Config Nixpacks para o Railway. O Nixpacks detecta Python automaticamente
+# pelo pyproject.toml; deixamos explícito só a versão e o comando de start.
+[phases.setup]
+nixPkgs = ["python312", "gcc", "postgresql.lib"]
+
+[phases.install]
+cmds = ["pip install --upgrade pip", "pip install -e ."]
+
+[start]
+cmd = "alembic upgrade head && python -m scripts.seed && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"

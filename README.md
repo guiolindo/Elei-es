@@ -71,6 +71,20 @@ Clique em dois candidatos do mesmo cargo. Abre uma tela com:
 - Gráficos ECharts (linhas de votos, % dos válidos, diferença acumulada, faixa de vitória).
 - Atualização via WebSocket, sem reload.
 
+## Deploy no Railway
+
+1. **Crie o projeto** no Railway a partir do repositório (`New Project → Deploy from GitHub repo`).
+2. **Adicione o plugin PostgreSQL** (`+ New → Database → Add PostgreSQL`). O Railway injeta automaticamente a variável `DATABASE_URL` no formato `postgres://…` — o app normaliza sozinho para `postgresql+asyncpg://…`.
+3. **Variáveis** (Settings → Variables):
+   - `CORS_ORIGINS` = URL pública do serviço (ex.: `https://apuracao-2026.up.railway.app`)
+   - `POLL_INTERVAL_SECONDS` = `20` (opcional)
+   - `TSE_CDN_BASE`, `ELEICAO_COD_1T`, `ELEICAO_COD_2T` — só se o TSE mudar de CDN
+   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` — só se quiser Web Push
+4. **Deploy**: o Railway usa `nixpacks.toml` + `Procfile`. O comando de start roda `alembic upgrade head` (migrations idempotentes), `python -m scripts.seed` (cargos/UFs/partidos idempotentes) e sobe o uvicorn na `$PORT` que o Railway define.
+5. **Domínio**: `Settings → Networking → Generate Domain` — o healthcheck aponta para `/api/cargos`.
+
+Arquivos usados pelo Railway: `Procfile`, `railway.json`, `nixpacks.toml`.
+
 ## Configuração
 
 Todas via `.env` — ver `.env.example`. Se o TSE mudar de CDN, basta trocar `TSE_CDN_BASE` e reiniciar.
