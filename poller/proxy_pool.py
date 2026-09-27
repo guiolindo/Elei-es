@@ -77,6 +77,9 @@ class ProxyPool:
 
     async def escolher(self) -> Optional[str]:
         """Retorna o proxy ativo, revalidando se o cache expirou. None = sem proxy."""
+        # Pool vazio: acesso direto (o Cloudflare Worker já resolve).
+        if not self.proxies:
+            return None
         async with self._lock:
             agora = time.time()
             if self._atual and (agora - self._validado_em) < TTL_VIVO_SEG:
@@ -121,13 +124,15 @@ def get_pool() -> ProxyPool:
         from app.config import get_settings
         s = get_settings()
         proxies: list[str] = []
-        # Preferência: TSE_PROXY_LIST customizado > TSE_PROXY único > defaults
+        # Preferência: TSE_PROXY_LIST customizado > TSE_PROXY único
         if s.tse_proxy_list:
             proxies.extend([p.strip() for p in s.tse_proxy_list.split(",") if p.strip()])
         if s.tse_proxy and s.tse_proxy not in proxies:
             proxies.insert(0, s.tse_proxy)
-        # Se nada foi configurado, cai nos defaults (proxies BR conhecidos)
-        if not proxies:
+        # Sem TSE_PROXY_LIST configurado, o pool fica vazio — o cliente vai
+        # direto (útil quando as URLs já apontam para o Cloudflare Worker BR).
+        # Para reativar os defaults, seta TSE_PROXY_LIST=defaults no env.
+        if not proxies and s.tse_proxy_list == "defaults":
             proxies = list(DEFAULT_PROXIES)
             log.info("proxy_pool: usando lista default de %d proxies BR", len(proxies))
         _pool = ProxyPool(proxies)

@@ -21,15 +21,18 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://apuracao:apuracao@localhost:5432/apuracao"
     port: int = 8000
-    tse_cdn_base: str = "https://resultados.tse.jus.br/oficial/ele2026"
-    tse_fotos_base: str = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidato/foto"
+    # Aponta para o Cloudflare Worker (que roda em SP e passa pelo Akamai
+    # do TSE como IP BR). Ver cloudflare-worker/ para o código do worker.
+    # No dia da eleição, se preferir, mova para variável de ambiente.
+    tse_cdn_base: str = "https://apuracao-2026.gui342386.workers.dev/oficial/ele2026"
+    tse_fotos_base: str = "https://apuracao-2026.gui342386.workers.dev/fotos"
     eleicao_ano: int = 2026
     eleicao_cod_1t: int = 619
     eleicao_cod_2t: int = 620
     poll_interval_seconds: int = 20
     # Base do endpoint de listagem de candidatos (divulga do TSE).
     # Formato: {base}/{ano}/{uf}/{cod_eleicao}/{cargo}/candidatos
-    tse_divulga_base: str = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidatura/listar"
+    tse_divulga_base: str = "https://apuracao-2026.gui342386.workers.dev/divulga/rest/v1/candidatura/listar"
     # Proxy para acessar TSE (o TSE bloqueia IPs fora do Brasil via Akamai).
     # Formato: http://usuario:senha@host:porta ou http://host:porta.
     # Se vazio, tenta acessar direto (funciona só se o app estiver hospedado no BR).
