@@ -292,6 +292,47 @@ async def push_subscribe(
     return {"ok": True}
 
 
+@router.get("/admin/status")
+async def admin_status(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Diagnóstico rápido: quantos candidatos há por cargo/UF e último snapshot."""
+    from sqlalchemy import func
+    r = await sess.execute(
+        select(Candidato.cod_cargo, Candidato.uf, func.count().label("n"))
+        .group_by(Candidato.cod_cargo, Candidato.uf)
+        .order_by(Candidato.cod_cargo, Candidato.uf)
+    )
+    por_cargo_uf = [{"cargo": row.cod_cargo, "uf": row.uf, "candidatos": row.n} for row in r.all()]
+
+    r = await sess.execute(select(func.count()).select_from(Snapshot))
+    total_snaps = r.scalar_one()
+    r = await sess.execute(
+        select(Snapshot.coletado_em).order_by(Snapshot.coletado_em.desc()).limit(1)
+    )
+    ultimo = r.scalar_one_or_none()
+    return {
+        "candidatos_por_cargo_uf": por_cargo_uf,
+        "total_snapshots": total_snaps,
+        "ultimo_snapshot": ultimo.isoformat() if ultimo else None,
+    }
+
+
+@router.post("/admin/sync-candidatos")
+async def admin_sync_candidatos(
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Dispara sincronização com o TSE agora. Retorna quantos candidatos
+    foram atualizados. Use para forçar quando o TSE publicar a lista
+    ou pra debug sem esperar as 6h do loop automático."""
+    from poller.candidatos_tse import sincronizar_candidatos
+    body = payload or {}
+    n = await sincronizar_candidatos(
+        ufs=body.get("ufs"),
+        cargos=body.get("cargos"),
+        baixar_fotos=body.get("baixar_fotos", True),
+    )
+    return {"atualizados": n}
+
+
 ws_router = APIRouter()
 
 
