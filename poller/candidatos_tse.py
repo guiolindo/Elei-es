@@ -112,13 +112,27 @@ def parse_lista(payload: dict, cod_cargo: int, uf: str | None) -> list[Candidato
     return out
 
 
+# Headers de navegador real. O TSE bloqueia (403) requisições sem
+# User-Agent de browser — é uma proteção anti-scraping padrão.
+_TSE_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+    "Referer": "https://divulgacandcontas.tse.jus.br/divulga/",
+    "Origin": "https://divulgacandcontas.tse.jus.br",
+}
+
+
 async def _fetch_lista(
     client: httpx.AsyncClient, ano: int, uf: str, cod_eleicao: int, cargo: int
 ) -> list[dict]:
     settings = get_settings()
     url = f"{settings.tse_divulga_base}/{ano}/{uf}/{cod_eleicao}/{cargo}/candidatos"
     try:
-        r = await client.get(url, timeout=20.0)
+        r = await client.get(url, timeout=20.0, headers=_TSE_HEADERS)
         if r.status_code == 404:
             return []
         r.raise_for_status()
@@ -189,7 +203,7 @@ async def _baixar_fotos(
         candidatos_urls.append(f"{settings.tse_fotos_base}/{settings.eleicao_ano}/{c.sq_candidato}")
         for url in candidatos_urls:
             try:
-                r = await client.get(url, timeout=15.0)
+                r = await client.get(url, timeout=15.0, headers=_TSE_HEADERS)
                 if r.status_code == 200 and r.content:
                     with open(path, "wb") as f:
                         f.write(r.content)
