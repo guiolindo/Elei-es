@@ -23,30 +23,10 @@ import httpx
 log = logging.getLogger(__name__)
 
 
-# Lista default de proxies BR — testados em 27/09/2026 do Termux (Brasil).
-# Free proxies caem/voltam sem aviso; o pool tolera queda e roteia pro
-# próximo que estiver vivo. Se todos morrerem, atualize TSE_PROXY_LIST
-# com uma lista fresca.
-DEFAULT_PROXIES = [
-    "http://167.234.251.155:8880",
-    "http://18.230.14.91:3128",
-    "http://200.229.76.160:3128",
-    "http://201.20.42.46:3128",
-    "http://138.0.143.119:8080",
-    "http://201.157.235.197:8080",
-    # extras da mesma lista, caso os 6 primeiros caiam
-    "http://186.65.104.52:2024",
-    "http://187.72.72.209:5151",
-    "http://45.70.52.248:8080",
-    "http://186.235.123.3:8080",
-    "http://201.20.42.46:3127",
-    "http://186.65.106.90:2024",
-    "http://170.254.201.46:3180",
-    "http://167.250.23.13:9090",
-    "http://187.94.220.85:8080",
-    "http://201.20.79.182:8088",
-    "http://201.62.125.142:8080",
-]
+# Free HTTP proxies não passam pelo Akamai do TSE (27+ testados, 0 vivos).
+# A solução em produção é o Cloudflare Worker apontado nas TSE_*_BASE.
+# Esta lista fica só como fallback caso alguém queira testar TSE_PROXY_LIST.
+DEFAULT_PROXIES: list[str] = []
 
 
 # URL leve pra testar se o proxy passa pelo TSE (Akamai).
