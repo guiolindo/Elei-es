@@ -136,9 +136,19 @@ async def _fetch_lista(
         r = await client.get(url, timeout=20.0, headers=_TSE_HEADERS)
         if r.status_code == 404:
             return []
+        if r.status_code == 403:
+            log.warning(
+                "candidatos %s cargo=%s uf=%s bloqueado (403 Akamai) — "
+                "proxy caiu ou lista precisa ser atualizada",
+                ano, cargo, uf,
+            )
+            return []
         r.raise_for_status()
         j = r.json()
-        return parse_lista(j, cargo, None if uf == "BR" else uf)
+        cs = parse_lista(j, cargo, None if uf == "BR" else uf)
+        if cs:
+            log.info("candidatos %s cargo=%s uf=%s: %d encontrados", ano, cargo, uf, len(cs))
+        return cs
     except (httpx.HTTPError, ValueError) as e:
         log.warning("candidatos %s cargo=%s uf=%s falhou: %s", ano, cargo, uf, e)
         return []

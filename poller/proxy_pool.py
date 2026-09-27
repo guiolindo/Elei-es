@@ -23,6 +23,32 @@ import httpx
 log = logging.getLogger(__name__)
 
 
+# Lista default de proxies BR — testados em 27/09/2026 do Termux (Brasil).
+# Free proxies caem/voltam sem aviso; o pool tolera queda e roteia pro
+# próximo que estiver vivo. Se todos morrerem, atualize TSE_PROXY_LIST
+# com uma lista fresca.
+DEFAULT_PROXIES = [
+    "http://167.234.251.155:8880",
+    "http://18.230.14.91:3128",
+    "http://200.229.76.160:3128",
+    "http://201.20.42.46:3128",
+    "http://138.0.143.119:8080",
+    "http://201.157.235.197:8080",
+    # extras da mesma lista, caso os 6 primeiros caiam
+    "http://186.65.104.52:2024",
+    "http://187.72.72.209:5151",
+    "http://45.70.52.248:8080",
+    "http://186.235.123.3:8080",
+    "http://201.20.42.46:3127",
+    "http://186.65.106.90:2024",
+    "http://170.254.201.46:3180",
+    "http://167.250.23.13:9090",
+    "http://187.94.220.85:8080",
+    "http://201.20.79.182:8088",
+    "http://201.62.125.142:8080",
+]
+
+
 # URL leve pra testar se o proxy passa pelo TSE (Akamai).
 # A home retorna 200 (HTML) quando o acesso é permitido, 403 quando bloqueado.
 SANIDADE_URL = "https://divulgacandcontas.tse.jus.br/divulga/"
@@ -94,10 +120,15 @@ def get_pool() -> ProxyPool:
     if _pool is None:
         from app.config import get_settings
         s = get_settings()
-        proxies = []
+        proxies: list[str] = []
+        # Preferência: TSE_PROXY_LIST customizado > TSE_PROXY único > defaults
         if s.tse_proxy_list:
-            proxies.extend([p.strip() for p in s.tse_proxy_list.split(",")])
+            proxies.extend([p.strip() for p in s.tse_proxy_list.split(",") if p.strip()])
         if s.tse_proxy and s.tse_proxy not in proxies:
             proxies.insert(0, s.tse_proxy)
+        # Se nada foi configurado, cai nos defaults (proxies BR conhecidos)
+        if not proxies:
+            proxies = list(DEFAULT_PROXIES)
+            log.info("proxy_pool: usando lista default de %d proxies BR", len(proxies))
         _pool = ProxyPool(proxies)
     return _pool

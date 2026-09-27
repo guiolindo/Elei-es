@@ -28,16 +28,19 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 
 async def _sync_candidatos_loop():
-    """Sincroniza candidatos oficiais do TSE a cada 6h.
+    """Sincroniza candidatos oficiais do TSE.
 
-    Nas semanas antes da eleição o TSE atualiza a lista com frequência
-    (impugnações, substituições). Após a apuração começar, as mudanças
-    são raras — mas continuar rodando é barato e mantém fotos em dia.
+    Roda uma vez logo no startup (30s de warmup pra DB e pool estarem
+    prontos) e depois a cada 6h. Nas semanas antes da eleição o TSE
+    atualiza a lista com frequência (impugnações, substituições); após
+    a apuração começar, as mudanças são raras.
     """
+    await asyncio.sleep(30)  # warmup
     while True:
         try:
+            log.info("sync_candidatos: iniciando ciclo")
             n = await sincronizar_candidatos(baixar_fotos=True)
-            log.info("sync_candidatos: %d atualizações", n)
+            log.info("sync_candidatos: %d candidatos atualizados", n)
         except Exception:
             log.exception("sync_candidatos falhou")
         await asyncio.sleep(6 * 3600)
