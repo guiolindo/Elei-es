@@ -205,7 +205,8 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
             except Exception:
                 log.exception("erro processando %s", alvo)
 
-    async with cliente_tse() as client:
-        while True:
+    while True:
+        # Recria o cliente a cada ciclo pra permitir troca de proxy quando um cair
+        async with await cliente_tse() as client:
             await asyncio.gather(*[_um(client, a) for a in alvos])
-            await asyncio.sleep(settings.poll_interval_seconds)
+        await asyncio.sleep(settings.poll_interval_seconds)

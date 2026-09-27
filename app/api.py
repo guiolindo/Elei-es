@@ -329,8 +329,10 @@ async def admin_testar_tse() -> dict[str, Any]:
         ("resultado", f"{s.tse_cdn_base}/{s.eleicao_cod_1t}/dados/br/{s.eleicao_cod_1t}-c0001-e00{s.eleicao_cod_1t}-br.json"),
         ("home", "https://divulgacandcontas.tse.jus.br/divulga/"),
     ]
-    resultado = {"proxy_configurado": bool(s.tse_proxy), "proxy": s.tse_proxy or "(direto)"}
-    async with cliente_tse() as client:
+    from poller.proxy_pool import get_pool
+    pool_info = get_pool().diagnostico()
+    resultado = {"proxy_pool": pool_info}
+    async with await cliente_tse() as client:
         for nome, url in urls:
             try:
                 r = await client.get(url, timeout=10.0)

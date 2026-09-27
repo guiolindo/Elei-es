@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # Formato: http://usuario:senha@host:porta ou http://host:porta.
     # Se vazio, tenta acessar direto (funciona só se o app estiver hospedado no BR).
     tse_proxy: str = ""
+    # Lista de proxies para rotação automática, separados por vírgula:
+    #   http://ip1:porta1,http://ip2:porta2,...
+    # O código testa cada um contra o TSE e cacheia o que funciona.
+    # Preferir este em vez de tse_proxy porque tolera proxies caindo.
+    tse_proxy_list: str = ""
     vapid_public_key: str = ""
     vapid_private_key: str = ""
     vapid_claim_email: str = "admin@example.com"

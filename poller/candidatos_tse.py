@@ -232,7 +232,7 @@ async def sincronizar_candidatos(
     cod_eleicao = settings.eleicao_cod_1t
 
     total = 0
-    async with cliente_tse() as client:
+    async with await cliente_tse() as client:
         for cargo in cargos:
             # Presidente é só uf=BR
             ufs_cargo = ["BR"] if cargo == 1 else [u for u in ufs if u != "BR"]

@@ -15,17 +15,18 @@ import httpx
 log = logging.getLogger(__name__)
 
 
-def cliente_tse() -> httpx.AsyncClient:
-    """AsyncClient já configurado com headers de browser e proxy TSE (se houver).
+async def cliente_tse() -> httpx.AsyncClient:
+    """AsyncClient com headers de browser e proxy ativo do pool.
 
-    Todos os módulos que falam com o TSE devem usar este helper para
-    herdar o proxy configurado em TSE_PROXY.
+    Escolhe automaticamente um proxy vivo (da lista TSE_PROXY_LIST) que
+    passe pelo Akamai do TSE. Se nenhum passar, tenta acesso direto.
+    Sempre use como `async with await cliente_tse() as client:`.
     """
-    from app.config import get_settings
-    s = get_settings()
+    from poller.proxy_pool import get_pool
+    proxy = await get_pool().escolher()
     kwargs: dict = {"headers": BROWSER_HEADERS, "timeout": 20.0}
-    if s.tse_proxy:
-        kwargs["proxy"] = s.tse_proxy
+    if proxy:
+        kwargs["proxy"] = proxy
     return httpx.AsyncClient(**kwargs)
 
 
