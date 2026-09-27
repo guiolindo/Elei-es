@@ -15,6 +15,20 @@ import httpx
 log = logging.getLogger(__name__)
 
 
+def cliente_tse() -> httpx.AsyncClient:
+    """AsyncClient já configurado com headers de browser e proxy TSE (se houver).
+
+    Todos os módulos que falam com o TSE devem usar este helper para
+    herdar o proxy configurado em TSE_PROXY.
+    """
+    from app.config import get_settings
+    s = get_settings()
+    kwargs: dict = {"headers": BROWSER_HEADERS, "timeout": 20.0}
+    if s.tse_proxy:
+        kwargs["proxy"] = s.tse_proxy
+    return httpx.AsyncClient(**kwargs)
+
+
 # Headers de navegador. O TSE bloqueia (403) requisições sem User-Agent
 # de browser real. Aplicado em todos os fetches para o TSE.
 BROWSER_HEADERS = {

@@ -23,7 +23,7 @@ from app.models import (
 )
 from math_engine import CandidatoResumo, TotaisResumo, avaliar_apuracao
 from poller.parser import parse_snapshot
-from poller.tse_client import buscar_json, resultado_url
+from poller.tse_client import buscar_json, cliente_tse, resultado_url
 
 log = logging.getLogger("poller")
 
@@ -205,7 +205,7 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
             except Exception:
                 log.exception("erro processando %s", alvo)
 
-    async with httpx.AsyncClient() as client:
+    async with cliente_tse() as client:
         while True:
             await asyncio.gather(*[_um(client, a) for a in alvos])
             await asyncio.sleep(settings.poll_interval_seconds)

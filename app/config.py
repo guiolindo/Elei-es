@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Base do endpoint de listagem de candidatos (divulga do TSE).
     # Formato: {base}/{ano}/{uf}/{cod_eleicao}/{cargo}/candidatos
     tse_divulga_base: str = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidatura/listar"
+    # Proxy para acessar TSE (o TSE bloqueia IPs fora do Brasil via Akamai).
+    # Formato: http://usuario:senha@host:porta ou http://host:porta.
+    # Se vazio, tenta acessar direto (funciona só se o app estiver hospedado no BR).
+    tse_proxy: str = ""
     vapid_public_key: str = ""
     vapid_private_key: str = ""
     vapid_claim_email: str = "admin@example.com"

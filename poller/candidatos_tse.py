@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db import SessionLocal
 from app.models import Candidato, Partido
+from poller.tse_client import cliente_tse
 
 log = logging.getLogger(__name__)
 
@@ -231,7 +232,7 @@ async def sincronizar_candidatos(
     cod_eleicao = settings.eleicao_cod_1t
 
     total = 0
-    async with httpx.AsyncClient() as client:
+    async with cliente_tse() as client:
         for cargo in cargos:
             # Presidente é só uf=BR
             ufs_cargo = ["BR"] if cargo == 1 else [u for u in ufs if u != "BR"]

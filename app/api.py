@@ -316,6 +316,31 @@ async def admin_status(sess: AsyncSession = Depends(get_session)) -> dict[str, A
     }
 
 
+@router.get("/admin/testar-tse")
+async def admin_testar_tse() -> dict[str, Any]:
+    """Diagnostica conexão com o TSE. Testa 3 endpoints e retorna o
+    status de cada um. Útil para validar se o proxy configurado está
+    conseguindo passar pelo Akamai."""
+    from poller.tse_client import cliente_tse
+    from app.config import get_settings
+    s = get_settings()
+    urls = [
+        ("candidatos", f"{s.tse_divulga_base}/{s.eleicao_ano}/SP/{s.eleicao_cod_1t}/1/candidatos"),
+        ("resultado", f"{s.tse_cdn_base}/{s.eleicao_cod_1t}/dados/br/{s.eleicao_cod_1t}-c0001-e00{s.eleicao_cod_1t}-br.json"),
+        ("home", "https://divulgacandcontas.tse.jus.br/divulga/"),
+    ]
+    resultado = {"proxy_configurado": bool(s.tse_proxy), "proxy": s.tse_proxy or "(direto)"}
+    async with cliente_tse() as client:
+        for nome, url in urls:
+            try:
+                r = await client.get(url, timeout=10.0)
+                resultado[nome] = {"status": r.status_code, "url": url,
+                                    "tamanho": len(r.content)}
+            except Exception as e:
+                resultado[nome] = {"erro": str(e), "url": url}
+    return resultado
+
+
 @router.post("/admin/sync-candidatos")
 async def admin_sync_candidatos(
     payload: dict[str, Any] | None = None,
