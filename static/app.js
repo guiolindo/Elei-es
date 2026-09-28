@@ -131,6 +131,24 @@ function fallbackFoto(imgEl, nome, partido) {
   imgEl.replaceWith(div);
 }
 
+// Retry: se a foto falhar (Akamai rate-limit costuma bloquear em picos),
+// espera um tempo aleatório e tenta 1 vez mais antes de cair no fallback.
+function anexarFotoComRetry(img, nome, partido) {
+  let tentativas = 0;
+  img.addEventListener("error", () => {
+    tentativas++;
+    if (tentativas === 1) {
+      // Espera 500-2500ms (jitter) e tenta de novo com cache-bust
+      const delay = 500 + Math.random() * 2000;
+      setTimeout(() => {
+        img.src = img.src.split("?")[0] + "?r=" + Date.now();
+      }, delay);
+    } else {
+      fallbackFoto(img, nome, partido);
+    }
+  });
+}
+
 function renderLista() {
   const el = $("lista-candidatos");
   el.innerHTML = "";
@@ -177,7 +195,7 @@ function renderLista() {
       badgeProp = `<div class="badge-prop ${cls}" title="${prop.status}">${label}${fed}</div>`;
     }
     div.innerHTML = `
-      <img class="cand-foto" src="${c.foto}" alt="" data-fallback-nome="${c.nome_urna}" data-fallback-partido="${c.partido}">
+      <img class="cand-foto" src="${c.foto}" alt="" loading="lazy" decoding="async">
       <div class="cand-info">
         <div class="cand-nome">${c.nome_urna}</div>
         <div class="cand-meta">${c.numero} · P${c.partido}${c.uf ? " · " + c.uf : ""}</div>
@@ -187,8 +205,7 @@ function renderLista() {
         <div class="cand-barra"><div data-sq-barra="${c.sq_candidato}" style="width:0%"></div></div>
       </div>
       <button class="cand-detalhes" data-detalhes="${c.sq_candidato}">detalhes</button>`;
-    const img = div.querySelector("img.cand-foto");
-    img.onerror = () => fallbackFoto(img, c.nome_urna, c.partido);
+    anexarFotoComRetry(div.querySelector("img.cand-foto"), c.nome_urna, c.partido);
     div.addEventListener("click", (e) => {
       if (e.target.closest("[data-detalhes]")) return;
       toggleSelecionar(c.sq_candidato);
@@ -265,8 +282,8 @@ async function abrirModal(sq) {
     $("modal-card").querySelector(".modal-close").onclick = fecharModal;
     $("modal-cand").querySelector(".modal-back").onclick = fecharModal;
     $("modal-selecionar").onclick = () => { toggleSelecionar(sq); fecharModal(); };
-    const img = $("modal-card").querySelector("img[data-fallback-nome]");
-    if (img) img.onerror = () => fallbackFoto(img, c.nome_urna, c.partido);
+    const img = $("modal-card").querySelector(".modal-hero img");
+    if (img) anexarFotoComRetry(img, c.nome_urna, c.partido);
   } catch (e) { toast("Erro ao abrir: " + e.message, "danger"); }
 }
 function fecharModal() { $("modal-cand").classList.add("oculto"); }
@@ -339,13 +356,12 @@ function renderCardsComp() {
     div.style.borderTopColor = PALETA[i];
     div.innerHTML = `
       <div class="badge-pos" data-pos="${sq}">—</div>
-      <img src="${c.foto}" data-fallback-nome="${c.nome_urna}" data-fallback-partido="${c.partido}">
+      <img src="${c.foto}" loading="lazy" decoding="async">
       <div class="nome">${c.nome_urna}</div>
       <div class="meta">${c.numero} · P${c.partido}${c.uf ? " · " + c.uf : ""}</div>
       <div class="votos" data-votos="${sq}">—</div>
       <div class="pct" data-pct="${sq}">—</div>`;
-    const img = div.querySelector("img");
-    img.onerror = () => fallbackFoto(img, c.nome_urna, c.partido);
+    anexarFotoComRetry(div.querySelector("img"), c.nome_urna, c.partido);
     el.appendChild(div);
   });
 }
