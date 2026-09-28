@@ -243,19 +243,19 @@ async function abrirModal(sq) {
 }
 function fecharModal() { $("modal-cand").classList.add("oculto"); }
 
-async function abrirModalMunicipio(codIbge) {
+async function abrirModalMunicipio(codIbge, nomeMun) {
+  const nome = nomeMun || `Município ${codIbge}`;
   try {
     const dados = await get(`/api/apuracao/municipio?cargo=${state.cargo}&uf=${state.abrangencia}&cod_ibge=${codIbge}`);
     const cands = dados.candidatos || [];
     if (!cands.length) {
-      toast(`Município ${codIbge}: sem dados ainda`, "warn");
+      toast(`${nome}: sem dados ainda`, "warn");
       return;
     }
-    const topVotos = Math.max(1, ...cands.map(c => c.votos));
     $("modal-card").innerHTML = `
       <button class="modal-close" aria-label="Fechar">✕</button>
       <div class="modal-hero" style="flex-direction:column;align-items:flex-start">
-        <div class="modal-nome">Município ${codIbge}</div>
+        <div class="modal-nome">${nome}</div>
         <div class="modal-urna">Ranking em ${state.abrangencia} · ${cands.length} candidatos</div>
       </div>
       <div style="max-height:400px;overflow-y:auto">
@@ -544,7 +544,7 @@ async function atualizarMapa() {
     }
   } catch (e) {}
   await renderMapa(container, state.abrangencia, dadosPorMun, {
-    onClickArea: (codIbge) => abrirModalMunicipio(codIbge),
+    onClickArea: (codIbge, nomeMun) => abrirModalMunicipio(codIbge, nomeMun),
   });
   renderLegenda(leg, dadosPorMun, {
     tituloVazio: `Municípios de ${state.abrangencia}`,

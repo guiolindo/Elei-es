@@ -4,6 +4,9 @@
 
 let _chart = null;
 const _mapasRegistrados = new Set();
+// Mapa auxiliar: chave_ECharts → nome amigável (pra tooltip).
+// Ex: no mapa de SP, "3550308" → "São Paulo".
+const _nomesPorArea = {};   // { mapKey: { "3550308": "São Paulo", ... } }
 
 async function registrarMapa(chave, url, nameProperty) {
   if (_mapasRegistrados.has(chave)) return true;
@@ -13,6 +16,15 @@ async function registrarMapa(chave, url, nameProperty) {
     const geo = await r.json();
     echarts.registerMap(chave, geo, { nameProperty });
     _mapasRegistrados.add(chave);
+    // Constrói o dicionário id → nome_amigavel pra usar na tooltip
+    const dic = {};
+    for (const f of geo.features || []) {
+      const p = f.properties || {};
+      const chaveArea = String(p[nameProperty]);
+      const nome = p.nome || p.name || p.description || chaveArea;
+      dic[chaveArea] = nome;
+    }
+    _nomesPorArea[chave] = dic;
     return true;
   } catch (e) {
     console.warn("mapa não carregou:", chave, e);
@@ -80,10 +92,11 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
       textStyle: { color: "#ecf0f7" },
       formatter: (p) => {
         const d = p.data?._extra || {};
-        // No mapa municipal, p.name = código IBGE; usa nome amigável do _extra.
-        const rotulo = d.nome_local || p.name;
-        if (!d.nome_lider) return `<b>${rotulo}</b><br>Sem dados`;
-        return `<b>${rotulo}</b><br>Líder: <b>${d.nome_lider}</b><br>Votos: ${(d.votos || 0).toLocaleString("pt-BR")}`;
+        // No mapa municipal, p.name é o código IBGE — pegamos o nome amigável
+        // do dicionário construído a partir das properties do GeoJSON.
+        const nomeAmigavel = _nomesPorArea[mapKey]?.[p.name] || d.nome_local || p.name;
+        if (!d.nome_lider) return `<b>${nomeAmigavel}</b><br>Sem dados`;
+        return `<b>${nomeAmigavel}</b><br>Líder: <b>${d.nome_lider}</b><br>Votos: ${(d.votos || 0).toLocaleString("pt-BR")}`;
       },
     },
     series: [{
@@ -119,7 +132,16 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
 
   _chart.off("click");
   if (opts.onClickArea) {
-    _chart.on("click", (p) => { if (p.name) opts.onClickArea(p.name); });
+    _chart.on("click", (p) => {
+      if (!p.name) return;
+      const nome = _nomesPorArea[mapKey]?.[p.name] || p.name;
+      opts.onClickArea(p.name, nome);
+    });
   }
   return _chart;
+}
+
+/** Nome amigável de uma área (UF sigla ou município cod_ibge). */
+export function nomeArea(chaveMapa, area) {
+  return _nomesPorArea[chaveMapa]?.[area] || area;
 }
