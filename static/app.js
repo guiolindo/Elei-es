@@ -322,6 +322,32 @@ async function abrirModal(sq) {
     const c = await get(`/api/candidato/${sq}`);
     const votos = state.ultimoSnapshot?.candidatos?.find(x => x.sq_candidato === sq);
     const corP = corPartido(c.partido);
+    const opcional = (v) => v || "—";
+    const dataNasc = c.data_nascimento
+      ? c.data_nascimento.split("T")[0].split("-").reverse().join("/")
+      : null;
+    const fields = [
+      ["Votos",           votos ? fmtNum(votos.votos) : "—", "num"],
+      ["% Válidos",       votos ? votos.pct_validos.toFixed(2) + "%" : "—", "num"],
+      ["Posição",         votos ? votos.posicao + "º" : "—", "num"],
+      ["Situação",        opcional(c.situacao)],
+      ["Coligação",       opcional(c.coligacao), "wide"],
+      ["Partido",         c.partido_nome ? `${c.partido_nome} (${c.partido})` : `${c.partido}`, "wide"],
+      ["Data de nasc.",   opcional(dataNasc)],
+      ["Sexo",            opcional(c.sexo)],
+      ["Cor/Raça",        opcional(c.cor_raca)],
+      ["Estado civil",    opcional(c.estado_civil)],
+      ["Grau de instr.",  opcional(c.grau_instrucao), "wide"],
+      ["Ocupação",        opcional(c.ocupacao), "wide"],
+      ["Naturalidade",    (c.municipio_nascimento && c.uf_nascimento)
+                          ? `${c.municipio_nascimento}/${c.uf_nascimento}` : "—", "wide"],
+      ["Vice",            c.vice_nome
+                          ? `${c.vice_nome}${c.vice_partido_sigla ? " (" + c.vice_partido_sigla + ")" : ""}`
+                          : null, "wide"],
+      ["Gasto de camp.",  c.gasto_campanha ? `R$ ${fmtNum(c.gasto_campanha)}` : null],
+      ["CNPJ da camp.",   c.cnpj_campanha, "wide"],
+    ].filter(([_, v]) => v !== null);
+
     $("modal-card").innerHTML = `
       <button class="modal-close" aria-label="Fechar">✕</button>
       <div class="modal-acento" style="background:linear-gradient(90deg, ${corP}, transparent 70%)"></div>
@@ -334,10 +360,9 @@ async function abrirModal(sq) {
         </div>
       </div>
       <div class="modal-grid">
-        <div class="modal-field"><div class="k">Votos</div><div class="v">${votos ? fmtNum(votos.votos) : "—"}</div></div>
-        <div class="modal-field"><div class="k">% Válidos</div><div class="v">${votos ? votos.pct_validos.toFixed(2) + "%" : "—"}</div></div>
-        <div class="modal-field"><div class="k">Posição</div><div class="v">${votos ? votos.posicao + "º" : "—"}</div></div>
-        <div class="modal-field"><div class="k">Coligação</div><div class="v" style="font-size:13px">${c.coligacao || "—"}</div></div>
+        ${fields.map(([k, v, cls]) =>
+          `<div class="modal-field ${cls || ""}"><div class="k">${k}</div><div class="v">${v}</div></div>`
+        ).join("")}
       </div>
       <div class="modal-acoes">
         <button class="btn-primary" id="modal-selecionar">

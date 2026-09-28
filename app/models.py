@@ -44,6 +44,7 @@ class Candidato(Base):
     foto_local_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     vice_nome: Mapped[str | None] = mapped_column(String(128), nullable=True)
     vice_partido: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    raw_divulga: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
 class Snapshot(Base):

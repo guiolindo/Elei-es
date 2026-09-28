@@ -48,6 +48,7 @@ class CandidatoTSE:
     vice_nome: str | None
     vice_partido: str | None
     foto_url: str | None
+    raw: dict | None = None
 
 
 def _pick(d: dict, *keys, default=None):
@@ -113,6 +114,7 @@ def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoT
         vice_nome=_pick(vice, "nomeUrna", "nome") if isinstance(vice, dict) else None,
         vice_partido=_pick(vice.get("partido", {}) if isinstance(vice, dict) else {}, "sigla"),
         foto_url=foto_url,
+        raw=payload,
     )
 
 
@@ -194,6 +196,7 @@ async def _upsert(sess: AsyncSession, candidatos: Iterable[CandidatoTSE]) -> int
             "foto_url": c.foto_url,
             "vice_nome": c.vice_nome,
             "vice_partido": c.vice_partido,
+            "raw_divulga": c.raw,
         })
 
     # Partidos: upsert idempotente

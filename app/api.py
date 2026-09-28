@@ -78,6 +78,17 @@ async def ficha(sq: str, sess: AsyncSession = Depends(get_session)) -> dict[str,
     c = r.scalar_one_or_none()
     if not c:
         raise HTTPException(404, "candidato não encontrado")
+    raw = c.raw_divulga or {}
+    # Extrai campos comuns do payload divulga (tolerante — se faltar, vira None)
+    def _p(*keys):
+        for k in keys:
+            v = raw.get(k)
+            if v not in (None, "", "#NULO#"):
+                return v
+        return None
+    partido_raw = raw.get("partido") or {}
+    vice_raw = raw.get("vice") or raw.get("candidatoVice") or {}
+    vice_part = (vice_raw.get("partido") or {}) if isinstance(vice_raw, dict) else {}
     return {
         "sq_candidato": c.sq_candidato,
         "nome": c.nome,
@@ -87,6 +98,21 @@ async def ficha(sq: str, sess: AsyncSession = Depends(get_session)) -> dict[str,
         "uf": c.uf,
         "coligacao": c.coligacao,
         "foto": _url_foto(c.sq_candidato, c.uf),
+        "situacao": _p("descricaoSituacao"),
+        "situacao_candidatura": _p("descricaoSituacao"),
+        "sexo": _p("descricaoSexo"),
+        "cor_raca": _p("descricaoCorRaca"),
+        "estado_civil": _p("descricaoEstadoCivil"),
+        "data_nascimento": _p("dataDeNascimento"),
+        "grau_instrucao": _p("grauInstrucao"),
+        "ocupacao": _p("ocupacao"),
+        "uf_nascimento": _p("sgUfNascimento"),
+        "municipio_nascimento": _p("nomeMunicipioNascimento"),
+        "gasto_campanha": raw.get("gastoCampanha"),
+        "cnpj_campanha": _p("cnpjcampanha"),
+        "vice_nome": vice_raw.get("nomeUrna") or vice_raw.get("nomeCompleto") if isinstance(vice_raw, dict) else None,
+        "vice_partido_sigla": vice_part.get("sigla") if isinstance(vice_part, dict) else None,
+        "partido_nome": partido_raw.get("nome") if isinstance(partido_raw, dict) else None,
     }
 
 

@@ -271,8 +271,15 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 }
 .badge-part-logo.erro { display: none; }
 /* No modal a logo pode ser um pouco maior */
-.modal-urna .badge-part-wrap { height: 22px; max-height: 22px; max-width: 80px; }
-.modal-urna .badge-part-logo { max-height: 22px; max-width: 80px; }
+.modal-urna .badge-part-wrap {
+  height: 26px; max-height: 26px;
+  width: 100px; max-width: 100px;         /* largura fixa + object-fit resolve */
+}
+.modal-urna .badge-part-logo {
+  height: 26px; max-height: 26px;
+  width: 100px; max-width: 100px;
+  object-fit: contain; object-position: left center;
+}
 
 /* Pill do partido com cor oficial (fallback quando não tem logo) */
 .pill-part {
@@ -507,10 +514,20 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center;
   margin-top: 4px;
 }
-.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.modal-field { padding: 10px 14px; background: var(--bg-3); border-radius: 10px; border: 1px solid var(--line); }
-.modal-field .k { font-size: 11px; color: var(--muted); text-transform: uppercase; }
-.modal-field .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal-field {
+  padding: 10px 14px; background: var(--bg-3); border-radius: 10px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.modal-field.wide { grid-column: 1 / -1; }
+.modal-field.num .v { font-variant-numeric: tabular-nums; }
+.modal-field .k { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.modal-field .v {
+  font-size: 14px; font-weight: 600; margin-top: 3px;
+  word-break: break-word;
+}
+.modal-field.num .v { font-size: 18px; font-weight: 800; }
 .modal-acoes { display: flex; gap: 10px; margin-top: 18px; }
 
 /* ============ Skeletons de loading ============ */
