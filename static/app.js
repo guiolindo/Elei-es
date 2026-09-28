@@ -599,6 +599,7 @@ async function atualizarPainelTotais() {
   $("pct-abstencoes").textContent = `${pctAbst}% dos aptos`;
   $("brancos-nulos").textContent = `${fmtNum(t.votos_brancos)} · ${fmtNum(t.votos_nulos)}`;
   $("ultimo").textContent = fmtHora(dados.coletado_em);
+  $("ultimo").dataset.iso = dados.coletado_em;
 
   // atualiza cards da lista
   const maxV = Math.max(1, ...dados.candidatos.map(c => c.votos));
@@ -859,7 +860,30 @@ async function boot() {
   $("btn-fechar").addEventListener("click", fecharComparacao);
   $("btn-comparar").addEventListener("click", abrirComparacao);
   $("btn-notif").addEventListener("click", pedirNotificacoes);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharModal(); });
+  // Atalhos de teclado
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { fecharModal(); return; }
+    // Ignora quando digitando
+    const t = e.target.tagName;
+    if (t === "INPUT" || t === "SELECT" || t === "TEXTAREA") return;
+    if (e.key === "/") { e.preventDefault(); $("busca-nome")?.focus(); }
+    else if (e.key === "c" && state.selecionados.length >= 2) $("btn-comparar")?.click();
+    else if (e.key === "n") $("btn-notif")?.click();
+  });
+
+  // Atualiza "há X segundos" no elemento #ultimo a cada 5s
+  setInterval(() => {
+    const el = $("ultimo");
+    const iso = el?.dataset.iso;
+    if (!iso) return;
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    let rotulo;
+    if (diff < 5) rotulo = "agora";
+    else if (diff < 60) rotulo = `há ${diff}s`;
+    else if (diff < 3600) rotulo = `há ${Math.floor(diff / 60)}min`;
+    else rotulo = fmtHora(iso);
+    el.textContent = rotulo;
+  }, 5000);
 
   // Header ganha sombra ao rolar + botão voltar ao topo
   const hero = document.querySelector(".hero");
