@@ -12,10 +12,11 @@ const state = {
   ficha: {},
   selecionados: [],
   ultimoSnapshot: null,
+  snapshotAnterior: null,   // pra calcular delta/tendência
   graficos: {},
   ws: null,
   filtro: { texto: "", partido: "", ordenar: "votos" },
-  proporcional: null,  // { candidatos: [{sq_candidato, status}], qe, barreira, vagas }
+  proporcional: null,
 };
 
 // ============ helpers ============
@@ -262,7 +263,10 @@ function renderLista() {
         <div class="cand-meta">${c.numero} · ${pillPart}${c.uf ? " · " + c.uf : ""}</div>
         ${badgeProp}
         <div class="cand-votos" data-sq="${c.sq_candidato}">—</div>
-        <div class="cand-pct" data-sq-pct="${c.sq_candidato}"></div>
+        <div class="cand-linha-inf">
+          <span class="cand-pct" data-sq-pct="${c.sq_candidato}"></span>
+          <span class="cand-delta" data-sq-delta="${c.sq_candidato}"></span>
+        </div>
         <div class="cand-barra"><div data-sq-barra="${c.sq_candidato}" style="width:0%"></div></div>
       </div>
       <button class="cand-detalhes" data-detalhes="${c.sq_candidato}">detalhes</button>`;
@@ -598,13 +602,30 @@ async function atualizarPainelTotais() {
 
   // atualiza cards da lista
   const maxV = Math.max(1, ...dados.candidatos.map(c => c.votos));
+  // Mapa do snapshot anterior pra calcular delta
+  const antMap = new Map((state.snapshotAnterior?.candidatos || [])
+    .map(c => [c.sq_candidato, c]));
   dados.candidatos.forEach(c => {
     const votos = document.querySelector(`[data-sq="${c.sq_candidato}"]`);
     const pct = document.querySelector(`[data-sq-pct="${c.sq_candidato}"]`);
     const barra = document.querySelector(`[data-sq-barra="${c.sq_candidato}"]`);
+    const delta = document.querySelector(`[data-sq-delta="${c.sq_candidato}"]`);
     if (votos) animarNumero(votos, c.votos, 400);
     if (pct) pct.textContent = c.pct_validos.toFixed(2) + "% dos válidos";
     if (barra) barra.style.width = (c.votos / maxV * 100) + "%";
+    if (delta) {
+      const ant = antMap.get(c.sq_candidato);
+      if (ant && ant.votos !== c.votos) {
+        const diff = c.votos - ant.votos;
+        const cls = diff > 0 ? "up" : "down";
+        const sym = diff > 0 ? "▲" : "▼";
+        delta.className = `cand-delta ${cls}`;
+        delta.textContent = `${sym} ${fmtNum(Math.abs(diff))}`;
+      } else {
+        delta.textContent = "";
+        delta.className = "cand-delta";
+      }
+    }
   });
 }
 
@@ -736,7 +757,13 @@ async function carregarEventos() {
 // ============ ciclo ============
 async function refreshApuracao() {
   try {
-    state.ultimoSnapshot = await get(`/api/apuracao/atual?cargo=${state.cargo}&abrangencia=${state.abrangencia}`);
+    const novo = await get(`/api/apuracao/atual?cargo=${state.cargo}&abrangencia=${state.abrangencia}`);
+    // Guarda snapshot anterior pra calcular tendência (só se realmente mudou)
+    if (state.ultimoSnapshot?.disponivel &&
+        state.ultimoSnapshot.coletado_em !== novo.coletado_em) {
+      state.snapshotAnterior = state.ultimoSnapshot;
+    }
+    state.ultimoSnapshot = novo;
   } catch (e) {
     state.ultimoSnapshot = { disponivel: false };
   }
