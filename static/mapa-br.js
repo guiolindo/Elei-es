@@ -93,13 +93,23 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
       scaleLimit: { min: 0.8, max: 8 },
       label: {
         show: abrangencia === "BR",
-        color: "#ecf0f7", fontSize: 10, fontWeight: 700,
+        color: "#ffffff", fontSize: 11, fontWeight: 700,
         formatter: labelFormatter,
+        textShadowColor: "#000",           // legibilidade em cima de qualquer cor
+        textShadowBlur: 3,
       },
-      itemStyle: { areaColor: "#1e2531", borderColor: "#0f1218", borderWidth: 0.6 },
+      itemStyle: {
+        areaColor: "#2a3242",           // 3.1:1 vs fundo — visível
+        borderColor: "#5a6478",         // borda clara pra separar estados
+        borderWidth: 0.8,
+      },
       emphasis: {
-        itemStyle: { areaColor: "#f0b429" },
-        label: { show: true, color: "#000", fontWeight: 700 },
+        itemStyle: { areaColor: "#f0b429", borderColor: "#fff", borderWidth: 1.5 },
+        label: { show: true, color: "#000", fontWeight: 700, fontSize: 14 },
+      },
+      select: {
+        itemStyle: { areaColor: "#f97316", borderColor: "#fff" },
+        label: { color: "#000", fontWeight: 700 },
       },
       data: seriesData,
     }],

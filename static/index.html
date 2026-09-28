@@ -40,8 +40,8 @@
           <option value="BR">Brasil</option>
         </select>
       </div>
-      <button class="btn-ghost" id="btn-notif" title="Ativar notificações">
-        <span class="ico">🔔</span>
+      <button class="btn-ghost" id="btn-notif" title="Ativar notificações" aria-label="Ativar notificações do navegador">
+        <span class="ico" aria-hidden="true">🔔</span>
       </button>
     </div>
   </nav>
@@ -84,8 +84,8 @@
       <p class="sub" id="sub-lista">Selecione até <strong>4 candidatos</strong> para comparar lado a lado.</p>
     </div>
     <div class="acoes">
-      <span class="chip-count" id="chip-count">0 selecionado(s)</span>
-      <button class="btn-primary" id="btn-comparar" disabled>Comparar →</button>
+      <span class="chip-count" id="chip-count" aria-live="polite">0 selecionado(s)</span>
+      <button class="btn-primary" id="btn-comparar" disabled aria-label="Abrir comparação dos candidatos selecionados">Comparar →</button>
     </div>
   </div>
 
