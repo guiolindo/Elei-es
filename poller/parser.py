@@ -51,9 +51,18 @@ class ParsedCandidato:
 
 
 @dataclass
+class ParsedMunicipio:
+    """Breakdown de votos de candidatos em um município específico."""
+    cod_ibge: str      # 7 dígitos do IBGE
+    nome: str
+    candidatos: list[ParsedCandidato]
+
+
+@dataclass
 class ParsedSnapshot:
     totais: ParsedTotais
     candidatos: list[ParsedCandidato]
+    municipios: list[ParsedMunicipio]
 
 
 def _parse_dt(raw: str | None) -> datetime | None:
@@ -96,16 +105,50 @@ def parse_snapshot(payload: dict) -> ParsedSnapshot:
         gerado_em=_parse_dt(payload.get("dg") or payload.get("gerado_em")),
     )
 
-    candidatos_raw = raiz.get("cand") or raiz.get("candidatos") or []
-    candidatos = [
-        ParsedCandidato(
-            sq_candidato=str(c.get("sqcand") or c.get("sq_candidato") or ""),
-            numero=_to_int(c.get("n") or c.get("numero")),
-            nome_urna=(c.get("nm") or c.get("nome_urna") or "").strip(),
-            votos=_to_int(c.get("vap") or c.get("votos")),
-            pct_validos=_to_float(c.get("pvap") or c.get("pct_validos")),
-        )
-        for c in candidatos_raw
-        if (c.get("sqcand") or c.get("sq_candidato"))
-    ]
-    return ParsedSnapshot(totais=tot, candidatos=candidatos)
+    def _parse_cand_list(raw_list) -> list[ParsedCandidato]:
+        out = []
+        for c in raw_list or []:
+            if not isinstance(c, dict):
+                continue
+            sq = c.get("sqcand") or c.get("sq_candidato") or c.get("sqCand") or c.get("id")
+            if not sq:
+                continue
+            out.append(ParsedCandidato(
+                sq_candidato=str(sq),
+                numero=_to_int(c.get("n") or c.get("numero") or c.get("nr")),
+                nome_urna=(c.get("nm") or c.get("nome_urna") or "").strip(),
+                votos=_to_int(c.get("vap") or c.get("votos") or c.get("vv")),
+                pct_validos=_to_float(c.get("pvap") or c.get("pct_validos") or c.get("pvv")),
+            ))
+        return out
+
+    candidatos = _parse_cand_list(raiz.get("cand") or raiz.get("candidatos"))
+
+    # Breakdown por município. TSE historicamente usa `abr[].mu[]` ou `mu[]`.
+    # Cada município tem cand[] próprio. Se o TSE mudar o formato, esta parte
+    # simplesmente devolve [] e não quebra nada.
+    municipios: list[ParsedMunicipio] = []
+    fontes_mun = []
+    for chave in ("abr", "mu", "municipios"):
+        val = raiz.get(chave)
+        if isinstance(val, list):
+            for item in val:
+                if isinstance(item, dict) and item.get("mu"):
+                    fontes_mun.extend(item["mu"])
+                elif isinstance(item, dict):
+                    fontes_mun.append(item)
+    for m in fontes_mun:
+        if not isinstance(m, dict):
+            continue
+        cod_ibge = str(m.get("cdi") or m.get("cod_ibge") or m.get("codIbge") or "")
+        if not cod_ibge:
+            continue
+        cands_m = _parse_cand_list(m.get("cand") or m.get("candidatos"))
+        if cands_m:
+            municipios.append(ParsedMunicipio(
+                cod_ibge=cod_ibge,
+                nome=(m.get("nm") or m.get("nome") or "").strip(),
+                candidatos=cands_m,
+            ))
+
+    return ParsedSnapshot(totais=tot, candidatos=candidatos, municipios=municipios)

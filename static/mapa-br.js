@@ -50,8 +50,8 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
   } else {
     mapKey = `uf-${abrangencia.toLowerCase()}`;
     url = `/static/municipios/${abrangencia.toLowerCase()}.geojson`;
-    nameProperty = "nome";
-    labelFormatter = () => "";  // muitos municípios: sem label
+    nameProperty = "id";        // usa código IBGE como chave (7 dígitos)
+    labelFormatter = () => "";  // sem label (centenas de municípios)
     roam = true;                // arrasta e dá zoom
     zoom = 1.05;
   }
@@ -80,8 +80,10 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
       textStyle: { color: "#ecf0f7" },
       formatter: (p) => {
         const d = p.data?._extra || {};
-        if (!d.nome_lider) return `<b>${p.name}</b><br>Sem dados`;
-        return `<b>${p.name}</b><br>Líder: <b>${d.nome_lider}</b><br>Votos: ${(d.votos || 0).toLocaleString("pt-BR")}`;
+        // No mapa municipal, p.name = código IBGE; usa nome amigável do _extra.
+        const rotulo = d.nome_local || p.name;
+        if (!d.nome_lider) return `<b>${rotulo}</b><br>Sem dados`;
+        return `<b>${rotulo}</b><br>Líder: <b>${d.nome_lider}</b><br>Votos: ${(d.votos || 0).toLocaleString("pt-BR")}`;
       },
     },
     series: [{

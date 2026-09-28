@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import (
     Cargo, UF, Candidato, Snapshot, SnapshotTotais, SnapshotCandidato,
-    Evento, Comparacao, PushSubscription,
+    SnapshotMunicipio, Evento, Comparacao, PushSubscription,
 )
 from app.ws import broadcaster
 
@@ -187,15 +187,49 @@ async def lideres_por_municipio(
     uf: str = Query(...),
     sess: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    """Retorna líder por município da UF.
+    """Retorna líder de cada município da UF, extraído do breakdown por
+    município embutido no snapshot da UF (campo `abr` ou `mu` do TSE).
 
-    Pré-requisito: o poller precisa coletar snapshots com abrangência
-    a nível de município (ex.: 'SP:3550308' para São Paulo capital).
-    Enquanto isso não estiver ativo, retorna {} — o mapa fica cinza mas
-    ainda navegável.
+    Se o TSE não incluir esse breakdown no JSON, retorna {} e o mapa
+    municipal fica cinza — mas ainda navegável.
     """
-    # Placeholder: sem dados por município ainda. Estrutura preparada.
-    return {"municipios": {}, "aviso": "coleta por município ainda não ativa"}
+    from sqlalchemy import func
+    # Último snapshot dessa (cargo, uf) e busca líder por município
+    subq = (
+        select(func.max(Snapshot.id).label("last_id"))
+        .where(
+            Snapshot.cod_cargo == cargo,
+            Snapshot.abrangencia == uf,
+            Snapshot.suspeito.is_(False),
+        )
+        .scalar_subquery()
+    )
+    q = (
+        select(
+            SnapshotMunicipio.cod_ibge,
+            SnapshotMunicipio.sq_candidato,
+            SnapshotMunicipio.votos,
+            Candidato.nome_urna,
+        )
+        .join(Candidato, Candidato.sq_candidato == SnapshotMunicipio.sq_candidato)
+        .where(
+            SnapshotMunicipio.snapshot_id == subq,
+            SnapshotMunicipio.posicao == 1,
+        )
+    )
+    r = await sess.execute(q)
+    municipios: dict[str, dict[str, Any]] = {}
+    sq_para_idx: dict[str, int] = {}
+    for row in r.all():
+        if row.sq_candidato not in sq_para_idx:
+            sq_para_idx[row.sq_candidato] = len(sq_para_idx)
+        municipios[row.cod_ibge] = {
+            "sq_candidato": row.sq_candidato,
+            "nome_lider": row.nome_urna,
+            "votos": row.votos,
+            "cor_idx": sq_para_idx[row.sq_candidato],
+        }
+    return {"municipios": municipios}
 
 
 @router.get("/apuracao/lideres-por-uf")

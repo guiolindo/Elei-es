@@ -88,6 +88,21 @@ class SnapshotCandidato(Base):
     posicao: Mapped[int] = mapped_column(SmallInteger)
 
 
+class SnapshotMunicipio(Base):
+    """Votos de cada candidato em cada município, extraídos do snapshot
+    da UF quando o TSE inclui breakdown por município no JSON."""
+    __tablename__ = "snapshot_municipio"
+    __table_args__ = (
+        Index("ix_snap_mun_cargo_ibge", "cod_ibge", "sq_candidato"),
+    )
+    snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshots.id", ondelete="CASCADE"), primary_key=True)
+    cod_ibge: Mapped[str] = mapped_column(String(7), primary_key=True)
+    sq_candidato: Mapped[str] = mapped_column(ForeignKey("candidatos.sq_candidato"), primary_key=True)
+    votos: Mapped[int] = mapped_column(BigInteger)
+    pct_validos: Mapped[float] = mapped_column(Numeric(6, 3))
+    posicao: Mapped[int] = mapped_column(SmallInteger)
+
+
 class Evento(Base):
     __tablename__ = "eventos"
     __table_args__ = (

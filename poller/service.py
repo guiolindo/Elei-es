@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db import SessionLocal
 from app.models import (
-    Snapshot, SnapshotTotais, SnapshotCandidato, Evento, Candidato,
+    Snapshot, SnapshotTotais, SnapshotCandidato, SnapshotMunicipio, Evento, Candidato,
 )
 from math_engine import CandidatoResumo, TotaisResumo, avaliar_apuracao
 from poller.parser import parse_snapshot
@@ -171,6 +171,44 @@ async def processar_alvo(
                 pct_validos=c.pct_validos,
                 posicao=pos,
             ))
+
+        # Se o JSON traz breakdown por município, persiste também
+        # (sem coleta adicional — extraído do mesmo snapshot).
+        for mun in parsed.municipios:
+            ordenados_mun = sorted(mun.candidatos, key=lambda c: c.votos, reverse=True)
+            # Garante que os candidatos existem (podem vir novos aqui)
+            sqs_novos = {c.sq_candidato for c in ordenados_mun} - sqs_snapshot
+            if sqs_novos:
+                existentes_mun = await sess.execute(
+                    select(Candidato.sq_candidato).where(
+                        Candidato.sq_candidato.in_(sqs_novos)
+                    )
+                )
+                faltando_mun = sqs_novos - {row[0] for row in existentes_mun.all()}
+                for c in ordenados_mun:
+                    if c.sq_candidato not in faltando_mun:
+                        continue
+                    sess.add(Candidato(
+                        sq_candidato=c.sq_candidato,
+                        nome=c.nome_urna or f"Cand {c.numero}",
+                        nome_urna=c.nome_urna or f"Cand {c.numero}",
+                        numero=c.numero,
+                        cod_cargo=alvo.cod_cargo,
+                        uf=None if alvo.abrangencia == "BR" else alvo.abrangencia,
+                        partido_numero=0,
+                    ))
+                if faltando_mun:
+                    await sess.flush()
+
+            for pos, c in enumerate(ordenados_mun, start=1):
+                sess.add(SnapshotMunicipio(
+                    snapshot_id=snap.id,
+                    cod_ibge=mun.cod_ibge,
+                    sq_candidato=c.sq_candidato,
+                    votos=c.votos,
+                    pct_validos=c.pct_validos,
+                    posicao=pos,
+                ))
 
         eventos_novos: list[dict] = []
         if not suspeito:
