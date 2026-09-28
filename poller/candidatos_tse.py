@@ -156,11 +156,11 @@ async def _fetch_lista(
         if r.status_code == 404:
             return []
         if r.status_code == 403:
-            log.warning(
-                "candidatos %s cargo=%s uf=%s bloqueado (403 Akamai) — "
-                "proxy caiu ou lista precisa ser atualizada",
-                ano, cargo, uf,
-            )
+            # Esperado quando o Railway (fora do BR) bate direto no TSE.
+            # Os candidatos são importados via Termux (scripts/importar_termux.py).
+            # Debug em vez de warning pra não poluir o log.
+            log.debug("candidatos %s cargo=%s uf=%s: 403 Akamai (esperado)",
+                      ano, cargo, uf)
             return []
         r.raise_for_status()
         j = r.json()
