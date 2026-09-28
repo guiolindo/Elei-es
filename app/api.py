@@ -423,28 +423,69 @@ async def diagnostico_ids(sess: AsyncSession = Depends(get_session)) -> dict[str
 
 @router.get("/admin/testar-tse")
 async def admin_testar_tse() -> dict[str, Any]:
-    """Diagnostica conexão com o TSE. Testa 3 endpoints e retorna o
-    status de cada um. Útil para validar se o proxy configurado está
-    conseguindo passar pelo Akamai."""
+    """Diagnóstico: testa se o Railway consegue falar com todos os
+    endpoints do TSE que a apuração usa. Cada teste diz se tá OK ou
+    onde falha (Akamai 403, 404 pois eleição ainda não publicada, etc)."""
     from poller.tse_client import cliente_tse
     from app.config import get_settings
     s = get_settings()
-    urls = [
-        ("candidatos", f"{s.tse_divulga_base}/{s.eleicao_ano}/SP/{s.eleicao_cod_divulga}/1/candidatos"),
-        ("resultado", f"{s.tse_cdn_base}/{s.eleicao_cod_1t}/dados/br/br-c0001-e{s.eleicao_cod_1t:06d}-u.json"),
-        ("home", "https://divulgacandcontas.tse.jus.br/divulga/"),
+
+    tests = [
+        # (nome, url, o_que_esperar)
+        (
+            "1. Config comum (resultados.tse.jus.br)",
+            f"{s.tse_cdn_base.rsplit('/', 1)[0]}/comum/config/ele-c.json",
+            "Deve ser 200. Se der 403, resultados.tse.jus.br também tem Akamai (grave).",
+        ),
+        (
+            "2. Config via Worker",
+            f"{s.tse_cdn_base}/{s.eleicao_cod_1t}/config/br/br-e{s.eleicao_cod_1t:06d}-cs.json",
+            "200 se 2026 publicado, 404 se ainda não.",
+        ),
+        (
+            "3. Resultado Presidente BR",
+            f"{s.tse_cdn_base}/{s.eleicao_cod_1t}/dados/br/br-c0001-e{s.eleicao_cod_1t:06d}-u.json",
+            "200 se apuração começou, 404 antes de domingo 17h.",
+        ),
+        (
+            "4. Resultado Governador SP",
+            f"{s.tse_cdn_base}/{s.eleicao_cod_1t}/dados/sp/sp-c0003-e{s.eleicao_cod_1t:06d}-u.json",
+            "200 se apuração começou, 404 antes.",
+        ),
+        (
+            "5. Foto de candidato (divulga)",
+            f"https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img/{s.eleicao_cod_divulga}/250002541303/SP",
+            "403 esperado (Akamai). Fotos são carregadas pelo browser do usuário, não pelo Railway.",
+        ),
     ]
-    from poller.proxy_pool import get_pool
-    pool_info = get_pool().diagnostico()
-    resultado = {"proxy_pool": pool_info}
+
+    resultado: dict[str, Any] = {
+        "config_atual": {
+            "tse_cdn_base": s.tse_cdn_base,
+            "eleicao_cod_1t (resultados)": s.eleicao_cod_1t,
+            "eleicao_cod_divulga (candidatos/fotos)": s.eleicao_cod_divulga,
+        },
+        "resumo": [],
+        "detalhes": {},
+    }
     async with await cliente_tse() as client:
-        for nome, url in urls:
+        for nome, url, expl in tests:
             try:
                 r = await client.get(url, timeout=10.0)
-                resultado[nome] = {"status": r.status_code, "url": url,
-                                    "tamanho": len(r.content)}
+                status = r.status_code
+                ok = status == 200
+                emoji = "✅" if ok else ("🟡" if status == 404 else "❌")
+                resultado["resumo"].append(f"{emoji} {nome}: {status}")
+                resultado["detalhes"][nome] = {
+                    "url": url,
+                    "status": status,
+                    "tamanho_bytes": len(r.content),
+                    "explicacao": expl,
+                    "preview": r.text[:200] if len(r.text) < 500 else "(muito longo)",
+                }
             except Exception as e:
-                resultado[nome] = {"erro": str(e), "url": url}
+                resultado["resumo"].append(f"💥 {nome}: {e}")
+                resultado["detalhes"][nome] = {"url": url, "erro": str(e), "explicacao": expl}
     return resultado
 
 
