@@ -17,6 +17,16 @@ from app.ws import broadcaster
 router = APIRouter(prefix="/api")
 
 
+def _url_foto(sq_candidato: str) -> str:
+    """URL da foto do candidato. Carregada pelo navegador do usuário
+    (que está no BR) direto do TSE — passa pelo Akamai.
+    Se for candidato do seed antigo (prefixos fixos), volta pra silhueta.
+    """
+    if any(sq_candidato.startswith(p) for p in ("PR2026_", "GO2026_", "SE2026_", "DF2026_", "DE2026_")):
+        return "/static/silhueta.svg"
+    return f"https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidato/foto/2026/{sq_candidato}"
+
+
 @router.get("/cargos")
 async def listar_cargos(sess: AsyncSession = Depends(get_session)) -> list[dict[str, Any]]:
     r = await sess.execute(select(Cargo))
@@ -48,7 +58,7 @@ async def listar_candidatos(
             "numero": c.numero,
             "partido": c.partido_numero,
             "uf": c.uf,
-            "foto": f"/static/candidatos/{c.sq_candidato}.jpg",
+            "foto": _url_foto(c.sq_candidato),
         }
         for c in r.scalars()
     ]
@@ -68,7 +78,7 @@ async def ficha(sq: str, sess: AsyncSession = Depends(get_session)) -> dict[str,
         "partido": c.partido_numero,
         "uf": c.uf,
         "coligacao": c.coligacao,
-        "foto": f"/static/candidatos/{c.sq_candidato}.jpg",
+        "foto": _url_foto(c.sq_candidato),
     }
 
 
