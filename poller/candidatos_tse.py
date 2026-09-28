@@ -68,7 +68,8 @@ def _to_int(v, default=0):
 
 
 def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoTSE | None:
-    """Aceita tanto o schema divulgacandcontas quanto os JSONs de config."""
+    """Aceita o schema divulgacandcontas 2026 (id, nomeUrna, partido.sigla)
+    e os variantes de 2022 (sqCandidato, camelCase)."""
     sq = _pick(payload, "id", "sqCandidato", "sq_candidato", "idCandidato", "sqCand")
     if not sq:
         return None
@@ -79,15 +80,29 @@ def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoT
             "sigla": payload.get("sgPartido"),
             "nome": payload.get("nomePartido") or "",
         }
+    # Em 2026 o partido.numero vem 0 no JSON — usa o número do candidato
+    # como referência do partido (o número da urna começa com o número do partido
+    # em cargos proporcionais; em majoritários, o número do candidato TEM o do
+    # partido codificado). Deixamos 0 se não vier explícito.
+    partido_num = _to_int(_pick(partido, "numero", "numeroPartido", "nr_partido"))
+    if not partido_num:
+        # Tenta derivar do número do candidato para majoritários (numero = partido)
+        num_cand = _to_int(_pick(payload, "numero", "numeroCandidato", "nr_candidato"))
+        if cod_cargo in (1, 3, 5) and num_cand:
+            partido_num = num_cand
     coligacao = _pick(payload, "nomeColigacao", "nm_coligacao", "coligacao")
     vice = payload.get("vice") or payload.get("candidatoVice") or {}
     foto_url = _pick(payload, "fotoUrl", "foto_url", "urlFoto")
+    # Ignora candidatos indeferidos / inaptos
+    situacao = (_pick(payload, "descricaoSituacao", "descricaoTotalizacao") or "").lower()
+    if "indeferido" in situacao and "recurso" not in situacao:
+        return None
     return CandidatoTSE(
         sq_candidato=str(sq),
         nome=_pick(payload, "nomeCompleto", "nomeCandidato", "nm_candidato", "nome", default=""),
         nome_urna=_pick(payload, "nomeUrna", "nomeUrnaCandidato", "nm_urna_candidato", default=""),
         numero=_to_int(_pick(payload, "numero", "numeroCandidato", "nr_candidato")),
-        partido_numero=_to_int(_pick(partido, "numero", "numeroPartido", "nr_partido")),
+        partido_numero=partido_num,
         partido_sigla=_pick(partido, "sigla", "sg_partido", default=""),
         partido_nome=_pick(partido, "nome", "nm_partido", default=""),
         uf=uf,

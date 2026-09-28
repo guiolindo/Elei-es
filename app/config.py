@@ -27,8 +27,10 @@ class Settings(BaseSettings):
     tse_cdn_base: str = "https://apuracao-2026.gui342386.workers.dev/oficial/ele2026"
     tse_fotos_base: str = "https://apuracao-2026.gui342386.workers.dev/fotos"
     eleicao_ano: int = 2026
-    eleicao_cod_1t: int = 619
-    eleicao_cod_2t: int = 620
+    # Códigos internos da divulgacandcontas — obtidos da URL do site do TSE
+    # em 28/09/2026 (https://divulgacandcontas.tse.jus.br/divulga/#/candidato/...)
+    eleicao_cod_1t: int = 20322002026
+    eleicao_cod_2t: int = 20322002026  # mesmo id, muda o turno
     poll_interval_seconds: int = 20
     # Base do endpoint de listagem de candidatos (divulga do TSE).
     # Formato: {base}/{ano}/{uf}/{cod_eleicao}/{cargo}/candidatos

@@ -92,6 +92,10 @@ def create_app() -> FastAPI:
     async def index():
         return FileResponse("static/index.html")
 
+    @app.get("/importar")
+    async def importar_page():
+        return FileResponse("static/importar.html")
+
     return app
 
 

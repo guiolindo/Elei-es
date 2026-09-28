@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Importar candidatos do TSE</title>
+<link rel="stylesheet" href="/static/app.css">
+<style>
+.imp {
+  max-width: 900px; margin: 30px auto; padding: 30px;
+  background: var(--bg-2); border-radius: 14px; border: 1px solid var(--line);
+}
+.imp h1 { margin-bottom: 20px; }
+.imp label { display: block; margin: 14px 0 4px; font-size: 12px; text-transform: uppercase; color: var(--muted); }
+.imp select, .imp textarea, .imp input {
+  width: 100%; background: var(--bg-3); color: var(--fg);
+  border: 1px solid var(--line-2); border-radius: 10px;
+  padding: 12px; font-family: inherit; font-size: 14px;
+}
+.imp textarea { min-height: 200px; font-family: monospace; font-size: 12px; }
+.linha { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.url-copiar {
+  background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 8px;
+  padding: 12px; font-family: monospace; font-size: 12px;
+  word-break: break-all; margin-top: 8px;
+  color: var(--a); cursor: pointer;
+}
+.url-copiar:hover { background: var(--bg-1); }
+.btn { background: var(--grad-a); color: #000; font-weight: 700;
+       padding: 12px 28px; border: none; border-radius: 10px;
+       cursor: pointer; margin-top: 16px; font-size: 15px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.log { background: #000; color: #0f0; padding: 12px; border-radius: 8px;
+       font-family: monospace; font-size: 12px; margin-top: 14px;
+       max-height: 300px; overflow-y: auto; white-space: pre-wrap; }
+.aviso { padding: 12px; background: rgba(240,180,41,0.1); border-left: 3px solid var(--a);
+         border-radius: 6px; margin-bottom: 20px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="imp">
+  <h1>📥 Importar candidatos do TSE</h1>
+
+  <div class="aviso">
+    <strong>Por quê aqui?</strong> O Akamai (firewall do TSE) bloqueia qualquer request que não venha de navegador real, então o app não consegue baixar direto. Você abre a URL no Chrome do celular (funciona porque tem fingerprint de browser), copia o JSON, e cola aqui — o app faz o resto.
+  </div>
+
+  <div class="linha">
+    <div>
+      <label>Cargo</label>
+      <select id="cargo">
+        <option value="1">1 — Presidente</option>
+        <option value="3">3 — Governador</option>
+        <option value="5">5 — Senador</option>
+        <option value="6">6 — Deputado Federal</option>
+        <option value="7">7 — Deputado Estadual</option>
+      </select>
+    </div>
+    <div>
+      <label>UF (BR pra Presidente)</label>
+      <select id="uf">
+        <option value="BR">BR — Brasil</option>
+        <option value="AC">AC</option><option value="AL">AL</option>
+        <option value="AM">AM</option><option value="AP">AP</option>
+        <option value="BA">BA</option><option value="CE">CE</option>
+        <option value="DF">DF</option><option value="ES">ES</option>
+        <option value="GO">GO</option><option value="MA">MA</option>
+        <option value="MG">MG</option><option value="MS">MS</option>
+        <option value="MT">MT</option><option value="PA">PA</option>
+        <option value="PB">PB</option><option value="PE">PE</option>
+        <option value="PI">PI</option><option value="PR">PR</option>
+        <option value="RJ">RJ</option><option value="RN">RN</option>
+        <option value="RO">RO</option><option value="RR">RR</option>
+        <option value="RS">RS</option><option value="SC">SC</option>
+        <option value="SE">SE</option><option value="SP">SP</option>
+        <option value="TO">TO</option>
+      </select>
+    </div>
+  </div>
+
+  <label>1. Abre esta URL no Chrome do celular:</label>
+  <div class="url-copiar" id="url-tse" onclick="copiar(this.textContent)">—</div>
+
+  <label>2. Cola aqui o JSON que aparecer no navegador:</label>
+  <textarea id="json" placeholder='{"unidadeEleitoral":..., "candidatos":[...]}'></textarea>
+
+  <button class="btn" id="btn-importar">3. Importar</button>
+
+  <div class="log" id="log">Aguardando ação…</div>
+
+  <hr style="margin: 30px 0; border-color: var(--line);">
+
+  <h2 style="font-size: 18px; margin-bottom: 12px;">🚀 Modo automático (colar vários)</h2>
+  <p style="color: var(--muted); font-size: 13px;">
+    Se preferir importar todas as UFs de um cargo de uma vez, cole abaixo múltiplos JSONs
+    <strong>separados por linha em branco</strong>. O app detecta a UF pela <code>unidadeEleitoral.sigla</code> de cada bloco.
+  </p>
+  <div class="linha">
+    <div>
+      <label>Cargo (para todos os blocos)</label>
+      <select id="cargo-batch">
+        <option value="1">1 — Presidente</option>
+        <option value="3" selected>3 — Governador</option>
+        <option value="5">5 — Senador</option>
+        <option value="6">6 — Deputado Federal</option>
+        <option value="7">7 — Deputado Estadual</option>
+      </select>
+    </div>
+    <div></div>
+  </div>
+  <label>Vários JSONs, um por UF, separados por linha em branco:</label>
+  <textarea id="batch" placeholder="Cole o JSON da UF1&#10;&#10;Cole o JSON da UF2&#10;&#10;..." style="min-height: 300px;"></textarea>
+  <button class="btn" id="btn-batch">Importar tudo</button>
+</div>
+
+<script>
+const COD_ELEICAO = 20322002026;
+
+function url() {
+  const c = document.getElementById("cargo").value;
+  const u = document.getElementById("uf").value;
+  return `https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidatura/listar/2026/${u}/${COD_ELEICAO}/${c}/candidatos`;
+}
+
+function atualizarUrl() {
+  document.getElementById("url-tse").textContent = url();
+}
+document.getElementById("cargo").addEventListener("change", atualizarUrl);
+document.getElementById("uf").addEventListener("change", atualizarUrl);
+atualizarUrl();
+
+function copiar(t) {
+  navigator.clipboard?.writeText(t);
+  log("✂ URL copiada para colar no Chrome");
+}
+
+function log(msg) {
+  const el = document.getElementById("log");
+  el.textContent += "\n" + msg;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function importar(cargo, uf, jsonStr) {
+  try {
+    const j = JSON.parse(jsonStr);
+    const r = await fetch("/api/admin/importar-candidatos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cargo: +cargo, uf, json: j }),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      log(`✓ cargo=${cargo} uf=${uf}: ${data.atualizados} candidatos`);
+    } else {
+      log(`✗ cargo=${cargo} uf=${uf}: ${JSON.stringify(data)}`);
+    }
+  } catch (e) {
+    log(`✗ cargo=${cargo} uf=${uf}: ${e.message}`);
+  }
+}
+
+document.getElementById("btn-importar").addEventListener("click", async () => {
+  const cargo = document.getElementById("cargo").value;
+  const uf = document.getElementById("uf").value;
+  const jsonStr = document.getElementById("json").value.trim();
+  if (!jsonStr) return log("Cola o JSON primeiro");
+  log(`Enviando cargo=${cargo} uf=${uf}...`);
+  await importar(cargo, uf, jsonStr);
+});
+
+document.getElementById("btn-batch").addEventListener("click", async () => {
+  const cargo = document.getElementById("cargo-batch").value;
+  const bruto = document.getElementById("batch").value.trim();
+  if (!bruto) return log("Cola pelo menos um JSON");
+  const blocos = bruto.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  log(`Batch: ${blocos.length} blocos detectados`);
+  for (const b of blocos) {
+    try {
+      const j = JSON.parse(b);
+      const uf = j.unidadeEleitoral?.sigla || "BR";
+      await importar(cargo, uf, b);
+    } catch (e) {
+      log(`✗ bloco inválido: ${e.message.slice(0, 80)}`);
+    }
+  }
+  log("✔ Batch completo");
+});
+</script>
+</body>
+</html>
