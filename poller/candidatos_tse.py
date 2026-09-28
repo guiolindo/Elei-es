@@ -80,16 +80,18 @@ def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoT
             "sigla": payload.get("sgPartido"),
             "nome": payload.get("nomePartido") or "",
         }
-    # Em 2026 o partido.numero vem 0 no JSON — usa o número do candidato
-    # como referência do partido (o número da urna começa com o número do partido
-    # em cargos proporcionais; em majoritários, o número do candidato TEM o do
-    # partido codificado). Deixamos 0 se não vier explícito.
+    # Em 2026 o partido.numero vem 0 no JSON — derivamos do número do candidato:
+    #  - Majoritário (1,3,5): número do candidato = número do partido (dois dígitos)
+    #  - Proporcional (6,7): dois primeiros dígitos do número (ex.: 13xxx = PT)
     partido_num = _to_int(_pick(partido, "numero", "numeroPartido", "nr_partido"))
-    if not partido_num:
-        # Tenta derivar do número do candidato para majoritários (numero = partido)
-        num_cand = _to_int(_pick(payload, "numero", "numeroCandidato", "nr_candidato"))
-        if cod_cargo in (1, 3, 5) and num_cand:
+    num_cand = _to_int(_pick(payload, "numero", "numeroCandidato", "nr_candidato"))
+    if not partido_num and num_cand:
+        if cod_cargo in (1, 3, 5):
             partido_num = num_cand
+        elif cod_cargo in (6, 7):
+            # Pega os dois primeiros dígitos (10..99) do número da urna
+            s = str(num_cand)
+            partido_num = int(s[:2]) if len(s) >= 2 else 0
     coligacao = _pick(payload, "nomeColigacao", "nm_coligacao", "coligacao")
     vice = payload.get("vice") or payload.get("candidatoVice") or {}
     foto_url = _pick(payload, "fotoUrl", "foto_url", "urlFoto")
@@ -174,8 +176,12 @@ async def _upsert(sess: AsyncSession, candidatos: Iterable[CandidatoTSE]) -> int
     partidos_vistos: dict[int, tuple[str, str]] = {}
     cands_dict = []
     for c in candidatos:
+        # Sempre registra o partido (sigla vem do JSON mesmo com numero derivado)
         if c.partido_numero:
             partidos_vistos[c.partido_numero] = (c.partido_sigla, c.partido_nome)
+        else:
+            # partido_numero=0: use um partido dummy pra não quebrar FK
+            partidos_vistos.setdefault(0, ("N/D", "Não informado"))
         cands_dict.append({
             "sq_candidato": c.sq_candidato,
             "nome": c.nome or c.nome_urna,

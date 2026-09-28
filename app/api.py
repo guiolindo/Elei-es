@@ -316,6 +316,37 @@ async def admin_status(sess: AsyncSession = Depends(get_session)) -> dict[str, A
     }
 
 
+@router.post("/admin/limpar-seed")
+async def limpar_seed(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Remove os candidatos fictícios do seed (prefixos PR2026_, GO2026_, etc).
+    Chame depois que os reais entrarem para não misturar."""
+    from sqlalchemy import delete, or_
+    prefixos = ["PR2026_", "GO2026_", "SE2026_", "DF2026_", "DE2026_"]
+    stmt = delete(Candidato).where(
+        or_(*(Candidato.sq_candidato.like(f"{p}%") for p in prefixos))
+    )
+    r = await sess.execute(stmt)
+    await sess.commit()
+    return {"removidos": r.rowcount}
+
+
+@router.post("/admin/upload-foto")
+async def upload_foto(payload: dict[str, Any]) -> dict[str, Any]:
+    """Recebe foto em base64 e salva em static/candidatos/{sq}.jpg.
+
+    Body: {"sq_candidato": "250002541303", "b64": "/9j/4AAQ..."}
+    Chamado pelo script Termux que baixa fotos com curl-cffi.
+    """
+    import base64
+    import os
+    sq = str(payload["sq_candidato"])
+    b64 = payload["b64"]
+    os.makedirs("static/candidatos", exist_ok=True)
+    with open(f"static/candidatos/{sq}.jpg", "wb") as f:
+        f.write(base64.b64decode(b64))
+    return {"ok": True, "sq": sq}
+
+
 @router.post("/admin/importar-candidatos")
 async def importar_candidatos(
     payload: dict[str, Any],

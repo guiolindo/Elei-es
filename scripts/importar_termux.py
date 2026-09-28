@@ -40,6 +40,34 @@ ok = 0
 fail = 0
 total_cand = 0
 
+# 1) Limpa candidatos falsos (seed) antes de importar os reais
+print("Limpando seed antigo…")
+try:
+    r = requests.post(f"{APP}/api/admin/limpar-seed", timeout=30)
+    print(f"  removidos: {r.json().get('removidos')}")
+except Exception as e:
+    print(f"  aviso: {e}")
+
+FOTO_BASE = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidato/foto"
+
+def baixar_foto(sq: str) -> bool:
+    """Baixa a foto do candidato do TSE e envia pro app."""
+    try:
+        r = requests.get(f"{FOTO_BASE}/{ANO}/{sq}", impersonate="chrome", timeout=15)
+        if r.status_code != 200 or len(r.content) < 500:
+            return False
+        import base64
+        b64 = base64.b64encode(r.content).decode()
+        resp = requests.post(
+            f"{APP}/api/admin/upload-foto",
+            json={"sq_candidato": sq, "b64": b64},
+            timeout=30,
+        )
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
 for cargo, nome, ufs in CARGOS:
     for uf in ufs:
         url = f"{TSE}/{ANO}/{uf}/{COD}/{cargo}/candidatos"
@@ -78,6 +106,14 @@ for cargo, nome, ufs in CARGOS:
                       f"(TSE tinha {n_cands})")
                 ok += 1
                 total_cand += res.get("atualizados", 0)
+                # Baixa fotos dos candidatos aptos (majoritários — poucos)
+                if cargo in (1, 3, 5):
+                    n_fotos = 0
+                    for c in (data.get("candidatos") or [])[:20]:
+                        if baixar_foto(str(c.get("id"))):
+                            n_fotos += 1
+                    if n_fotos:
+                        print(f"     └ {n_fotos} fotos baixadas")
             else:
                 print(f"[err POST] {nome} {uf}: HTTP {resp.status_code}")
                 fail += 1
