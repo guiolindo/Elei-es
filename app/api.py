@@ -316,6 +316,33 @@ async def admin_status(sess: AsyncSession = Depends(get_session)) -> dict[str, A
     }
 
 
+@router.post("/admin/importar-candidatos")
+async def importar_candidatos(
+    payload: dict[str, Any],
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Recebe JSON do TSE (que o cliente baixou direto do celular) e faz upsert.
+
+    Body esperado:
+        { "cargo": 1, "uf": "SP", "json": { ... payload bruto do TSE ... } }
+
+    Uso via Termux (ver scripts/importar_do_celular.sh) — o celular roda o
+    fetch direto no TSE (funciona porque é IP residencial BR) e faz POST
+    aqui pra alimentar o banco. Substitui o sync automático quando o
+    Akamai bloqueia o backend.
+    """
+    from poller.candidatos_tse import parse_lista, _upsert
+    cargo = int(payload["cargo"])
+    uf_arg = payload.get("uf")
+    uf = None if uf_arg in ("BR", "", None) else uf_arg
+    tse_json = payload["json"]
+    cands = parse_lista(tse_json, cargo, uf)
+    if not cands:
+        return {"atualizados": 0, "aviso": "JSON não tinha candidatos ou schema desconhecido"}
+    n = await _upsert(sess, cands)
+    return {"atualizados": n, "cargo": cargo, "uf": uf_arg or "BR"}
+
+
 @router.get("/admin/testar-tse")
 async def admin_testar_tse() -> dict[str, Any]:
     """Diagnostica conexão com o TSE. Testa 3 endpoints e retorna o
