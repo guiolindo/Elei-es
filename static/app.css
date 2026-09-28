@@ -46,9 +46,18 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   background: var(--grad-hero);
   border-bottom: 1px solid var(--line);
   overflow: hidden;
-  transition: box-shadow .2s;
+  transition: box-shadow .2s, padding .2s;
 }
 .hero.scrolled { box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+/* No mobile, ao rolar, esconde o painel de stats — só barra fica */
+.hero .stats { transition: max-height .25s, opacity .2s, padding .2s; }
+@media (max-width: 720px) {
+  .hero.scrolled { padding-top: 12px; }
+  .hero.scrolled .stats {
+    max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0;
+    overflow: hidden;
+  }
+}
 .hero-bg {
   position: absolute; inset: 0; opacity: 0.4;
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><circle cx='1' cy='1' r='1' fill='%23303a4d'/></svg>");
@@ -175,11 +184,12 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 16px 16px 40px;                 /* espaço pro botão detalhes absoluto */
   cursor: pointer;
   transition: all .2s cubic-bezier(.4,0,.2,1);
   display: flex; gap: 14px;
   overflow: hidden;
+  min-height: 118px;                        /* altura mínima consistente */
 }
 .candidato::before {
   content: ""; position: absolute; inset: 0;
@@ -212,9 +222,24 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 }
 .card-comp .cand-foto-fallback { width: 88px; height: 112px; font-size: 28px; }
 .modal-hero .cand-foto-fallback { width: 100px; height: 130px; font-size: 32px; }
-.cand-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.cand-nome { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
-.cand-meta { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+.cand-info {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  overflow: hidden;
+}
+.cand-nome {
+  font-weight: 700; font-size: 16px; letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cand-meta {
+  font-size: 12px; color: var(--muted); margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center;
+  line-height: 1.4;
+}
+.cand-meta .pill-part, .cand-meta .badge-part-wrap {
+  vertical-align: baseline;
+}
 
 /* Badge do partido: tenta logo, cai na pill se não existir */
 .badge-part-wrap {
@@ -254,15 +279,24 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .cand-votos {
   font-size: 22px; font-weight: 800; margin-top: 8px;
   font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  line-height: 1.1;
 }
-.cand-pct { font-size: 13px; color: var(--fg-2); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
-.cand-barra { height: 4px; background: var(--bg-3); border-radius: 2px; overflow: hidden; margin-top: auto; padding-top: 8px; }
+.cand-pct {
+  font-size: 12px; color: var(--fg-2); margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cand-barra {
+  height: 4px; background: var(--bg-3); border-radius: 2px;
+  overflow: hidden; margin-top: 8px;
+}
 .cand-barra div { height: 4px; background: var(--grad-a); border-radius: 2px; transition: width .6s cubic-bezier(.4,0,.2,1); }
 
 .badge-prop {
   display: inline-block; padding: 3px 8px; border-radius: 999px;
   font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
   margin-top: 4px; text-transform: uppercase;
+  align-self: flex-start; white-space: nowrap;
 }
 .badge-eleito     { background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid #10b981; }
 .badge-suplente   { background: rgba(148,161,184,0.15); color: #b6c0d4; border: 1px solid #94a1b8; }
