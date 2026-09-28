@@ -457,17 +457,26 @@ async function atualizarComparacao() {
     .sort((x, y) => y.votos - x.votos);
   if (ordenados.length >= 2) {
     const dif = ordenados[0].votos - ordenados[1].votos;
-    $("dif-abs").textContent = fmtNum(dif);
+    animarNumero($("dif-abs"), dif);
     $("dif-pct").textContent = (ordenados[0].pct_validos - ordenados[1].pct_validos).toFixed(2) + " pp";
-    // probabilidade estimada — dif / restantes_max
-    const restantesMax = Math.max(0, (dados.totais.eleitorado_apto || 0) - (ordenados[0].votos + ordenados[1].votos) * 0);
+    // Margem de segurança = quanto o líder pode perder e ainda vencer
+    const restantes = Math.max(0, (dados.totais.eleitorado_apto || 0) - (dados.totais.eleitorado_apto_totalizadas || 0));
+    const margem = ordenados[0].votos > 0
+      ? Math.max(-100, Math.min(100, (ordenados[0].votos - (ordenados[1].votos + restantes)) / ordenados[0].votos * 100))
+      : 0;
     const pctApurado = dados.totais.pct_apurado || 0;
     if (pctApurado < 20) {
       $("dif-prob").textContent = "EM DISPUTA";
       $("dif-prob-hint").textContent = `Motor matemático silenciado (< 20% apurado)`;
+    } else if (margem <= 0) {
+      $("dif-prob").textContent = "NO FIO";
+      $("dif-prob-hint").textContent = `Diferença menor que os votos que faltam`;
+    } else if (margem > 50) {
+      $("dif-prob").textContent = "DEFINIDO";
+      $("dif-prob-hint").textContent = `Líder folgado — margem ${margem.toFixed(1)}%`;
     } else {
-      $("dif-prob").textContent = pctApurado >= 99 ? "DEFINIDO" : `~${pctApurado.toFixed(0)}%`;
-      $("dif-prob-hint").textContent = `Baseado em ${pctApurado.toFixed(1)}% apurado`;
+      $("dif-prob").textContent = `~${margem.toFixed(0)}%`;
+      $("dif-prob-hint").textContent = `Margem de segurança sobre 2º`;
     }
   }
 }
