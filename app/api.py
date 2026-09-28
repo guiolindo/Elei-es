@@ -392,6 +392,35 @@ async def importar_candidatos(
     return {"atualizados": n, "cargo": cargo, "uf": uf_arg or "BR"}
 
 
+@router.get("/admin/diagnostico-ids")
+async def diagnostico_ids(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Verifica se os IDs de candidatos batem entre divulga (importado) e
+    resultados (snapshots). Chame depois que começar a apurar."""
+    from sqlalchemy import func
+    r = await sess.execute(
+        select(SnapshotCandidato.sq_candidato,
+               func.count(SnapshotCandidato.snapshot_id))
+        .group_by(SnapshotCandidato.sq_candidato)
+    )
+    sqs_em_snapshots = {row[0]: row[1] for row in r.all()}
+    if not sqs_em_snapshots:
+        return {"status": "ainda sem snapshots"}
+
+    r = await sess.execute(select(Candidato.sq_candidato))
+    sqs_em_candidatos = {row[0] for row in r.all()}
+
+    faltando_nome = [
+        sq for sq in sqs_em_snapshots
+        if sq not in sqs_em_candidatos
+    ]
+    return {
+        "total_sqs_snapshots": len(sqs_em_snapshots),
+        "total_sqs_candidatos": len(sqs_em_candidatos),
+        "candidatos_sem_ficha_completa": len(faltando_nome),
+        "amostra_faltando": faltando_nome[:10],
+    }
+
+
 @router.get("/admin/testar-tse")
 async def admin_testar_tse() -> dict[str, Any]:
     """Diagnostica conexão com o TSE. Testa 3 endpoints e retorna o

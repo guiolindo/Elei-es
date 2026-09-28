@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db import SessionLocal
 from app.models import (
-    Snapshot, SnapshotTotais, SnapshotCandidato, Evento,
+    Snapshot, SnapshotTotais, SnapshotCandidato, Evento, Candidato,
 )
 from math_engine import CandidatoResumo, TotaisResumo, avaliar_apuracao
 from poller.parser import parse_snapshot
@@ -136,6 +136,33 @@ async def processar_alvo(
         ))
 
         ordenados = sorted(parsed.candidatos, key=lambda c: c.votos, reverse=True)
+        # Garante que todos os candidatos do snapshot existem na tabela
+        # candidatos — evita quebrar FK caso o sq_candidato de resultados
+        # não bata com o id vindo da divulga. Cria stubs quando falta.
+        sqs_snapshot = {c.sq_candidato for c in ordenados}
+        if sqs_snapshot:
+            existentes = await sess.execute(
+                select(Candidato.sq_candidato).where(
+                    Candidato.sq_candidato.in_(sqs_snapshot)
+                )
+            )
+            faltando = sqs_snapshot - {row[0] for row in existentes.all()}
+            for c in ordenados:
+                if c.sq_candidato not in faltando:
+                    continue
+                sess.add(Candidato(
+                    sq_candidato=c.sq_candidato,
+                    nome=c.nome_urna or f"Cand {c.numero}",
+                    nome_urna=c.nome_urna or f"Cand {c.numero}",
+                    numero=c.numero,
+                    cod_cargo=alvo.cod_cargo,
+                    uf=None if alvo.abrangencia == "BR" else alvo.abrangencia,
+                    partido_numero=0,
+                ))
+            if faltando:
+                await sess.flush()
+                log.info("stub criado para %d candidatos que faltavam", len(faltando))
+
         for pos, c in enumerate(ordenados, start=1):
             sess.add(SnapshotCandidato(
                 snapshot_id=snap.id,
