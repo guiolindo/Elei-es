@@ -214,7 +214,20 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .cand-nome { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
 .cand-meta { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
 
-/* Pill do partido com cor oficial */
+/* Badge do partido: tenta logo, cai na pill se não existir */
+.badge-part-wrap {
+  display: inline-flex; align-items: center; vertical-align: middle;
+  height: 18px;
+}
+.badge-part-logo {
+  height: 18px; width: auto; max-width: 60px;
+  object-fit: contain;
+  vertical-align: middle;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
+}
+.badge-part-logo.erro { display: none; }
+
+/* Pill do partido com cor oficial (fallback quando não tem logo) */
 .pill-part {
   display: inline-block;
   color: #fff;

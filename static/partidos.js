@@ -56,3 +56,17 @@ export function corDoPartido(numero) {
 export function siglaDoPartido(numero) {
   return PARTIDOS[numero]?.sigla || `P${numero || "?"}`;
 }
+
+// Retorna HTML de badge do partido: tenta logo, cai na pill colorida com sigla.
+// Logo carregada do path local static/partidos/{numero}.png (baixada 1x via
+// scripts/baixar_logos_partidos.sh — se o arquivo não existe, browser vê o
+// erro e o onerror mostra a pill como fallback).
+export function badgePartidoHtml(numero) {
+  const sig = siglaDoPartido(numero);
+  const cor = corDoPartido(numero);
+  return `<span class="badge-part-wrap">
+    <img class="badge-part-logo" src="/static/partidos/${numero}.png" alt="${sig}"
+         onerror="this.classList.add('erro');this.nextElementSibling.style.display='inline-block'">
+    <span class="pill-part" style="background:${cor};display:none">${sig}</span>
+  </span>`;
+}

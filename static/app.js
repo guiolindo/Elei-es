@@ -1,5 +1,5 @@
 import { renderMapa } from "/static/mapa-br.js";
-import { corDoPartido, siglaDoPartido } from "/static/partidos.js";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js";
 
 const PALETA = ["#f0b429", "#3b82f6", "#ec4899", "#10b981", "#a855f7", "#f97316"];
 const TZ = "America/Sao_Paulo";
@@ -192,7 +192,7 @@ function renderLista() {
       const fed = prop.federacao ? ` · Fed.` : "";
       badgeProp = `<div class="badge-prop ${cls}" title="${prop.status}">${label}${fed}</div>`;
     }
-    const pillPart = `<span class="pill-part" style="background:${corPartido(c.partido)}">${siglaDoPartido(c.partido)}</span>`;
+    const pillPart = badgePartidoHtml(c.partido);
     div.innerHTML = `
       <img class="cand-foto" src="${c.foto}" alt="" loading="lazy" decoding="async">
       <div class="cand-info">
@@ -256,7 +256,6 @@ async function abrirModal(sq) {
     const c = await get(`/api/candidato/${sq}`);
     const votos = state.ultimoSnapshot?.candidatos?.find(x => x.sq_candidato === sq);
     const corP = corPartido(c.partido);
-    const sig = siglaDoPartido(c.partido);
     $("modal-card").innerHTML = `
       <button class="modal-close" aria-label="Fechar">✕</button>
       <div class="modal-acento" style="background:linear-gradient(90deg, ${corP}, transparent 70%)"></div>
@@ -265,7 +264,7 @@ async function abrirModal(sq) {
         <div>
           <div class="modal-nome">${c.nome}</div>
           <div class="modal-urna">Nome urna: ${c.nome_urna}</div>
-          <div class="modal-urna">${c.numero} · <span class="pill-part" style="background:${corP}">${sig}</span>${c.uf ? " · " + c.uf : ""}</div>
+          <div class="modal-urna">${c.numero} · ${badgePartidoHtml(c.partido)}${c.uf ? " · " + c.uf : ""}</div>
         </div>
       </div>
       <div class="modal-grid">
@@ -360,7 +359,7 @@ function renderCardsComp() {
       <div class="badge-pos" data-pos="${sq}">—</div>
       <img src="${c.foto}" loading="lazy" decoding="async">
       <div class="nome">${c.nome_urna}</div>
-      <div class="meta">${c.numero} · <span class="pill-part" style="background:${corPartido(c.partido)}">${siglaDoPartido(c.partido)}</span>${c.uf ? " · " + c.uf : ""}</div>
+      <div class="meta">${c.numero} · ${badgePartidoHtml(c.partido)}${c.uf ? " · " + c.uf : ""}</div>
       <div class="votos" data-votos="${sq}">—</div>
       <div class="pct" data-pct="${sq}">—</div>`;
     anexarFotoComRetry(div.querySelector("img"), c.nome_urna, c.partido);
