@@ -256,6 +256,57 @@ async def apuracao_proporcional(
     }
 
 
+@router.get("/apuracao/municipio")
+async def detalhe_municipio(
+    cargo: int = Query(...),
+    uf: str = Query(...),
+    cod_ibge: str = Query(...),
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Retorna ranking completo dos candidatos daquele município."""
+    from sqlalchemy import func
+    subq = (
+        select(func.max(Snapshot.id).label("last_id"))
+        .where(
+            Snapshot.cod_cargo == cargo,
+            Snapshot.abrangencia == uf.upper(),
+            Snapshot.suspeito.is_(False),
+        )
+        .scalar_subquery()
+    )
+    q = (
+        select(
+            SnapshotMunicipio.sq_candidato,
+            SnapshotMunicipio.votos,
+            SnapshotMunicipio.pct_validos,
+            SnapshotMunicipio.posicao,
+            Candidato.nome_urna,
+            Candidato.numero,
+            Candidato.partido_numero,
+        )
+        .join(Candidato, Candidato.sq_candidato == SnapshotMunicipio.sq_candidato)
+        .where(
+            SnapshotMunicipio.snapshot_id == subq,
+            SnapshotMunicipio.cod_ibge == cod_ibge,
+        )
+        .order_by(SnapshotMunicipio.posicao)
+    )
+    r = await sess.execute(q)
+    candidatos = [
+        {
+            "sq_candidato": row.sq_candidato,
+            "nome_urna": row.nome_urna,
+            "numero": row.numero,
+            "partido": row.partido_numero,
+            "votos": row.votos,
+            "pct_validos": float(row.pct_validos),
+            "posicao": row.posicao,
+        }
+        for row in r.all()
+    ]
+    return {"cod_ibge": cod_ibge, "candidatos": candidatos}
+
+
 @router.get("/apuracao/lideres-por-municipio")
 async def lideres_por_municipio(
     cargo: int = Query(...),

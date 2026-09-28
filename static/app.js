@@ -243,6 +243,46 @@ async function abrirModal(sq) {
 }
 function fecharModal() { $("modal-cand").classList.add("oculto"); }
 
+async function abrirModalMunicipio(codIbge) {
+  try {
+    const dados = await get(`/api/apuracao/municipio?cargo=${state.cargo}&uf=${state.abrangencia}&cod_ibge=${codIbge}`);
+    const cands = dados.candidatos || [];
+    if (!cands.length) {
+      toast(`Município ${codIbge}: sem dados ainda`, "warn");
+      return;
+    }
+    const topVotos = Math.max(1, ...cands.map(c => c.votos));
+    $("modal-card").innerHTML = `
+      <button class="modal-close" aria-label="Fechar">✕</button>
+      <div class="modal-hero" style="flex-direction:column;align-items:flex-start">
+        <div class="modal-nome">Município ${codIbge}</div>
+        <div class="modal-urna">Ranking em ${state.abrangencia} · ${cands.length} candidatos</div>
+      </div>
+      <div style="max-height:400px;overflow-y:auto">
+        ${cands.slice(0, 20).map((c, i) => `
+          <div style="display:flex;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line);align-items:center">
+            <div style="min-width:24px;font-weight:700;color:var(--muted)">${i+1}</div>
+            <div style="flex:1">
+              <div style="font-weight:600">${c.nome_urna}</div>
+              <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace">${c.numero} · P${c.partido}</div>
+            </div>
+            <div style="text-align:right;min-width:120px">
+              <div style="font-weight:700;font-variant-numeric:tabular-nums">${fmtNum(c.votos)}</div>
+              <div style="font-size:11px;color:var(--muted)">${c.pct_validos.toFixed(1)}%</div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      ${cands.length > 20 ? `<div style="color:var(--muted);font-size:12px;padding:8px 0;text-align:center">+ ${cands.length - 20} outros candidatos</div>` : ""}
+    `;
+    $("modal-cand").classList.remove("oculto");
+    $("modal-card").querySelector(".modal-close").onclick = fecharModal;
+    $("modal-cand").querySelector(".modal-back").onclick = fecharModal;
+  } catch (e) {
+    toast("Erro: " + e.message, "danger");
+  }
+}
+
 // ============ comparação ============
 function abrirComparacao() {
   if (state.selecionados.length < 2) return;
@@ -429,6 +469,12 @@ async function atualizarPainelTotais() {
   $("secoes").textContent = fmtNum(t.secoes_totalizadas);
   $("secoes-sub").textContent = `de ${fmtNum(t.secoes_total)}`;
   $("comparecimento").textContent = fmtNum(t.comparecimento);
+  $("abstencoes").textContent = fmtNum(t.abstencoes);
+  const totalAptos = t.eleitorado_apto || 1;
+  const pctCompar = (t.comparecimento / totalAptos * 100).toFixed(1);
+  const pctAbst = (t.abstencoes / totalAptos * 100).toFixed(1);
+  $("pct-comparecimento").textContent = `${pctCompar}% dos aptos`;
+  $("pct-abstencoes").textContent = `${pctAbst}% dos aptos`;
   $("brancos-nulos").textContent = `${fmtNum(t.votos_brancos)} · ${fmtNum(t.votos_nulos)}`;
   $("ultimo").textContent = fmtHora(dados.coletado_em);
 
@@ -498,9 +544,7 @@ async function atualizarMapa() {
     }
   } catch (e) {}
   await renderMapa(container, state.abrangencia, dadosPorMun, {
-    onClickArea: (nomeMun) => {
-      toast(`${nomeMun}: coleta por município ainda não ativa`, "warn");
-    },
+    onClickArea: (codIbge) => abrirModalMunicipio(codIbge),
   });
   renderLegenda(leg, dadosPorMun, {
     tituloVazio: `Municípios de ${state.abrangencia}`,
