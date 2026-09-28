@@ -18,6 +18,7 @@ from app.config import get_settings
 from app.ws import broadcaster
 from poller.service import loop as poller_loop
 from poller.candidatos_tse import sincronizar_candidatos
+from poller.descoberta import descobrir_cod_eleicao_atual
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -25,6 +26,22 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 log = logging.getLogger("app")
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+
+
+async def _descobrir_cod_loop():
+    """A cada 5 min tenta descobrir o código real da eleição 2026 no TSE.
+    Enquanto ainda é 2024, mantém o fallback do simulado (21270).
+    """
+    settings = get_settings()
+    while True:
+        try:
+            cod = await descobrir_cod_eleicao_atual()
+            if cod and cod != settings.eleicao_cod_1t:
+                object.__setattr__(settings, "eleicao_cod_1t", cod)
+                log.info("cod_eleicao atualizado dinamicamente para %s", cod)
+        except Exception:
+            log.exception("descoberta cod falhou")
+        await asyncio.sleep(300)
 
 
 async def _sync_candidatos_loop():
@@ -51,9 +68,11 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     tasks: list[asyncio.Task] = []
     if not getattr(app.state, "poller_disabled", False):
+        tasks.append(asyncio.create_task(_descobrir_cod_loop()))
         tasks.append(asyncio.create_task(poller_loop(broadcaster=broadcaster)))
         tasks.append(asyncio.create_task(_sync_candidatos_loop()))
-        log.info("poller + sync candidatos iniciados (intervalo=%ss)", settings.poll_interval_seconds)
+        log.info("poller + descoberta + sync candidatos iniciados (intervalo=%ss)",
+                 settings.poll_interval_seconds)
     try:
         yield
     finally:
