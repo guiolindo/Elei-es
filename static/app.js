@@ -24,10 +24,38 @@ const fmtNum = n => fmt.format(n ?? 0);
 const fmtHora = iso => new Date(iso).toLocaleTimeString("pt-BR", { timeZone: TZ });
 const $ = id => document.getElementById(id);
 
-async function get(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json();
+// Anima transição entre valores numéricos (efeito ao vivo)
+function animarNumero(el, novoValor, duracao = 500) {
+  if (!el) return;
+  const anterior = parseInt((el.dataset.valor || el.textContent).replace(/\D/g, ""), 10) || 0;
+  if (anterior === novoValor) { el.textContent = fmtNum(novoValor); return; }
+  el.dataset.valor = novoValor;
+  const inicio = performance.now();
+  function tick(t) {
+    const p = Math.min(1, (t - inicio) / duracao);
+    const eased = 1 - Math.pow(1 - p, 3);
+    const atual = Math.round(anterior + (novoValor - anterior) * eased);
+    el.textContent = fmtNum(atual);
+    if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = fmtNum(novoValor);
+  }
+  requestAnimationFrame(tick);
+}
+
+async function get(url, opts = {}) {
+  const tentativas = opts.retries ?? 2;
+  let ultimoErro;
+  for (let i = 0; i <= tentativas; i++) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${r.status} ${await r.text().catch(() => "")}`);
+      return await r.json();
+    } catch (e) {
+      ultimoErro = e;
+      if (i < tentativas) await new Promise(res => setTimeout(res, 400 * (i + 1)));
+    }
+  }
+  throw ultimoErro;
 }
 
 function toast(msg, tipo = "") {
@@ -540,10 +568,10 @@ async function atualizarPainelTotais() {
   const t = dados.totais;
   $("pct-apurado").textContent = t.pct_apurado.toFixed(2) + "%";
   $("prog-apurado").style.width = t.pct_apurado + "%";
-  $("secoes").textContent = fmtNum(t.secoes_totalizadas);
+  animarNumero($("secoes"), t.secoes_totalizadas);
   $("secoes-sub").textContent = `de ${fmtNum(t.secoes_total)}`;
-  $("comparecimento").textContent = fmtNum(t.comparecimento);
-  $("abstencoes").textContent = fmtNum(t.abstencoes);
+  animarNumero($("comparecimento"), t.comparecimento);
+  animarNumero($("abstencoes"), t.abstencoes);
   const totalAptos = t.eleitorado_apto || 1;
   const pctCompar = (t.comparecimento / totalAptos * 100).toFixed(1);
   const pctAbst = (t.abstencoes / totalAptos * 100).toFixed(1);
@@ -558,7 +586,7 @@ async function atualizarPainelTotais() {
     const votos = document.querySelector(`[data-sq="${c.sq_candidato}"]`);
     const pct = document.querySelector(`[data-sq-pct="${c.sq_candidato}"]`);
     const barra = document.querySelector(`[data-sq-barra="${c.sq_candidato}"]`);
-    if (votos) votos.textContent = fmtNum(c.votos);
+    if (votos) animarNumero(votos, c.votos, 400);
     if (pct) pct.textContent = c.pct_validos.toFixed(2) + "% dos válidos";
     if (barra) barra.style.width = (c.votos / maxV * 100) + "%";
   });
