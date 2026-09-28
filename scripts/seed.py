@@ -91,9 +91,13 @@ async def main() -> None:
         for num, sig, nome in PARTIDOS:
             if not (await sess.execute(select(Partido).where(Partido.numero == num))).scalar_one_or_none():
                 sess.add(Partido(numero=num, sigla=sig, nome=nome))
-        # candidatos
-        for sq, nome, urna, numero, cargo, uf, partido in CANDIDATOS:
-            if not (await sess.execute(select(Candidato).where(Candidato.sq_candidato == sq))).scalar_one_or_none():
+        # candidatos — só insere fictícios se não houver NENHUM candidato ainda.
+        # Depois que os reais do TSE entrarem, o seed nunca mais reinsere.
+        r = await sess.execute(select(Candidato).limit(1))
+        if r.scalar_one_or_none() is not None:
+            print("já existem candidatos — pulando seed de fictícios")
+        else:
+            for sq, nome, urna, numero, cargo, uf, partido in CANDIDATOS:
                 sess.add(Candidato(
                     sq_candidato=sq, nome=nome, nome_urna=urna, numero=numero,
                     cod_cargo=cargo, uf=uf, partido_numero=partido,
