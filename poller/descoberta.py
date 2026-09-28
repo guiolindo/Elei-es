@@ -1,12 +1,31 @@
 """Descoberta automática do código da eleição atual no TSE.
 
 O TSE publica em `resultados.tse.jus.br/oficial/comum/config/ele-c.json`
-qual é o ciclo/código de eleição corrente. Enquanto for 2024, mantemos
-o valor hardcoded do simulado (21270). Assim que virar 2026, atualizamos.
+a lista de pleitos ativos. Estrutura confirmada em 28/09/2026:
+
+  { "c": "ele2024",     # ciclo atual
+    "pl": [
+      { "cd": "452",    # código do pleito
+        "dt": "06/10/2024",
+        "e": [
+          { "cd": "619",       # código da eleição (1T)
+            "cdt2": "620",     # código do 2T
+            "nm": "Eleição Ordinária Municipal - 2024 - 06/10/2024 1º Turno",
+            "t": "1",          # turno
+            "cp": [ ... ]      # cargos
+          }
+        ]
+      }
+    ]
+  }
+
+Assim que TSE incluir "Eleição Geral 2026" nesta lista, extraímos e
+cd correto automaticamente e atualizamos o config em memória.
 """
 from __future__ import annotations
 
 import logging
+import re
 
 import httpx
 
@@ -16,11 +35,14 @@ from poller.tse_client import BROWSER_HEADERS, cliente_tse
 log = logging.getLogger(__name__)
 
 
-async def descobrir_cod_eleicao_atual() -> int | None:
-    """Consulta o TSE e devolve o código do ciclo/eleição atual, se for 2026."""
+async def descobrir_cod_eleicao_atual() -> tuple[int, int] | None:
+    """Consulta o TSE e devolve (cd_1t, cd_2t) da Eleição Geral 2026 quando disponível.
+
+    Retorna None se ainda não estiver publicada.
+    """
     settings = get_settings()
     base = settings.tse_cdn_base.rstrip("/")
-    # Se a base termina em /ele2026, sobe uma pasta pra achar comum/config
+    # sobe uma pasta pra achar comum/config
     if base.endswith("/ele2026"):
         base = base.rsplit("/", 1)[0]
     url = f"{base}/comum/config/ele-c.json"
@@ -30,17 +52,21 @@ async def descobrir_cod_eleicao_atual() -> int | None:
         if r.status_code != 200:
             return None
         j = r.json()
-        ciclo = j.get("c") or ""
-        if not ciclo.endswith("2026"):
-            log.info("descoberta: TSE ainda em ciclo %s — usando fallback", ciclo)
-            return None
-        # Estrutura: pl (pleitos) -> lista -> e (eleições) -> lista -> cd
         for pl in j.get("pl", []):
+            dt = pl.get("dt", "")   # DD/MM/AAAA
+            if not dt.endswith("/2026"):
+                continue
             for e in pl.get("e", []):
-                cd = e.get("cd")
-                if cd:
-                    log.info("descoberta: código 2026 encontrado = %s", cd)
-                    return int(cd)
+                nm = (e.get("nm") or "").lower()
+                turno = e.get("t")
+                # Procura pleito geral do 1T de 2026 (ignora suplementares)
+                if turno == "1" and re.search(r"geral.*2026|2026.*geral", nm):
+                    cd_1t = int(e.get("cd"))
+                    cd_2t = int(e.get("cdt2") or (cd_1t + 1))
+                    log.info("descoberta: 2026 geral cd_1t=%d cd_2t=%d", cd_1t, cd_2t)
+                    return cd_1t, cd_2t
+        log.info("descoberta: TSE em ciclo %s — 2026 ainda não publicado",
+                 j.get("c"))
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as e:
         log.warning("descoberta: falhou %s", e)
     return None

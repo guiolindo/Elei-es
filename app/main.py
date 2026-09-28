@@ -29,16 +29,23 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 
 async def _descobrir_cod_loop():
-    """A cada 5 min tenta descobrir o código real da eleição 2026 no TSE.
-    Enquanto ainda é 2024, mantém o fallback do simulado (21270).
+    """A cada 5 min tenta descobrir os códigos reais da Eleição Geral 2026
+    no TSE. Enquanto ainda for ciclo 2024, mantém o fallback do simulado (21270).
+    Quando TSE publicar o 2026, o config em memória se atualiza sozinho
+    e o poller começa a puxar os arquivos certos no próximo ciclo.
     """
     settings = get_settings()
     while True:
         try:
-            cod = await descobrir_cod_eleicao_atual()
-            if cod and cod != settings.eleicao_cod_1t:
-                object.__setattr__(settings, "eleicao_cod_1t", cod)
-                log.info("cod_eleicao atualizado dinamicamente para %s", cod)
+            res = await descobrir_cod_eleicao_atual()
+            if res:
+                cd_1t, cd_2t = res
+                if cd_1t != settings.eleicao_cod_1t:
+                    object.__setattr__(settings, "eleicao_cod_1t", cd_1t)
+                    log.info("cod_eleicao 1T atualizado para %s", cd_1t)
+                if cd_2t != settings.eleicao_cod_2t:
+                    object.__setattr__(settings, "eleicao_cod_2t", cd_2t)
+                    log.info("cod_eleicao 2T atualizado para %s", cd_2t)
         except Exception:
             log.exception("descoberta cod falhou")
         await asyncio.sleep(300)
