@@ -49,14 +49,14 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   transition: box-shadow .2s, padding .2s;
 }
 .hero.scrolled { box-shadow: 0 8px 32px rgba(0,0,0,.5); }
-/* No mobile, ao rolar, esconde o painel de stats — só barra fica */
-.hero .stats { transition: max-height .25s, opacity .2s, padding .2s; }
-@media (max-width: 720px) {
-  .hero.scrolled { padding-top: 12px; }
-  .hero.scrolled .stats {
-    max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0;
-    overflow: hidden;
-  }
+/* Ao rolar (todos os tamanhos), esconde o painel de stats — só barra fica */
+.hero .stats {
+  transition: max-height .25s, opacity .2s, padding .2s;
+  max-height: 400px; overflow: hidden;
+}
+.hero.scrolled { padding-top: 10px; }
+.hero.scrolled .stats {
+  max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0;
 }
 .hero-bg {
   position: absolute; inset: 0; opacity: 0.4;
@@ -256,16 +256,23 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 
 /* Badge do partido: tenta logo, cai na pill se não existir */
 .badge-part-wrap {
-  display: inline-flex; align-items: center; vertical-align: middle;
-  height: 18px;
+  display: inline-flex; align-items: center; justify-content: flex-start;
+  vertical-align: middle;
+  height: 20px; max-height: 20px;
+  max-width: 60px;
+  overflow: hidden;
 }
 .badge-part-logo {
-  height: 18px; width: auto; max-width: 60px;
-  object-fit: contain;
-  vertical-align: middle;
+  height: 100%; max-height: 20px;
+  width: auto; max-width: 60px;
+  object-fit: contain; object-position: left center;
+  display: block;
   filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
 }
 .badge-part-logo.erro { display: none; }
+/* No modal a logo pode ser um pouco maior */
+.modal-urna .badge-part-wrap { height: 22px; max-height: 22px; max-width: 80px; }
+.modal-urna .badge-part-logo { max-height: 22px; max-width: 80px; }
 
 /* Pill do partido com cor oficial (fallback quando não tem logo) */
 .pill-part {
@@ -480,10 +487,26 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   font-size: 22px; cursor: pointer; width: 36px; height: 36px; border-radius: 10px;
 }
 .modal-close:hover { background: var(--bg-3); color: var(--fg); }
-.modal-hero { display: flex; gap: 16px; align-items: center; margin-bottom: 20px; }
-.modal-hero img { width: 100px; height: 130px; border-radius: 10px; object-fit: cover; }
-.modal-nome { font-size: 22px; font-weight: 800; }
-.modal-urna { color: var(--fg-2); font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+.modal-hero {
+  display: flex; gap: 16px; align-items: flex-start;
+  margin-bottom: 20px; margin-top: 8px;
+}
+.modal-hero img {
+  width: 100px; height: 130px;
+  min-width: 100px;                       /* não deixa a foto encolher com nome longo */
+  border-radius: 10px; object-fit: cover;
+}
+.modal-hero > div { min-width: 0; flex: 1; }
+.modal-nome {
+  font-size: 20px; font-weight: 800;
+  line-height: 1.2;
+  word-break: break-word;
+}
+.modal-urna {
+  color: var(--fg-2); font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center;
+  margin-top: 4px;
+}
 .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .modal-field { padding: 10px 14px; background: var(--bg-3); border-radius: 10px; border: 1px solid var(--line); }
 .modal-field .k { font-size: 11px; color: var(--muted); text-transform: uppercase; }
