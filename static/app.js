@@ -1,4 +1,5 @@
 import { renderMapa } from "/static/mapa-br.js";
+import { corDoPartido, siglaDoPartido } from "/static/partidos.js";
 
 const PALETA = ["#f0b429", "#3b82f6", "#ec4899", "#10b981", "#a855f7", "#f97316"];
 const TZ = "America/Sao_Paulo";
@@ -103,15 +104,12 @@ function atualizarFiltroPartidos() {
   const partidos = [...new Set(state.candidatos.map(c => String(c.partido)))].sort((a, b) => +a - +b);
   const atual = sel.value;
   sel.innerHTML = `<option value="">Todos os partidos</option>` +
-    partidos.map(p => `<option value="${p}">Partido ${p}</option>`).join("");
+    partidos.map(p => `<option value="${p}">${siglaDoPartido(+p)} (${p})</option>`).join("");
   if (partidos.includes(atual)) sel.value = atual;
 }
 
-// Cores estáveis por número de partido (base HSL, gerada uma vez)
-function corPartido(numero) {
-  const hue = (numero * 137.508) % 360;  // dispersão em ângulo dourado
-  return `hsl(${hue.toFixed(0)}, 55%, 42%)`;
-}
+// Cor oficial do partido (fallback HSL pra desconhecidos)
+const corPartido = corDoPartido;
 
 // Iniciais do candidato (usa nome_urna, ex.: "TARCÍSIO DE FREITAS" → "TF")
 function iniciais(nome) {
@@ -194,11 +192,12 @@ function renderLista() {
       const fed = prop.federacao ? ` · Fed.` : "";
       badgeProp = `<div class="badge-prop ${cls}" title="${prop.status}">${label}${fed}</div>`;
     }
+    const pillPart = `<span class="pill-part" style="background:${corPartido(c.partido)}">${siglaDoPartido(c.partido)}</span>`;
     div.innerHTML = `
       <img class="cand-foto" src="${c.foto}" alt="" loading="lazy" decoding="async">
       <div class="cand-info">
         <div class="cand-nome">${c.nome_urna}</div>
-        <div class="cand-meta">${c.numero} · P${c.partido}${c.uf ? " · " + c.uf : ""}</div>
+        <div class="cand-meta">${c.numero} · ${pillPart}${c.uf ? " · " + c.uf : ""}</div>
         ${badgeProp}
         <div class="cand-votos" data-sq="${c.sq_candidato}">—</div>
         <div class="cand-pct" data-sq-pct="${c.sq_candidato}"></div>
@@ -256,14 +255,17 @@ async function abrirModal(sq) {
   try {
     const c = await get(`/api/candidato/${sq}`);
     const votos = state.ultimoSnapshot?.candidatos?.find(x => x.sq_candidato === sq);
+    const corP = corPartido(c.partido);
+    const sig = siglaDoPartido(c.partido);
     $("modal-card").innerHTML = `
       <button class="modal-close" aria-label="Fechar">✕</button>
+      <div class="modal-acento" style="background:linear-gradient(90deg, ${corP}, transparent 70%)"></div>
       <div class="modal-hero">
-        <img src="${c.foto}" data-fallback-nome="${c.nome_urna}" data-fallback-partido="${c.partido}">
+        <img src="${c.foto}">
         <div>
           <div class="modal-nome">${c.nome}</div>
           <div class="modal-urna">Nome urna: ${c.nome_urna}</div>
-          <div class="modal-urna">${c.numero} · Partido ${c.partido}${c.uf ? " · " + c.uf : ""}</div>
+          <div class="modal-urna">${c.numero} · <span class="pill-part" style="background:${corP}">${sig}</span>${c.uf ? " · " + c.uf : ""}</div>
         </div>
       </div>
       <div class="modal-grid">
@@ -358,7 +360,7 @@ function renderCardsComp() {
       <div class="badge-pos" data-pos="${sq}">—</div>
       <img src="${c.foto}" loading="lazy" decoding="async">
       <div class="nome">${c.nome_urna}</div>
-      <div class="meta">${c.numero} · P${c.partido}${c.uf ? " · " + c.uf : ""}</div>
+      <div class="meta">${c.numero} · <span class="pill-part" style="background:${corPartido(c.partido)}">${siglaDoPartido(c.partido)}</span>${c.uf ? " · " + c.uf : ""}</div>
       <div class="votos" data-votos="${sq}">—</div>
       <div class="pct" data-pct="${sq}">—</div>`;
     anexarFotoComRetry(div.querySelector("img"), c.nome_urna, c.partido);
