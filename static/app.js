@@ -107,6 +107,30 @@ function atualizarFiltroPartidos() {
   if (partidos.includes(atual)) sel.value = atual;
 }
 
+// Cores estáveis por número de partido (base HSL, gerada uma vez)
+function corPartido(numero) {
+  const hue = (numero * 137.508) % 360;  // dispersão em ângulo dourado
+  return `hsl(${hue.toFixed(0)}, 55%, 42%)`;
+}
+
+// Iniciais do candidato (usa nome_urna, ex.: "TARCÍSIO DE FREITAS" → "TF")
+function iniciais(nome) {
+  if (!nome) return "?";
+  const partes = nome.trim().split(/\s+/).filter(p => p.length > 1);
+  if (partes.length === 0) return nome.slice(0, 2).toUpperCase();
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
+
+// Substitui a img por um div com iniciais + cor do partido
+function fallbackFoto(imgEl, nome, partido) {
+  const div = document.createElement("div");
+  div.className = imgEl.className + " cand-foto-fallback";
+  div.style.background = corPartido(partido || 0);
+  div.textContent = iniciais(nome);
+  imgEl.replaceWith(div);
+}
+
 function renderLista() {
   const el = $("lista-candidatos");
   el.innerHTML = "";
@@ -153,7 +177,7 @@ function renderLista() {
       badgeProp = `<div class="badge-prop ${cls}" title="${prop.status}">${label}${fed}</div>`;
     }
     div.innerHTML = `
-      <img class="cand-foto" src="${c.foto}" onerror="this.src='/static/silhueta.svg'" alt="">
+      <img class="cand-foto" src="${c.foto}" alt="" data-fallback-nome="${c.nome_urna}" data-fallback-partido="${c.partido}">
       <div class="cand-info">
         <div class="cand-nome">${c.nome_urna}</div>
         <div class="cand-meta">${c.numero} · P${c.partido}${c.uf ? " · " + c.uf : ""}</div>
@@ -163,6 +187,8 @@ function renderLista() {
         <div class="cand-barra"><div data-sq-barra="${c.sq_candidato}" style="width:0%"></div></div>
       </div>
       <button class="cand-detalhes" data-detalhes="${c.sq_candidato}">detalhes</button>`;
+    const img = div.querySelector("img.cand-foto");
+    img.onerror = () => fallbackFoto(img, c.nome_urna, c.partido);
     div.addEventListener("click", (e) => {
       if (e.target.closest("[data-detalhes]")) return;
       toggleSelecionar(c.sq_candidato);
@@ -216,7 +242,7 @@ async function abrirModal(sq) {
     $("modal-card").innerHTML = `
       <button class="modal-close" aria-label="Fechar">✕</button>
       <div class="modal-hero">
-        <img src="${c.foto}" onerror="this.src='/static/silhueta.svg'">
+        <img src="${c.foto}" data-fallback-nome="${c.nome_urna}" data-fallback-partido="${c.partido}">
         <div>
           <div class="modal-nome">${c.nome}</div>
           <div class="modal-urna">Nome urna: ${c.nome_urna}</div>
@@ -239,6 +265,8 @@ async function abrirModal(sq) {
     $("modal-card").querySelector(".modal-close").onclick = fecharModal;
     $("modal-cand").querySelector(".modal-back").onclick = fecharModal;
     $("modal-selecionar").onclick = () => { toggleSelecionar(sq); fecharModal(); };
+    const img = $("modal-card").querySelector("img[data-fallback-nome]");
+    if (img) img.onerror = () => fallbackFoto(img, c.nome_urna, c.partido);
   } catch (e) { toast("Erro ao abrir: " + e.message, "danger"); }
 }
 function fecharModal() { $("modal-cand").classList.add("oculto"); }
@@ -311,11 +339,13 @@ function renderCardsComp() {
     div.style.borderTopColor = PALETA[i];
     div.innerHTML = `
       <div class="badge-pos" data-pos="${sq}">—</div>
-      <img src="${c.foto}" onerror="this.src='/static/silhueta.svg'">
+      <img src="${c.foto}" data-fallback-nome="${c.nome_urna}" data-fallback-partido="${c.partido}">
       <div class="nome">${c.nome_urna}</div>
       <div class="meta">${c.numero} · P${c.partido}${c.uf ? " · " + c.uf : ""}</div>
       <div class="votos" data-votos="${sq}">—</div>
       <div class="pct" data-pct="${sq}">—</div>`;
+    const img = div.querySelector("img");
+    img.onerror = () => fallbackFoto(img, c.nome_urna, c.partido);
     el.appendChild(div);
   });
 }

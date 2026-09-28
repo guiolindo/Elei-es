@@ -200,6 +200,16 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   width: 78px; height: 100px; object-fit: cover; border-radius: 10px;
   background: var(--bg-3); flex-shrink: 0;
 }
+.cand-foto-fallback,
+.card-comp img.fallback,
+.modal-hero img.fallback {
+  display: grid; place-items: center;
+  color: #fff; font-weight: 800; letter-spacing: 1px;
+  font-size: 26px;
+  text-shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+.card-comp .cand-foto-fallback { width: 88px; height: 112px; font-size: 28px; }
+.modal-hero .cand-foto-fallback { width: 100px; height: 130px; font-size: 32px; }
 .cand-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .cand-nome { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
 .cand-meta { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
