@@ -181,6 +181,81 @@ async def historico(
     return {"series": series}
 
 
+@router.get("/apuracao/proporcional")
+async def apuracao_proporcional(
+    cargo: int = Query(..., description="6 = Deputado Federal, 7 = Deputado Estadual"),
+    uf: str = Query(...),
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Aplica o cálculo proporcional (QE + cláusula de barreira + sobras
+    D'Hondt + federações) sobre a apuração atual e retorna quem se elege.
+
+    Só faz sentido pra cargo 6 (Dep Federal) ou 7 (Dep Estadual)."""
+    from math_engine.proporcional import (
+        CandidatoProporcional, calcular_eleitos_proporcional,
+        VAGAS_DEP_FEDERAL, vagas_dep_estadual,
+    )
+    if cargo == 6:
+        vagas = VAGAS_DEP_FEDERAL.get(uf.upper(), 0)
+    elif cargo == 7:
+        vagas = vagas_dep_estadual(uf)
+    else:
+        raise HTTPException(400, "cargo deve ser 6 (Dep Federal) ou 7 (Dep Estadual)")
+
+    snap = await _ultimo_snapshot(sess, cargo, uf.upper())
+    if not snap:
+        return {"disponivel": False, "vagas": vagas}
+
+    cands_db = (await sess.execute(
+        select(SnapshotCandidato, Candidato)
+        .join(Candidato, Candidato.sq_candidato == SnapshotCandidato.sq_candidato)
+        .where(SnapshotCandidato.snapshot_id == snap.id)
+    )).all()
+    cands_prop = [
+        CandidatoProporcional(
+            sq_candidato=sc.sq_candidato,
+            nome_urna=cnd.nome_urna,
+            numero=cnd.numero,
+            partido_numero=cnd.partido_numero,
+            votos=sc.votos,
+        )
+        for sc, cnd in cands_db
+    ]
+    r = calcular_eleitos_proporcional(cands_prop, vagas=vagas)
+    return {
+        "disponivel": True,
+        "vagas": r.vagas,
+        "quociente_eleitoral": r.qe,
+        "barreira_10pct": r.barreira_absoluta,
+        "votos_validos": r.votos_validos,
+        "coletado_em": snap.coletado_em.isoformat(),
+        "candidatos": [
+            {
+                "sq_candidato": c.sq_candidato,
+                "nome_urna": c.nome_urna,
+                "partido": c.partido,
+                "federacao": c.federacao,
+                "votos": c.votos,
+                "status": c.status,      # "eleito" / "suplente" / "nao_atingiu_barreira" / "partido_sem_vaga"
+                "posicao_partido": c.posicao_no_partido,
+            }
+            for c in r.candidatos
+        ],
+        "partidos": [
+            {
+                "partido": p.partido,
+                "federacao": p.federacao,
+                "votos_totais": p.votos_totais,
+                "vagas_qp": p.vagas_qp,
+                "vagas_sobras": p.vagas_sobras,
+                "total_vagas": p.total_vagas,
+                "passou_qe": p.passou_qe,
+            }
+            for p in r.partidos
+        ],
+    }
+
+
 @router.get("/apuracao/lideres-por-municipio")
 async def lideres_por_municipio(
     cargo: int = Query(...),

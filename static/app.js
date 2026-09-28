@@ -14,6 +14,7 @@ const state = {
   graficos: {},
   ws: null,
   filtro: { texto: "", partido: "", ordenar: "votos" },
+  proporcional: null,  // { candidatos: [{sq_candidato, status}], qe, barreira, vagas }
 };
 
 // ============ helpers ============
@@ -133,11 +134,30 @@ function renderLista() {
       div.style.borderColor = PALETA[sel];
       div.style.boxShadow = `0 0 0 2px ${PALETA[sel]}55, 0 8px 24px rgba(0,0,0,.35)`;
     }
+    const prop = statusProporcionalDe(c.sq_candidato);
+    let badgeProp = "";
+    if (prop) {
+      const cls = {
+        eleito: "badge-eleito",
+        suplente: "badge-suplente",
+        nao_atingiu_barreira: "badge-barreira",
+        partido_sem_vaga: "badge-sem-vaga",
+      }[prop.status] || "";
+      const label = {
+        eleito: "✓ ELEITO",
+        suplente: "SUPLENTE",
+        nao_atingiu_barreira: "S/ BARREIRA",
+        partido_sem_vaga: "PARTIDO S/ VAGA",
+      }[prop.status] || "";
+      const fed = prop.federacao ? ` · Fed.` : "";
+      badgeProp = `<div class="badge-prop ${cls}" title="${prop.status}">${label}${fed}</div>`;
+    }
     div.innerHTML = `
       <img class="cand-foto" src="${c.foto}" onerror="this.src='/static/silhueta.svg'" alt="">
       <div class="cand-info">
         <div class="cand-nome">${c.nome_urna}</div>
         <div class="cand-meta">${c.numero} · P${c.partido}${c.uf ? " · " + c.uf : ""}</div>
+        ${badgeProp}
         <div class="cand-votos" data-sq="${c.sq_candidato}">—</div>
         <div class="cand-pct" data-sq-pct="${c.sq_candidato}"></div>
         <div class="cand-barra"><div data-sq-barra="${c.sq_candidato}" style="width:0%"></div></div>
@@ -539,10 +559,42 @@ async function refreshApuracao() {
   } catch (e) {
     state.ultimoSnapshot = { disponivel: false };
   }
+  // Se for cargo proporcional (Deputado Fed/Est) e temos UF, busca cálculo
+  state.proporcional = null;
+  if ((state.cargo === 6 || state.cargo === 7) && state.abrangencia !== "BR") {
+    try {
+      const p = await get(`/api/apuracao/proporcional?cargo=${state.cargo}&uf=${state.abrangencia}`);
+      if (p.disponivel) state.proporcional = p;
+    } catch (e) { /* sem dados ainda */ }
+  }
   atualizarPainelTotais();
+  atualizarPainelProporcional();
   if (state.selecionados.length >= 2 && !$("comparacao").classList.contains("oculto")) {
     atualizarComparacao();
   }
+  renderLista();  // re-renderiza para pintar badges de eleito
+}
+
+function atualizarPainelProporcional() {
+  let el = $("prop-info");
+  if (!el) return;
+  if (!state.proporcional) {
+    el.classList.add("oculto");
+    return;
+  }
+  const p = state.proporcional;
+  el.classList.remove("oculto");
+  el.innerHTML = `
+    <div><span class="rot">Vagas</span><span class="val">${p.vagas}</span></div>
+    <div><span class="rot">Quociente Eleitoral</span><span class="val">${p.quociente_eleitoral.toLocaleString('pt-BR')}</span></div>
+    <div><span class="rot">Barreira (10% QE)</span><span class="val">${p.barreira_10pct.toLocaleString('pt-BR')}</span></div>
+    <div><span class="rot">Válidos</span><span class="val">${p.votos_validos.toLocaleString('pt-BR')}</span></div>
+  `;
+}
+
+function statusProporcionalDe(sq) {
+  if (!state.proporcional) return null;
+  return state.proporcional.candidatos.find(c => c.sq_candidato === sq);
 }
 
 function conectarWS() {
