@@ -834,11 +834,17 @@ async function boot() {
   $("btn-notif").addEventListener("click", pedirNotificacoes);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharModal(); });
 
-  // Header ganha sombra ao rolar
+  // Header ganha sombra ao rolar + botão voltar ao topo
   const hero = document.querySelector(".hero");
-  const onScroll = () => hero.classList.toggle("scrolled", window.scrollY > 8);
+  const btnTopo = $("btn-topo");
+  const onScroll = () => {
+    const y = window.scrollY;
+    hero.classList.toggle("scrolled", y > 8);
+    btnTopo.classList.toggle("visible", y > 400);
+  };
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
+  btnTopo.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 
   // filtros da lista
   let buscaTimer;

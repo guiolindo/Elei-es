@@ -495,6 +495,49 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .candidato.loading .cand-meta { height: 12px; width: 40%; margin-bottom: 6px; }
 .candidato.loading .cand-votos { height: 22px; width: 50%; }
 
+/* Skeleton do mapa (enquanto GeoJSON carrega) */
+.mapa.loading {
+  display: grid; place-items: center;
+}
+.mapa.loading::before {
+  content: "";
+  width: 80%; max-width: 460px;
+  aspect-ratio: 1;
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,.03) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M30 20 L70 15 L85 35 L88 70 L60 88 L25 75 L15 45 Z' fill='black'/></svg>") no-repeat center / contain;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M30 20 L70 15 L85 35 L88 70 L60 88 L25 75 L15 45 Z' fill='black'/></svg>") no-repeat center / contain;
+  background-color: rgba(240,180,41,0.15);
+}
+
+/* Botão voltar ao topo */
+.btn-topo {
+  position: fixed; bottom: 20px; right: 20px; z-index: 40;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--bg-2); color: var(--fg);
+  border: 1px solid var(--line-2);
+  display: grid; place-items: center;
+  cursor: pointer; opacity: 0; transform: translateY(20px);
+  transition: opacity .2s, transform .2s;
+  box-shadow: var(--shadow);
+  font-size: 20px;
+}
+.btn-topo.visible { opacity: 1; transform: none; }
+.btn-topo:hover { background: var(--a); color: #000; border-color: var(--a); }
+
+/* Feedback tátil em selects/botões */
+.filtros select:active, .filtro-lista select:active,
+.filtros input:active, .filtro-lista input:active {
+  transform: scale(.98);
+}
+
+/* Card feedback ao clicar (rippleish) */
+.candidato:active { transform: scale(.99); }
+@media (max-width: 720px) {
+  .candidato:active { background: linear-gradient(180deg, var(--bg-3), var(--bg-2)); }
+}
+
 /* Empty state estilizado */
 .empty-state {
   grid-column: 1 / -1;
