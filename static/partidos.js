@@ -57,15 +57,27 @@ export function siglaDoPartido(numero) {
   return PARTIDOS[numero]?.sigla || `P${numero || "?"}`;
 }
 
-// Retorna HTML de badge do partido: tenta logo, cai na pill colorida com sigla.
-// Logo carregada do path local static/partidos/{numero}.png (baixada 1x via
-// scripts/baixar_logos_partidos.sh — se o arquivo não existe, browser vê o
-// erro e o onerror mostra a pill como fallback).
+// Extensão do logo por número de partido (baseado no que foi enviado).
+// SVG quando possível (escala melhor), PNG quando é a versão disponível.
+const EXT_LOGO = {
+  10: "svg", 11: "png", 12: "png", 13: "svg", 14: "svg",
+  15: "png", 16: "png", 18: "svg", 20: "png", 21: "svg",
+  22: "svg", 23: "png", 25: "svg", 27: "png", 28: "png",
+  29: "svg", 30: "svg", 33: "png", 35: "svg", 36: "png",
+  40: "png", 43: "svg", 44: "svg", 45: "svg", 50: "png",
+  55: "svg", 65: "svg", 70: "svg", 77: "png", 80: "png",
+};
+
+// Retorna HTML de badge do partido: tenta logo local, cai na pill colorida.
+// Estrutura: <img> primeiro (some se falhar) + <span pill> escondido que
+// aparece via onerror. Loading lazy pra não sobrecarregar a listagem.
 export function badgePartidoHtml(numero) {
   const sig = siglaDoPartido(numero);
   const cor = corDoPartido(numero);
+  const ext = EXT_LOGO[numero] || "svg";
   return `<span class="badge-part-wrap">
-    <img class="badge-part-logo" src="/static/partidos/${numero}.png" alt="${sig}"
+    <img class="badge-part-logo" src="/static/partidos/${numero}.${ext}" alt="${sig}"
+         loading="lazy" decoding="async"
          onerror="this.classList.add('erro');this.nextElementSibling.style.display='inline-block'">
     <span class="pill-part" style="background:${cor};display:none">${sig}</span>
   </span>`;
