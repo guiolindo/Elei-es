@@ -232,18 +232,6 @@ def avaliar_apuracao(
         return []
     ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
     eventos: list[dict] = []
-    # Detecta candidatos eliminados matematicamente (top-5 pra não spammar)
-    pos_relevantes = 2 if cod_cargo == 1 else 1
-    for c in ordenados[:5]:
-        if matematicamente_eliminado(c, ordenados, totais, pos_relevantes):
-            eventos.append({
-                "tipo": "MATEMATICAMENTE_ELIMINADO",
-                "sq_candidato_a": c.sq_candidato,
-                "detalhes": {
-                    "votos_max": c.votos + votos_restantes_max(totais),
-                    "alvo_top": pos_relevantes,
-                },
-            })
     if cod_cargo == 1:
         if eleito_1t_presidencial(ordenados, totais):
             eventos.append({
@@ -268,4 +256,21 @@ def avaliar_apuracao(
                 "sq_candidato_a": ordenados[0].sq_candidato,
                 "detalhes": {"votos": ordenados[0].votos, "cod_cargo": cod_cargo},
             })
+
+    # Reporta MATEMATICAMENTE_ELIMINADO só se ninguém foi eleito ainda
+    # (senão vira ruído — óbvio que todos os outros estão eliminados quando
+    # tem eleito). Só olha candidatos que ainda apareciam como contenders
+    # (top 5) e que não são já 1º ou 2º colocado.
+    if not eventos:
+        pos_relevantes = 2 if cod_cargo == 1 else 1
+        for c in ordenados[pos_relevantes:5]:
+            if matematicamente_eliminado(c, ordenados, totais, pos_relevantes):
+                eventos.append({
+                    "tipo": "MATEMATICAMENTE_ELIMINADO",
+                    "sq_candidato_a": c.sq_candidato,
+                    "detalhes": {
+                        "votos_max": c.votos + votos_restantes_max(totais),
+                        "alvo_top": pos_relevantes,
+                    },
+                })
     return eventos
