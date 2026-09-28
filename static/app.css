@@ -428,7 +428,11 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   list-style: none;
   background: var(--bg-2); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 8px 20px;
+  max-height: 500px; overflow-y: auto;
+  scrollbar-width: thin;
 }
+.timeline::-webkit-scrollbar { width: 6px; }
+.timeline::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
 .timeline li {
   padding: 14px 0; border-bottom: 1px dashed var(--line);
   display: flex; gap: 16px; align-items: center;
@@ -463,9 +467,13 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   position: relative; z-index: 1;
   background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
   border: 1px solid var(--line-2); border-radius: var(--radius-lg);
-  padding: 28px; max-width: 480px; width: calc(100% - 32px);
+  padding: 28px; max-width: 520px; width: calc(100% - 32px);
+  max-height: calc(100vh - 32px); overflow-y: auto;
   box-shadow: var(--shadow-lg);
+  scrollbar-width: thin;
 }
+.modal-card::-webkit-scrollbar { width: 6px; }
+.modal-card::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
 .modal-close {
   position: absolute; top: 12px; right: 12px;
   background: transparent; border: none; color: var(--muted);
