@@ -30,6 +30,13 @@ function animarNumero(el, novoValor, duracao = 500) {
   const anterior = parseInt((el.dataset.valor || el.textContent).replace(/\D/g, ""), 10) || 0;
   if (anterior === novoValor) { el.textContent = fmtNum(novoValor); return; }
   el.dataset.valor = novoValor;
+  // Flash: destaque visual sutil pra sinalizar mudança
+  if (anterior > 0) {
+    el.classList.remove("flash");
+    void el.offsetWidth;      // força reflow pra permitir re-animar
+    el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 900);
+  }
   const inicio = performance.now();
   function tick(t) {
     const p = Math.min(1, (t - inicio) / duracao);
