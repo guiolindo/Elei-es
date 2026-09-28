@@ -6,6 +6,10 @@ from .engine import (
     segundo_turno_definido,
     eleito_majoritario,
     avaliar_apuracao,
+    matematicamente_eliminado,
+    virada_iminente,
+    margem_de_seguranca,
+    projecao_final,
     APURACAO_MIN_PCT,
 )
 
@@ -17,5 +21,9 @@ __all__ = [
     "segundo_turno_definido",
     "eleito_majoritario",
     "avaliar_apuracao",
+    "matematicamente_eliminado",
+    "virada_iminente",
+    "margem_de_seguranca",
+    "projecao_final",
     "APURACAO_MIN_PCT",
 ]

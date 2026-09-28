@@ -32,11 +32,22 @@ async function registrarMapa(chave, url, nameProperty) {
   }
 }
 
-async function init(container) {
+async function init(container, abrangencia) {
   if (_chart) _chart.dispose();
+  // Ajusta altura ao aspect ratio real do mapa em vez de esticar
+  // Brasil ~ 1:1 (68% × altura), UFs variam mas 1.1:1 é razoável
+  const w = container.clientWidth || 800;
+  const aspect = abrangencia === "BR" ? 0.95 : 1.05;
+  container.style.height = Math.min(720, Math.max(360, w * aspect)) + "px";
   _chart = echarts.init(container, null, { renderer: "canvas" });
   if (!init._resize) {
-    window.addEventListener("resize", () => _chart && _chart.resize());
+    window.addEventListener("resize", () => {
+      if (_chart) {
+        const w2 = container.clientWidth || 800;
+        container.style.height = Math.min(720, Math.max(360, w2 * aspect)) + "px";
+        _chart.resize();
+      }
+    });
     init._resize = true;
   }
   return _chart;
@@ -49,7 +60,7 @@ async function init(container) {
  * @param {Object} opts { onClickArea?: (name) => void }
  */
 export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts = {}) {
-  await init(container);
+  await init(container, abrangencia);
 
   let mapKey, url, nameProperty, labelFormatter, roam, zoom;
   if (abrangencia === "BR") {

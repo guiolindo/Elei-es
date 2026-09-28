@@ -31,10 +31,13 @@ async function get(url) {
 }
 
 function toast(msg, tipo = "") {
+  const cont = $("toasts");
+  // Máximo 3 toasts visíveis; remove o mais antigo se estourar
+  while (cont.children.length >= 3) cont.firstElementChild.remove();
   const div = document.createElement("div");
   div.className = "toast " + tipo;
   div.textContent = msg;
-  $("toasts").appendChild(div);
+  cont.appendChild(div);
   setTimeout(() => { div.style.opacity = "0"; setTimeout(() => div.remove(), 300); }, 5000);
 }
 
@@ -61,6 +64,7 @@ function ajustarUFParaCargo() {
 
 // ============ lista de candidatos ============
 async function carregarCandidatos() {
+  renderSkeletons(6);
   const uf = state.abrangencia === "BR" ? "" : `&uf=${state.abrangencia}`;
   const cands = await get(`/api/candidatos?cargo=${state.cargo}${uf}`);
   atualizarSubtitulo();
@@ -147,6 +151,23 @@ function anexarFotoComRetry(img, nome, partido) {
   });
 }
 
+function renderSkeletons(n = 6) {
+  const el = $("lista-candidatos");
+  el.innerHTML = "";
+  for (let i = 0; i < n; i++) {
+    const div = document.createElement("div");
+    div.className = "candidato loading";
+    div.innerHTML = `
+      <div class="cand-foto"></div>
+      <div class="cand-info">
+        <div class="cand-nome"></div>
+        <div class="cand-meta"></div>
+        <div class="cand-votos"></div>
+      </div>`;
+    el.appendChild(div);
+  }
+}
+
 function renderLista() {
   const el = $("lista-candidatos");
   el.innerHTML = "";
@@ -156,13 +177,19 @@ function renderLista() {
       ? `${state.candidatos.length} candidatos`
       : `${filtrados.length} de ${state.candidatos.length}`;
   if (state.candidatos.length === 0) {
-    el.innerHTML = `<p style="grid-column:1/-1;color:var(--muted);text-align:center;padding:40px">
-      Nenhum candidato encontrado para este cargo/UF.</p>`;
+    el.innerHTML = `<div class="empty-state">
+      <div class="clock">🕔</div>
+      <h3>Aguardando dados</h3>
+      <p>O TSE publica os resultados quando as urnas fecham (domingo, 17h).
+         Enquanto isso, você pode navegar pelo mapa e explorar os candidatos.</p>
+    </div>`;
     return;
   }
   if (filtrados.length === 0) {
-    el.innerHTML = `<p style="grid-column:1/-1;color:var(--muted);text-align:center;padding:40px">
-      Nenhum candidato bate com o filtro atual.</p>`;
+    el.innerHTML = `<div class="empty-state">
+      <h3>Nada encontrado</h3>
+      <p>Ajuste o filtro ou a busca para ver candidatos.</p>
+    </div>`;
     return;
   }
   for (const c of filtrados) {
@@ -619,6 +646,14 @@ function renderLegenda(leg, dados, texto) {
 }
 
 // ============ eventos ============
+const TIPOS_EVENTO = {
+  ELEITO_1T:                 { label: "Eleito 1T", classe: "ok",     emoji: "🎉" },
+  ELEITO_MAJORITARIO:        { label: "Eleito",    classe: "ok",     emoji: "🎉" },
+  SEGUNDO_TURNO_DEFINIDO:    { label: "2º Turno",  classe: "warn",   emoji: "⚡" },
+  VIRADA:                    { label: "Virada",    classe: "warn",   emoji: "🔄" },
+  MATEMATICAMENTE_ELIMINADO: { label: "Eliminado", classe: "danger", emoji: "❌" },
+};
+
 async function carregarEventos() {
   let evs = [];
   try { evs = await get(`/api/eventos?cargo=${state.cargo}&abrangencia=${state.abrangencia}`); } catch (e) {}
@@ -628,17 +663,28 @@ async function carregarEventos() {
     return;
   }
   ul.innerHTML = "";
-  for (const ev of evs.reverse()) {
+  for (const ev of evs.slice().reverse()) {
     const nome = state.ficha[ev.sq_candidato_a]?.nome_urna || ev.sq_candidato_a;
-    let tipoBadge = "ev-tipo", texto = "";
-    if (ev.tipo === "ELEITO_1T") { tipoBadge += " ok"; texto = `<strong>${nome}</strong> eleito(a) no 1º turno.`; }
-    else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
-      tipoBadge += " warn";
+    const meta = TIPOS_EVENTO[ev.tipo] || { label: ev.tipo, classe: "", emoji: "•" };
+    let texto = "";
+    if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
       const b = state.ficha[ev.sq_candidato_b]?.nome_urna || ev.sq_candidato_b;
       texto = `2º turno definido: <strong>${nome}</strong> × <strong>${b}</strong>`;
-    } else { tipoBadge += " ok"; texto = `<strong>${nome}</strong> eleito(a).`; }
+    } else if (ev.tipo === "VIRADA") {
+      const b = state.ficha[ev.sq_candidato_b]?.nome_urna || ev.sq_candidato_b;
+      texto = `<strong>${nome}</strong> passou <strong>${b}</strong>`;
+    } else if (ev.tipo === "MATEMATICAMENTE_ELIMINADO") {
+      texto = `<strong>${nome}</strong> matematicamente eliminado`;
+    } else if (ev.tipo === "ELEITO_1T") {
+      texto = `<strong>${nome}</strong> eleito(a) no 1º turno`;
+    } else {
+      texto = `<strong>${nome}</strong> eleito(a)`;
+    }
     const li = document.createElement("li");
-    li.innerHTML = `<time>${fmtHora(ev.ocorrido_em)}</time><span class="${tipoBadge}">${ev.tipo}</span><span class="ev-texto">${texto}</span>`;
+    li.innerHTML = `
+      <time>${fmtHora(ev.ocorrido_em)}</time>
+      <span class="ev-tipo ${meta.classe}">${meta.emoji} ${meta.label}</span>
+      <span class="ev-texto">${texto}</span>`;
     ul.appendChild(li);
   }
 }
@@ -743,6 +789,12 @@ async function boot() {
   $("btn-comparar").addEventListener("click", abrirComparacao);
   $("btn-notif").addEventListener("click", pedirNotificacoes);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharModal(); });
+
+  // Header ganha sombra ao rolar
+  const hero = document.querySelector(".hero");
+  const onScroll = () => hero.classList.toggle("scrolled", window.scrollY > 8);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
 
   // filtros da lista
   let buscaTimer;

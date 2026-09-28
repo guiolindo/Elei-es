@@ -92,6 +92,130 @@ def eleito_majoritario(candidatos: Sequence[CandidatoResumo], totais: TotaisResu
     return b.votos + restantes < a.votos
 
 
+def matematicamente_eliminado(
+    candidato: CandidatoResumo,
+    candidatos: Sequence[CandidatoResumo],
+    totais: TotaisResumo,
+    posicoes_relevantes: int = 2,
+) -> bool:
+    """True se o candidato NÃO PODE chegar entre os `posicoes_relevantes`
+    primeiros nem com todos os votos restantes.
+
+    Para Presidente (cargo=1), posicoes_relevantes=2 (top 2 vai pro 2T).
+    Para majoritários (Gov, Sen), posicoes_relevantes=1 (só ganha 1).
+    """
+    if candidato not in candidatos:
+        return False
+    ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
+    restantes = votos_restantes_max(totais)
+    max_final_cand = candidato.votos + restantes
+    # Precisa ficar melhor que o `posicoes_relevantes`-ésimo colocado
+    # já contando com o cenário em que ninguém à frente dele muda.
+    pos_alvo = ordenados[posicoes_relevantes - 1] if len(ordenados) >= posicoes_relevantes else None
+    if pos_alvo is None or pos_alvo.sq_candidato == candidato.sq_candidato:
+        return False
+    # Está eliminado se mesmo somando tudo, ainda fica ATRÁS do alvo (estrito)
+    return max_final_cand < pos_alvo.votos
+
+
+def virada_iminente(
+    candidatos: Sequence[CandidatoResumo],
+    totais: TotaisResumo,
+    limite_pct: float = 0.10,
+) -> tuple[bool, float]:
+    """Detecta se a distância entre 1º e 2º é menor que `limite_pct` dos
+    votos restantes — ou seja, virada possível em qualquer novo snapshot.
+
+    Retorna (é_iminente, razao) onde razao = diferença / restantes.
+    """
+    if len(candidatos) < 2:
+        return False, 0.0
+    ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
+    diff = ordenados[0].votos - ordenados[1].votos
+    restantes = votos_restantes_max(totais)
+    if restantes <= 0:
+        return False, 0.0
+    razao = diff / restantes
+    return razao < limite_pct, razao
+
+
+def margem_de_seguranca(
+    candidatos: Sequence[CandidatoResumo],
+    totais: TotaisResumo,
+) -> float:
+    """Quantos pontos percentuais o líder pode perder e ainda vencer.
+    Retorna 0 se está no fio, 100 se já é 100% garantido, negativo se
+    já perdeu. Útil pra gauge de "probabilidade matemática" na UI.
+    """
+    if len(candidatos) < 2:
+        return 100.0
+    ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
+    a, b = ordenados[0], ordenados[1]
+    restantes = votos_restantes_max(totais)
+    # Cenário pior pro líder: tudo vira pro 2º
+    # Ele mantém vitória se a.votos > b.votos + restantes
+    # Margem = (a.votos - (b.votos + restantes)) / max(a.votos, 1) * 100
+    if a.votos == 0:
+        return 0.0
+    margem = (a.votos - (b.votos + restantes)) / a.votos * 100
+    return max(-100.0, min(100.0, margem))
+
+
+def projecao_final(
+    candidato: CandidatoResumo,
+    totais: TotaisResumo,
+) -> int:
+    """Projeção linear simples do total final de votos: extrapola pelo
+    % apurado. Só faz sentido depois de 20-30% apurado; antes disso
+    varia muito. NÃO é preditivo, é aritmético.
+    """
+    pct = pct_apurado(totais)
+    if pct <= 0:
+        return candidato.votos
+    return int(candidato.votos / pct)
+
+
+def detectar_viradas(
+    candidatos_atual: Sequence[CandidatoResumo],
+    candidatos_anterior: Sequence[CandidatoResumo],
+) -> list[dict]:
+    """Detecta ultrapassagens entre snapshots consecutivos.
+
+    Retorna eventos {'tipo': 'VIRADA', 'sq_candidato_a': ..., 'sq_candidato_b': ...}
+    onde A passou a estar à frente de B.
+    """
+    if not candidatos_atual or not candidatos_anterior:
+        return []
+    pos_anterior = {c.sq_candidato: i for i, c in
+                    enumerate(sorted(candidatos_anterior, key=lambda x: x.votos, reverse=True))}
+    pos_atual = {c.sq_candidato: i for i, c in
+                 enumerate(sorted(candidatos_atual, key=lambda x: x.votos, reverse=True))}
+    eventos = []
+    # Só reporta viradas entre top-5 (evita ruído nos deputados)
+    top = sorted(candidatos_atual, key=lambda c: c.votos, reverse=True)[:5]
+    for c in top:
+        sq = c.sq_candidato
+        if sq not in pos_anterior or sq not in pos_atual:
+            continue
+        if pos_atual[sq] < pos_anterior[sq]:
+            # Subiu — descobre quem ele passou
+            for outro in candidatos_atual:
+                if outro.sq_candidato == sq:
+                    continue
+                if (pos_anterior.get(outro.sq_candidato, -1) < pos_anterior[sq] and
+                    pos_atual.get(outro.sq_candidato, -1) > pos_atual[sq]):
+                    eventos.append({
+                        "tipo": "VIRADA",
+                        "sq_candidato_a": sq,
+                        "sq_candidato_b": outro.sq_candidato,
+                        "detalhes": {
+                            "pos_nova": pos_atual[sq] + 1,
+                            "pos_antiga": pos_anterior[sq] + 1,
+                        },
+                    })
+    return eventos
+
+
 def avaliar_apuracao(
     candidatos: Sequence[CandidatoResumo],
     totais: TotaisResumo,
@@ -108,6 +232,18 @@ def avaliar_apuracao(
         return []
     ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
     eventos: list[dict] = []
+    # Detecta candidatos eliminados matematicamente (top-5 pra não spammar)
+    pos_relevantes = 2 if cod_cargo == 1 else 1
+    for c in ordenados[:5]:
+        if matematicamente_eliminado(c, ordenados, totais, pos_relevantes):
+            eventos.append({
+                "tipo": "MATEMATICAMENTE_ELIMINADO",
+                "sq_candidato_a": c.sq_candidato,
+                "detalhes": {
+                    "votos_max": c.votos + votos_restantes_max(totais),
+                    "alvo_top": pos_relevantes,
+                },
+            })
     if cod_cargo == 1:
         if eleito_1t_presidencial(ordenados, totais):
             eventos.append({

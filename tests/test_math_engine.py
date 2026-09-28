@@ -146,6 +146,83 @@ def test_avaliar_apuracao_segundo_turno():
     assert ev[0]["sq_candidato_b"] == "b"
 
 
+def test_matematicamente_eliminado_top2():
+    # 80% apurado, restantes = 200 (apto=1000, apto_tz=800)
+    # Presidencial: precisa top 2. Alvo = 2º colocado B (400).
+    # D tem 30 + 200 = 230 < 400 → eliminado
+    # C tem 250 + 200 = 450 > 400 → ainda tem chance
+    t = totais(100, 80, 1000, 800, 800)
+    cands = [
+        CandidatoResumo("A", 500),
+        CandidatoResumo("B", 400),
+        CandidatoResumo("C", 250),
+        CandidatoResumo("D", 30),
+    ]
+    from math_engine.engine import matematicamente_eliminado
+    assert matematicamente_eliminado(cands[3], cands, t, 2) is True
+    assert matematicamente_eliminado(cands[2], cands, t, 2) is False
+
+
+def test_matematicamente_eliminado_lider_nunca_eliminado():
+    t = totais(100, 90, 1000, 900, 900)
+    cands = [CandidatoResumo("A", 500), CandidatoResumo("B", 300)]
+    from math_engine.engine import matematicamente_eliminado
+    assert matematicamente_eliminado(cands[0], cands, t, 1) is False
+
+
+def test_virada_iminente_quando_diff_menor_que_restantes():
+    from math_engine.engine import virada_iminente
+    # Diff 100 vs 1000 restantes → razão 0.1 → iminente com limite 15%
+    t = totais(100, 50, 2000, 1000, 900)
+    cands = [CandidatoResumo("A", 500), CandidatoResumo("B", 400)]
+    iminente, razao = virada_iminente(cands, t, limite_pct=0.15)
+    assert iminente is True
+    assert abs(razao - 0.1) < 0.01
+
+
+def test_virada_nao_iminente_quando_lider_folgado():
+    from math_engine.engine import virada_iminente
+    # Diff 500 vs 100 restantes → líder folgado
+    t = totais(100, 95, 1000, 900, 900)
+    cands = [CandidatoResumo("A", 700), CandidatoResumo("B", 200)]
+    iminente, razao = virada_iminente(cands, t, limite_pct=0.5)
+    assert iminente is False
+    assert razao > 0.5
+
+
+def test_margem_de_seguranca_folgada():
+    from math_engine.engine import margem_de_seguranca
+    # A 700, B 200, restantes 100 → margem ≈ (700 - 300) / 700 * 100 ≈ 57%
+    t = totais(100, 90, 1000, 900, 900)
+    cands = [CandidatoResumo("A", 700), CandidatoResumo("B", 200)]
+    m = margem_de_seguranca(cands, t)
+    assert 50 < m < 65
+
+
+def test_margem_de_seguranca_no_fio():
+    from math_engine.engine import margem_de_seguranca
+    # A 500, B 400, restantes 100 → margem = 0 (empate técnico)
+    t = totais(100, 90, 1000, 900, 900)
+    cands = [CandidatoResumo("A", 500), CandidatoResumo("B", 400)]
+    m = margem_de_seguranca(cands, t)
+    assert abs(m) < 5  # praticamente zero
+
+
+def test_projecao_final_extrapola_linearmente():
+    from math_engine.engine import projecao_final
+    # 50% apurado, candidato tem 500 votos → projeção 1000
+    t = totais(100, 50, 2000, 1000, 1000)
+    cand = CandidatoResumo("A", 500)
+    assert projecao_final(cand, t) == 1000
+
+
+def test_projecao_final_zero_apurado_nao_quebra():
+    from math_engine.engine import projecao_final
+    t = totais(100, 0, 1000, 0, 0)
+    cand = CandidatoResumo("A", 0)
+    assert projecao_final(cand, t) == 0
+
+
 def test_snapshot_com_totalizadas_maior_que_apto_nao_quebra():
     # anomalia TSE: restantes clampeado a 0 → decisão fecha imediatamente
     t = totais(100, 100, 1000, 1200, 900)

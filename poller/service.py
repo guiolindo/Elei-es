@@ -22,6 +22,7 @@ from app.models import (
     Snapshot, SnapshotTotais, SnapshotCandidato, SnapshotMunicipio, Evento, Candidato,
 )
 from math_engine import CandidatoResumo, TotaisResumo, avaliar_apuracao
+from math_engine.engine import detectar_viradas
 from poller.parser import parse_snapshot
 from poller.tse_client import buscar_json, cliente_tse, resultado_url
 
@@ -221,10 +222,34 @@ async def processar_alvo(
                 qt_votos_validos=parsed.totais.qt_votos_validos,
             )
             eventos = avaliar_apuracao(resumos, tot, cod_cargo=alvo.cod_cargo)
+
+            # Detecta viradas comparando com o snapshot anterior
+            q_anterior = (
+                select(SnapshotCandidato.sq_candidato, SnapshotCandidato.votos)
+                .join(Snapshot, Snapshot.id == SnapshotCandidato.snapshot_id)
+                .where(
+                    Snapshot.cod_cargo == alvo.cod_cargo,
+                    Snapshot.abrangencia == alvo.abrangencia,
+                    Snapshot.suspeito.is_(False),
+                    Snapshot.id != snap.id,
+                )
+                .order_by(Snapshot.coletado_em.desc())
+                .limit(50)  # top 50 candidatos do snapshot anterior
+            )
+            r_ant = await sess.execute(q_anterior)
+            resumos_ant = [CandidatoResumo(sq, v) for sq, v in r_ant.all()]
+            if resumos_ant:
+                eventos.extend(detectar_viradas(resumos, resumos_ant))
+
             ja = await _eventos_existentes(sess, alvo.cod_cargo, alvo.abrangencia)
             for ev in eventos:
+                # Viradas podem repetir se candidato ping-pongar → dedupe por A+B
                 chave = (ev["tipo"], ev["sq_candidato_a"])
-                if chave in ja:
+                if ev["tipo"] == "VIRADA":
+                    chave = (ev["tipo"], ev["sq_candidato_a"], ev.get("sq_candidato_b"))
+                    if chave in ja:
+                        continue
+                elif chave in ja:
                     continue
                 sess.add(Evento(
                     ocorrido_em=datetime.now(timezone.utc),

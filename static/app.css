@@ -41,12 +41,14 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 
 /* ============ Hero ============ */
 .hero {
-  position: relative;
+  position: sticky; top: 0; z-index: 50;
   padding: 20px 0 0;
   background: var(--grad-hero);
   border-bottom: 1px solid var(--line);
   overflow: hidden;
+  transition: box-shadow .2s;
 }
+.hero.scrolled { box-shadow: 0 8px 32px rgba(0,0,0,.5); }
 .hero-bg {
   position: absolute; inset: 0; opacity: 0.4;
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><circle cx='1' cy='1' r='1' fill='%23303a4d'/></svg>");
@@ -349,7 +351,7 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   background: #0b0f16;                    /* fundo bem escuro pra realçar estados */
   border: 1px solid var(--line);
   border-radius: var(--radius); padding: 12px;
-  height: 620px;
+  min-height: 360px;                       /* altura definida via JS por aspect ratio */
 }
 .mapa-legenda h3 {
   color: var(--fg);                       /* era muted — invisível no dark */
@@ -378,12 +380,13 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   color: var(--muted); min-width: 90px;
 }
 .timeline .ev-tipo {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .8px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
   padding: 3px 8px; border-radius: 4px; font-weight: 700;
-  background: var(--a); color: #000;
+  background: var(--a); color: #000; white-space: nowrap;
 }
-.timeline .ev-tipo.warn { background: var(--warn); }
+.timeline .ev-tipo.warn { background: var(--warn); color: #1a0f00; }
 .timeline .ev-tipo.ok { background: var(--ok); color: #001a0a; }
+.timeline .ev-tipo.danger { background: var(--danger); color: #fff; }
 .timeline .ev-texto { flex: 1; }
 
 /* ============ Modal ============ */
@@ -418,6 +421,45 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .modal-field .k { font-size: 11px; color: var(--muted); text-transform: uppercase; }
 .modal-field .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
 .modal-acoes { display: flex; gap: 10px; margin-top: 18px; }
+
+/* ============ Skeletons de loading ============ */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3) 50%, var(--bg-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 6px;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.candidato.loading { pointer-events: none; }
+.candidato.loading .cand-foto { background: var(--bg-3); }
+.candidato.loading .cand-nome,
+.candidato.loading .cand-meta,
+.candidato.loading .cand-votos {
+  background: var(--bg-3); color: transparent;
+  border-radius: 4px;
+  animation: shimmer 1.4s infinite;
+  background-image: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3) 50%, var(--bg-2) 75%);
+  background-size: 200% 100%;
+}
+.candidato.loading .cand-nome { height: 16px; width: 60%; margin-bottom: 4px; }
+.candidato.loading .cand-meta { height: 12px; width: 40%; margin-bottom: 6px; }
+.candidato.loading .cand-votos { height: 22px; width: 50%; }
+
+/* Empty state estilizado */
+.empty-state {
+  grid-column: 1 / -1;
+  padding: 60px 20px; text-align: center;
+  background: var(--bg-2); border: 1px dashed var(--line-2);
+  border-radius: var(--radius); color: var(--muted);
+}
+.empty-state h3 { font-size: 18px; color: var(--fg); margin-bottom: 8px; }
+.empty-state p { font-size: 14px; line-height: 1.6; max-width: 480px; margin: 0 auto; }
+.empty-state .clock {
+  font-size: 40px; margin-bottom: 12px; opacity: 0.6;
+}
 
 /* ============ Toasts ============ */
 #toasts { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 200; }
@@ -456,11 +498,24 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   .mapa-wrap { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
-  .nav { padding: 0 20px 16px; }
-  .page { padding: 24px 20px 60px; }
-  .stats { grid-template-columns: repeat(2, 1fr); padding: 0 20px 20px; }
+  .nav { padding: 0 16px 16px; flex-wrap: wrap; gap: 12px; }
+  .page { padding: 20px 16px 60px; }
+  .stats { grid-template-columns: repeat(2, 1fr); padding: 0 16px 16px; gap: 8px; }
+  .stat { padding: 12px; }
+  .stat-value { font-size: 20px; }
   .filtros { width: 100%; }
-  .filtro-grupo select { min-width: 140px; }
-  .dif-panel { grid-template-columns: 1fr; }
+  .filtro-grupo { flex: 1; }
+  .filtro-grupo select { min-width: 0; width: 100%; }
+  .filtro-lista { flex-direction: column; align-items: stretch; }
+  .filtro-lista input, .filtro-lista select { width: 100%; }
+  .dif-panel { grid-template-columns: 1fr; gap: 8px; padding: 12px; }
   .dif-value { font-size: 24px; }
+  .grid-candidatos { grid-template-columns: 1fr; }
+  .comparacao { padding: 16px; }
+  .comp-header h2 { font-size: 18px; }
+  .prop-info { grid-template-columns: repeat(2, 1fr); }
+  .mapa { padding: 6px; }
+  .timeline { padding: 8px 12px; }
+  .timeline li { flex-wrap: wrap; }
+  .cand-foto, .badge-part-logo { max-height: 90px; }
 }
