@@ -17,9 +17,6 @@ from app.ws import broadcaster
 router = APIRouter(prefix="/api")
 
 
-_COD_ELEICAO_FOTO = 20322002026  # id interno da eleição 2026 (URL das fotos)
-
-
 def _url_foto(sq_candidato: str, uf: str | None) -> str:
     """URL da foto do candidato no site do TSE.
 
@@ -30,9 +27,11 @@ def _url_foto(sq_candidato: str, uf: str | None) -> str:
     if any(sq_candidato.startswith(p) for p in ("PR2026_", "GO2026_", "SE2026_", "DF2026_", "DE2026_")):
         return "/static/silhueta.svg"
     uf_seg = uf or "BR"
+    from app.config import get_settings
+    cod = get_settings().eleicao_cod_divulga
     return (
         f"https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img/"
-        f"{_COD_ELEICAO_FOTO}/{sq_candidato}/{uf_seg}"
+        f"{cod}/{sq_candidato}/{uf_seg}"
     )
 
 
@@ -402,8 +401,8 @@ async def admin_testar_tse() -> dict[str, Any]:
     from app.config import get_settings
     s = get_settings()
     urls = [
-        ("candidatos", f"{s.tse_divulga_base}/{s.eleicao_ano}/SP/{s.eleicao_cod_1t}/1/candidatos"),
-        ("resultado", f"{s.tse_cdn_base}/{s.eleicao_cod_1t}/dados/br/{s.eleicao_cod_1t}-c0001-e00{s.eleicao_cod_1t}-br.json"),
+        ("candidatos", f"{s.tse_divulga_base}/{s.eleicao_ano}/SP/{s.eleicao_cod_divulga}/1/candidatos"),
+        ("resultado", f"{s.tse_cdn_base}/{s.eleicao_cod_1t}/dados/br/br-c0001-e{s.eleicao_cod_1t:06d}-u.json"),
         ("home", "https://divulgacandcontas.tse.jus.br/divulga/"),
     ]
     from poller.proxy_pool import get_pool

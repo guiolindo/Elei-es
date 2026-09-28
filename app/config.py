@@ -21,16 +21,17 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://apuracao:apuracao@localhost:5432/apuracao"
     port: int = 8000
-    # Aponta para o Cloudflare Worker (que roda em SP e passa pelo Akamai
-    # do TSE como IP BR). Ver cloudflare-worker/ para o código do worker.
-    # No dia da eleição, se preferir, mova para variável de ambiente.
+    # Base do resultado oficial via Cloudflare Worker (que roda em SP e
+    # passa pelo Akamai do TSE como IP BR).
     tse_cdn_base: str = "https://apuracao-2026.gui342386.workers.dev/oficial/ele2026"
     tse_fotos_base: str = "https://apuracao-2026.gui342386.workers.dev/fotos"
     eleicao_ano: int = 2026
-    # Códigos internos da divulgacandcontas — obtidos da URL do site do TSE
-    # em 28/09/2026 (https://divulgacandcontas.tse.jus.br/divulga/#/candidato/...)
-    eleicao_cod_1t: int = 20322002026
-    eleicao_cod_2t: int = 20322002026  # mesmo id, muda o turno
+    # Código da eleição no divulgacandcontas (candidatos, fotos) — visto na URL
+    # do site do TSE em 28/09/2026
+    eleicao_cod_1t: int = 21270
+    eleicao_cod_2t: int = 21271  # 2º turno costuma ser cod+1
+    # Código da eleição no divulgacandcontas (usado para candidatos e fotos)
+    eleicao_cod_divulga: int = 20322002026
     poll_interval_seconds: int = 20
     # Base do endpoint de listagem de candidatos (divulga do TSE).
     # Formato: {base}/{ano}/{uf}/{cod_eleicao}/{cargo}/candidatos

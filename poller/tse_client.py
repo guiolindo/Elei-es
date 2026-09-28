@@ -44,10 +44,21 @@ BROWSER_HEADERS = {
 
 
 def resultado_url(base: str, cod_eleicao: int, cod_cargo: int, abrangencia: str) -> str:
+    """URL do JSON de resultados no formato oficial TSE.
+
+    Descoberto na documentação e simulado TSE 2026:
+      {base}/{cod_eleicao}/dados/{uf}/{uf}-c{cargo:04d}-e{cod_eleicao:06d}-u.json
+
+    Exemplos:
+      Presidente BR:  ele2026/21270/dados/br/br-c0001-e021270-u.json
+      Gov SP:         ele2026/21270/dados/sp/sp-c0003-e021270-u.json
+
+    Note o sufixo `-u.json` (não -r ou -br) — u = "urna".
+    """
     abr = abrangencia.lower()
     return (
         f"{base.rstrip('/')}/{cod_eleicao}/dados/{abr}/"
-        f"{cod_eleicao}-c{cod_cargo:04d}-e{cod_eleicao:06d}-{abr}.json"
+        f"{abr}-c{cod_cargo:04d}-e{cod_eleicao:06d}-u.json"
     )
 
 

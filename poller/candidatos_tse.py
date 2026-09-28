@@ -260,7 +260,8 @@ async def sincronizar_candidatos(
                   "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO"]
     cargos = cargos or [1, 3, 5, 6, 7]
     ano = settings.eleicao_ano
-    cod_eleicao = settings.eleicao_cod_1t
+    # Candidatos usam o cod_divulga (que é diferente do cod_resultados)
+    cod_eleicao = settings.eleicao_cod_divulga
 
     total = 0
     async with await cliente_tse() as client:
