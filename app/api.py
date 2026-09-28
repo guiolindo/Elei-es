@@ -17,14 +17,23 @@ from app.ws import broadcaster
 router = APIRouter(prefix="/api")
 
 
-def _url_foto(sq_candidato: str) -> str:
-    """URL da foto do candidato. Carregada pelo navegador do usuário
-    (que está no BR) direto do TSE — passa pelo Akamai.
-    Se for candidato do seed antigo (prefixos fixos), volta pra silhueta.
+_COD_ELEICAO_FOTO = 20322002026  # id interno da eleição 2026 (URL das fotos)
+
+
+def _url_foto(sq_candidato: str, uf: str | None) -> str:
+    """URL da foto do candidato no site do TSE.
+
+    Formato (2026): /divulga/rest/arquivo/img/{cod_eleicao}/{sq}/{uf}
+    Carregada pelo navegador do usuário (IP residencial BR) — passa
+    pelo Akamai. Candidatos do seed antigo caem na silhueta.
     """
     if any(sq_candidato.startswith(p) for p in ("PR2026_", "GO2026_", "SE2026_", "DF2026_", "DE2026_")):
         return "/static/silhueta.svg"
-    return f"https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidato/foto/2026/{sq_candidato}"
+    uf_seg = uf or "BR"
+    return (
+        f"https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img/"
+        f"{_COD_ELEICAO_FOTO}/{sq_candidato}/{uf_seg}"
+    )
 
 
 @router.get("/cargos")
@@ -58,7 +67,7 @@ async def listar_candidatos(
             "numero": c.numero,
             "partido": c.partido_numero,
             "uf": c.uf,
-            "foto": _url_foto(c.sq_candidato),
+            "foto": _url_foto(c.sq_candidato, c.uf),
         }
         for c in r.scalars()
     ]
@@ -78,7 +87,7 @@ async def ficha(sq: str, sess: AsyncSession = Depends(get_session)) -> dict[str,
         "partido": c.partido_numero,
         "uf": c.uf,
         "coligacao": c.coligacao,
-        "foto": _url_foto(c.sq_candidato),
+        "foto": _url_foto(c.sq_candidato, c.uf),
     }
 
 
