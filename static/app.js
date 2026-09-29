@@ -305,15 +305,29 @@ function anexarFotoComRetry(img, nome, partido) {
 function renderSkeletons(n = 6) {
   const el = $("lista-candidatos");
   el.innerHTML = "";
+  // Skeleton bate 1:1 com o layout do card real: topo com foto+info+check,
+  // métricas, rodapé com 2 botões. Assim a transição pro estado carregado
+  // é suave (sem "salto" de layout).
   for (let i = 0; i < n; i++) {
     const div = document.createElement("div");
     div.className = "candidato loading";
     div.innerHTML = `
-      <div class="cand-foto"></div>
-      <div class="cand-info">
-        <div class="cand-nome"></div>
-        <div class="cand-meta"></div>
-        <div class="cand-votos"></div>
+      <div class="cand-topo">
+        <div class="cand-foto skel"></div>
+        <div class="cand-info">
+          <div class="cand-nome skel"></div>
+          <div class="cand-meta skel"></div>
+        </div>
+        <div class="cand-check-vazio skel"></div>
+      </div>
+      <div class="cand-metricas">
+        <div class="cand-votos skel"></div>
+        <div class="cand-linha-inf"><span class="skel-inline"></span></div>
+        <div class="cand-barra skel"></div>
+      </div>
+      <div class="cand-rodape">
+        <div class="cand-acao skel"></div>
+        <div class="cand-acao skel"></div>
       </div>`;
     el.appendChild(div);
   }

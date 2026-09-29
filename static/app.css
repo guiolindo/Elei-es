@@ -436,10 +436,9 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   background: rgba(240,180,41,.15); color: var(--brand); border-color: var(--brand);
 }
 .cand-ver:hover { background: rgba(124,92,255,.10); border-color: var(--accent); color: #cfc4ff; }
-.cand-foto {
-  width: 78px; height: 100px; object-fit: cover; border-radius: 10px;
-  background: var(--bg-3); flex-shrink: 0;
-}
+/* .cand-foto regras principais estão no bloco de redesign acima
+   (60×78 no card, com hover scale). Fallback + tamanhos maiores
+   pra modal e comparação continuam abaixo. */
 .cand-foto-fallback,
 .card-comp img.fallback,
 .modal-hero img.fallback {
@@ -450,21 +449,9 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 }
 .card-comp .cand-foto-fallback { width: 88px; height: 112px; font-size: 28px; }
 .modal-hero .cand-foto-fallback { width: 100px; height: 130px; font-size: 32px; }
-.cand-info {
-  flex: 1; min-width: 0;
-  display: flex; flex-direction: column; gap: 2px;
-  overflow: hidden;
-}
-.cand-nome {
-  font-weight: 700; font-size: 16px; letter-spacing: -0.01em;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.cand-meta {
-  font-size: 12px; color: var(--muted); margin-top: 2px;
-  font-family: 'JetBrains Mono', monospace;
-  display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center;
-  line-height: 1.4;
-}
+/* .cand-info, .cand-nome, .cand-meta — regras principais estão no
+   bloco "Cards de candidatos (redesign v2)" acima. Aqui só o legado
+   pra baseline de alinhamento no modal/comparação. */
 .cand-meta .pill-part, .cand-meta .badge-part-wrap {
   vertical-align: baseline;
 }
@@ -525,20 +512,8 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 .modal-card { position: relative; }
-.cand-votos {
-  font-size: 22px; font-weight: 800; margin-top: 8px;
-  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
-  line-height: 1.1;
-}
-.cand-pct {
-  font-size: 12px; color: var(--fg-2);
-  font-family: 'JetBrains Mono', monospace;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.cand-linha-inf {
-  display: flex; gap: 8px; align-items: baseline; margin-top: 2px;
-  font-size: 12px;
-}
+
+/* Delta arrow (variação de votos) */
 .cand-delta {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px; font-weight: 700;
@@ -546,13 +521,18 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   transition: background .3s;
   white-space: nowrap;
 }
-.cand-delta.up   { background: rgba(16,185,129,0.15); color: #10b981; }
-.cand-delta.down { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.cand-delta.up   { background: rgba(16,185,129,0.15); color: var(--ok); }
+.cand-delta.down { background: rgba(239,68,68,0.15);  color: var(--danger); }
+
+/* Barra de progresso do candidato (%válidos vs líder) */
 .cand-barra {
-  height: 4px; background: var(--bg-3); border-radius: 2px;
-  overflow: hidden; margin-top: 8px;
+  height: 5px; background: var(--surface-3); border-radius: 3px;
+  overflow: hidden; margin-top: 2px;
 }
-.cand-barra div { height: 4px; background: var(--grad-a); border-radius: 2px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+.cand-barra div {
+  height: 100%; background: var(--grad-a); border-radius: 3px;
+  width: 0; transition: width .6s cubic-bezier(.4,0,.2,1);
+}
 
 .badge-prop {
   display: inline-block; padding: 3px 8px; border-radius: 999px;
@@ -757,20 +737,23 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
-.candidato.loading { pointer-events: none; }
-.candidato.loading .cand-foto { background: var(--bg-3); }
-.candidato.loading .cand-nome,
-.candidato.loading .cand-meta,
-.candidato.loading .cand-votos {
+.candidato.loading { pointer-events: none; cursor: default; }
+.candidato.loading .skel,
+.candidato.loading .skel-inline {
   background: var(--bg-3); color: transparent;
   border-radius: 4px;
   animation: shimmer 1.4s infinite;
   background-image: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3) 50%, var(--bg-2) 75%);
   background-size: 200% 100%;
 }
-.candidato.loading .cand-nome { height: 16px; width: 60%; margin-bottom: 4px; }
-.candidato.loading .cand-meta { height: 12px; width: 40%; margin-bottom: 6px; }
-.candidato.loading .cand-votos { height: 22px; width: 50%; }
+.candidato.loading .cand-foto.skel { width: 60px; height: 78px; }
+.candidato.loading .cand-nome.skel { height: 16px; width: 65%; margin-bottom: 4px; }
+.candidato.loading .cand-meta.skel { height: 12px; width: 45%; margin-bottom: 6px; }
+.candidato.loading .cand-votos.skel { height: 22px; width: 50%; }
+.candidato.loading .cand-check-vazio.skel { border: none; }
+.candidato.loading .cand-barra.skel { height: 5px; margin-top: 8px; }
+.candidato.loading .cand-acao.skel { height: 32px; border: none; }
+.candidato.loading .skel-inline { display: inline-block; height: 12px; width: 60%; }
 
 /* Skeleton do mapa (enquanto GeoJSON carrega) */
 .mapa.loading {
@@ -851,7 +834,7 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   }
   .dot.on { animation: none; opacity: 1; }
   .stat-value.flash, .cand-votos.flash { animation: none; }
-  .skeleton, .candidato.loading .cand-nome { animation: none; opacity: 0.6; }
+  .skeleton, .candidato.loading .skel { animation: none; opacity: 0.6; }
 }
 
 /* Skeleton dos gráficos ECharts (enquanto ele inicializa) */
@@ -1087,15 +1070,10 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   100% { transform: translate3d(0, 0, 0); opacity: 1; }
 }
 
-/* Cards de candidato: mudança de posição no ranking (FLIP animation
-   via JS, o CSS só provê a transição) */
-.candidato {
-  transition: transform var(--dur-slow) var(--ease-in-out),
-              border-color var(--dur-fast),
-              box-shadow var(--dur-fast);
-}
+/* Card durante FLIP animation (JS aplica transform inicial invertido) */
 .candidato.moving {
   will-change: transform;   /* removido pelo JS após o movimento */
+  transition: transform var(--dur-slow) var(--ease-in-out) !important;
 }
 
 /* ============ Iconografia SVG unificada ============ */
@@ -1237,9 +1215,9 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
   .filtro-lista { grid-template-columns: 1fr; gap: 8px; padding: 8px 0; }
   .filtro-lista input, .filtro-lista select { min-height: 44px; font-size: 15px; }
   .grid-candidatos { grid-template-columns: 1fr !important; gap: 10px; }
-  .cand-card { padding: 14px; }
-  .cand-foto { max-height: 100px !important; }
-  .cand-card button, .cand-card [role=button] { min-height: 44px; }
+  .candidato { padding: 14px; }
+  .cand-foto { width: 64px !important; height: 82px !important; }
+  .candidato button, .candidato [role=button] { min-height: 44px; }
   .comparacao { display: block; padding: 0; }
   .cards-comp { grid-template-columns: 1fr !important; gap: 12px; }
 
@@ -1359,6 +1337,6 @@ body.modo-tv .stats .stat:not(:first-child):not(:nth-child(6)) {
   display: none !important;
 }
 body.modo-tv .grid-candidatos { grid-template-columns: 1fr; max-width: 900px; margin: 0 auto; }
-body.modo-tv .cand-card { transform: scale(1.15); transform-origin: top center;
+body.modo-tv .candidato { transform: scale(1.05); transform-origin: top center;
   padding: 24px; margin-bottom: 20px; }
 body.modo-tv .hero { padding: 12px; }
