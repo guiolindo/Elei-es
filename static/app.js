@@ -246,17 +246,16 @@ function renderLista() {
       : `${filtrados.length} de ${state.candidatos.length}`;
   if (state.candidatos.length === 0) {
     el.innerHTML = `<div class="empty-state">
-      <div class="clock">🕔</div>
-      <h3>Aguardando dados</h3>
-      <p>O TSE publica os resultados quando as urnas fecham (domingo, 17h).
-         Enquanto isso, você pode navegar pelo mapa e explorar os candidatos.</p>
+      <svg class="empty-ico" width="48" height="48"><use href="#i-clock"/></svg>
+      <h3>Aguardando o TSE liberar os dados</h3>
+      <p>Os primeiros resultados começam a sair a partir das 17h de domingo, quando as urnas fecham. O placar preenche sozinho assim que os primeiros votos chegarem.</p>
     </div>`;
     return;
   }
   if (filtrados.length === 0) {
     el.innerHTML = `<div class="empty-state">
-      <h3>Nada encontrado</h3>
-      <p>Ajuste o filtro ou a busca para ver candidatos.</p>
+      <h3>Nada com esse filtro</h3>
+      <p>Tente escrever outra parte do nome, mudar o partido ou limpar a busca.</p>
     </div>`;
     return;
   }
@@ -937,7 +936,7 @@ function atualizarContagemRegressiva() {
   const seg = Math.floor((diff % 60_000) / 1000);
   el.classList.remove("oculto");
   el.innerHTML = `
-    <span class="cd-icone">⏳</span>
+    <svg class="cd-icone" width="14" height="14"><use href="#i-hourglass"/></svg>
     <span class="cd-titulo">Apuração começa em</span>
     <span class="cd-nums">
       <b>${String(dias).padStart(2,"0")}</b>d
@@ -1138,23 +1137,43 @@ function fecharBottomSheet() {
   $("m-sheet")?.classList.add("oculto");
 }
 
+const TITULOS_TAB = {
+  placar: "Placar ao vivo",
+  mapa: "Mapa por região",
+  comparar: "Comparar candidatos",
+  eventos: "Linha do tempo",
+  mais: "Sobre e opções",
+};
+
 function trocarTabMobile(tab) {
   const page = document.querySelector("main.page");
   if (!page) return;
-  page.classList.remove("m-tab-placar", "m-tab-mapa", "m-tab-comparar",
-                       "m-tab-eventos", "m-tab-mais");
-  page.classList.add(`m-tab-${tab}`);
+  // Se for compare mas nada selecionado, avisa e mantém no placar
+  if (tab === "comparar" && state.selecionados.length < 2) {
+    toast("Escolha pelo menos 2 candidatos no placar antes.", "warn");
+    return;
+  }
+  // Transição visual: fade+slide na section entrando
+  page.classList.add("m-tab-trocando");
+  setTimeout(() => {
+    ["placar","mapa","comparar","eventos","mais"].forEach(t => {
+      page.classList.remove(`m-tab-${t}`);
+      document.body.classList.remove(`m-tab-${t}`);
+    });
+    page.classList.add(`m-tab-${tab}`);
+    document.body.classList.add(`m-tab-${tab}`);
+    page.classList.remove("m-tab-trocando");
+    // Título grande da tab
+    const t = $("m-tab-titulo");
+    if (t) t.textContent = TITULOS_TAB[tab] || tab;
+    // Ao entrar em "comparar", abre a comparação sem esperar clique
+    if (tab === "comparar") abrirComparacao();
+  }, 120);
   document.querySelectorAll(".m-nav-item").forEach(b => {
     const on = b.dataset.tab === tab;
     b.classList.toggle("ativo", on);
     b.setAttribute("aria-selected", on ? "true" : "false");
   });
-  // Se for compare mas nada selecionado, mostra aviso
-  if (tab === "comparar" && state.selecionados.length < 2) {
-    toast("Selecione pelo menos 2 candidatos na aba Placar", "warn");
-    setTimeout(() => trocarTabMobile("placar"), 100);
-    return;
-  }
   window.scrollTo({ top: 0, behavior: "smooth" });
   try { localStorage.setItem("elei-es:m-tab", tab); } catch(e) {}
 }
@@ -1228,7 +1247,8 @@ function bootMobile() {
 async function pedirNotificacoes() {
   if (!("Notification" in window)) return toast("Navegador sem suporte a notificações.", "warn");
   const p = await Notification.requestPermission();
-  toast(p === "granted" ? "🔔 Notificações ativadas" : "Notificações negadas", p === "granted" ? "" : "warn");
+  toast(p === "granted" ? "Notificações ativadas" : "Notificações não permitidas pelo navegador",
+        p === "granted" ? "ok" : "warn");
 }
 
 // ============ boot ============

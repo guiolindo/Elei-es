@@ -34,17 +34,26 @@ async function registrarMapa(chave, url, nameProperty) {
 
 async function init(container, abrangencia) {
   if (_chart) _chart.dispose();
-  // Ajusta altura ao aspect ratio real do mapa em vez de esticar
-  // Brasil ~ 1:1 (68% × altura), UFs variam mas 1.1:1 é razoável
+  // Bounding box real do Brasil: ~40° largura × ~39° altura (5°N a -34°S,
+  // -74°W a -34°W). Como usaremos aspectScale=1 pra não distorcer o
+  // desenho, o container precisa de proporção próxima da real (≈0.9).
+  // No mobile o mapa fica em coluna estreita, então cai pra 1.0 (quadrado)
+  // pra ainda mostrar o país inteiro.
   const w = container.clientWidth || 800;
-  const aspect = abrangencia === "BR" ? 0.95 : 1.05;
-  container.style.height = Math.min(720, Math.max(360, w * aspect)) + "px";
+  const isMobile = w < 500;
+  const aspect = abrangencia === "BR"
+    ? (isMobile ? 1.0 : 0.88)
+    : 1.0;  // UF: bounding box varia, quadrado é razoável
+  const alturaAlvo = Math.min(640, Math.max(340, w * aspect));
+  container.style.height = alturaAlvo + "px";
   _chart = echarts.init(container, null, { renderer: "canvas" });
   if (!init._resize) {
     window.addEventListener("resize", () => {
       if (_chart) {
         const w2 = container.clientWidth || 800;
-        container.style.height = Math.min(720, Math.max(360, w2 * aspect)) + "px";
+        const isMob2 = w2 < 500;
+        const asp2 = abrangencia === "BR" ? (isMob2 ? 1.0 : 0.88) : 1.0;
+        container.style.height = Math.min(640, Math.max(340, w2 * asp2)) + "px";
         _chart.resize();
       }
     });
@@ -117,6 +126,12 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
       roam,
       zoom,
       scaleLimit: { min: 0.8, max: 8 },
+      // aspectScale=1 preserva a proporção real do GeoJSON (não achata
+      // verticalmente como o default 0.75 do ECharts, que era o que
+      // fazia o Brasil parecer "esticado" pra cima).
+      aspectScale: 1,
+      layoutCenter: ["50%", "52%"],
+      layoutSize: "94%",
       label: {
         show: abrangencia === "BR",
         color: "#ffffff", fontSize: 11, fontWeight: 700,

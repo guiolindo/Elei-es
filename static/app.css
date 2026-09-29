@@ -750,6 +750,14 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .ajuda-sub { margin-top: 16px; font-size: 12px; color: var(--muted, #94a3b8);
   line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; }
 
+/* ============ Iconografia SVG unificada ============ */
+svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
+.rodape-linha svg, .m-icon-btn svg {
+  display: inline-block; vertical-align: middle;
+  fill: none; stroke: currentColor;
+}
+.btn-ghost svg.ico { width: 18px; height: 18px; }
+
 /* ==================================================================
    MOBILE APP CHROME (só ativa em <=768px)
    Reformula a experiência: bottom-nav com tabs, top bar compacto,
@@ -790,11 +798,35 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
     display: flex; align-items: center; justify-content: center; }
   .m-icon-btn:active { transform: scale(0.94); }
 
+  /* --- Título da tab atual (fica bem visível) --- */
+  .m-tab-titulo {
+    padding: 14px 16px 4px;
+    font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
+    color: #fff;
+    background: #0b1220;
+  }
+
+  /* --- Transição entre tabs --- */
+  main.page > section, main.page > .page-header, main.page > .filtro-lista,
+  main.page > .prop-info, main.page > footer.rodape {
+    animation: tab-in .18s ease-out;
+  }
+  main.page.m-tab-trocando > * { opacity: 0.3; transform: translateY(4px);
+    transition: opacity .12s, transform .12s; }
+  @keyframes tab-in { from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); } }
+
+  /* --- Indicador de tab ativa (barra dourada no topo do item) --- */
+  .m-nav-item { position: relative; }
+  .m-nav-item.ativo::before {
+    content: ""; position: absolute; top: 0; left: 22%; right: 22%;
+    height: 2px; background: var(--gold, #f0b429); border-radius: 0 0 2px 2px;
+  }
+
   /* --- Chips de cargo/UF --- */
   .m-chips {
     display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-    padding: 10px 12px; background: #0b1220;
-    position: sticky; top: 60px; z-index: 49;
+    padding: 8px 16px 12px; background: #0b1220;
     border-bottom: 1px solid rgba(255,255,255,.04);
   }
   .m-chip {
@@ -840,6 +872,18 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   main.page.m-tab-comparar > .comparacao { display: block; }
   main.page.m-tab-eventos > .timeline-secao { display: block; }
   main.page.m-tab-mais > .rodape { display: block; }
+
+  /* Chips só aparecem na aba Placar e Mapa (onde filtragem faz sentido) */
+  .m-chips, .m-stats { display: none; }
+  main.page.m-tab-placar ~ .m-chips,
+  main.page.m-tab-placar ~ .m-stats,
+  main.page.m-tab-mapa ~ .m-chips,
+  main.page.m-tab-mapa ~ .m-stats { display: none; }
+  /* precisa ser irmão da main → arruma no body */
+  body.m-tab-placar .m-chips,
+  body.m-tab-mapa .m-chips { display: grid; }
+  body.m-tab-placar .m-stats,
+  body.m-tab-comparar .m-stats { display: flex; }
 
   /* Ajustes visuais dentro das tabs */
   .filtro-lista { grid-template-columns: 1fr; gap: 8px; padding: 8px 0; }
