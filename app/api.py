@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,17 @@ from app.models import (
 from app.ws import broadcaster
 
 router = APIRouter(prefix="/api")
+
+
+def _exigir_admin(x_admin_token: str | None = Header(default=None)) -> None:
+    """Protege endpoints /admin/*. Se ADMIN_TOKEN estiver setado, exige
+    o header X-Admin-Token com valor idêntico. Se vazio (dev), libera."""
+    from app.config import get_settings
+    esperado = (get_settings().admin_token or "").strip()
+    if not esperado:
+        return  # sem token configurado → aberto (só em dev)
+    if not x_admin_token or x_admin_token.strip() != esperado:
+        raise HTTPException(status_code=401, detail="admin token inválido")
 
 
 def _url_foto(sq_candidato: str, uf: str | None) -> str:
@@ -501,7 +512,7 @@ async def push_subscribe(
     return {"ok": True}
 
 
-@router.get("/admin/status")
+@router.get("/admin/status", dependencies=[Depends(_exigir_admin)])
 async def admin_status(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Diagnóstico rápido: quantos candidatos há por cargo/UF e último snapshot."""
     from sqlalchemy import func
@@ -525,7 +536,7 @@ async def admin_status(sess: AsyncSession = Depends(get_session)) -> dict[str, A
     }
 
 
-@router.post("/admin/limpar-seed")
+@router.post("/admin/limpar-seed", dependencies=[Depends(_exigir_admin)])
 async def limpar_seed(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Remove os candidatos fictícios do seed (prefixos PR2026_, GO2026_, etc).
     Chame depois que os reais entrarem para não misturar."""
@@ -539,7 +550,7 @@ async def limpar_seed(sess: AsyncSession = Depends(get_session)) -> dict[str, An
     return {"removidos": r.rowcount}
 
 
-@router.post("/admin/upload-foto")
+@router.post("/admin/upload-foto", dependencies=[Depends(_exigir_admin)])
 async def upload_foto(payload: dict[str, Any]) -> dict[str, Any]:
     """Recebe foto em base64 e salva em static/candidatos/{sq}.jpg.
 
@@ -556,7 +567,7 @@ async def upload_foto(payload: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "sq": sq}
 
 
-@router.post("/admin/importar-candidatos")
+@router.post("/admin/importar-candidatos", dependencies=[Depends(_exigir_admin)])
 async def importar_candidatos(
     payload: dict[str, Any],
     sess: AsyncSession = Depends(get_session),
@@ -583,7 +594,7 @@ async def importar_candidatos(
     return {"atualizados": n, "cargo": cargo, "uf": uf_arg or "BR"}
 
 
-@router.post("/admin/atualizar-detalhe")
+@router.post("/admin/atualizar-detalhe", dependencies=[Depends(_exigir_admin)])
 async def atualizar_detalhe(
     payload: dict[str, Any],
     sess: AsyncSession = Depends(get_session),
@@ -622,7 +633,7 @@ async def atualizar_detalhe(
     return {"ok": True, "sq": sq}
 
 
-@router.get("/admin/diagnostico-ids")
+@router.get("/admin/diagnostico-ids", dependencies=[Depends(_exigir_admin)])
 async def diagnostico_ids(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Verifica se os IDs de candidatos batem entre divulga (importado) e
     resultados (snapshots). Chame depois que começar a apurar."""
@@ -651,7 +662,7 @@ async def diagnostico_ids(sess: AsyncSession = Depends(get_session)) -> dict[str
     }
 
 
-@router.get("/admin/testar-tse")
+@router.get("/admin/testar-tse", dependencies=[Depends(_exigir_admin)])
 async def admin_testar_tse() -> dict[str, Any]:
     """Diagnóstico: testa se o Railway consegue falar com todos os
     endpoints do TSE que a apuração usa. Cada teste diz se tá OK ou
@@ -719,7 +730,7 @@ async def admin_testar_tse() -> dict[str, Any]:
     return resultado
 
 
-@router.post("/admin/sync-candidatos")
+@router.post("/admin/sync-candidatos", dependencies=[Depends(_exigir_admin)])
 async def admin_sync_candidatos(
     payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:

@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     vapid_claim_email: str = "admin@example.com"
     session_secret: str = "change-me"
     cors_origins: str = "http://localhost:8080"
+    # Token exigido nos endpoints /api/admin/*. Se vazio, admin fica aberto
+    # (útil só em dev). Em produção sempre setar via env var.
+    admin_token: str = ""
 
 
 @lru_cache

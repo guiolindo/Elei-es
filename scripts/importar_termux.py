@@ -4,15 +4,27 @@
 Uso no Termux (Android):
     pkg install python
     pip install curl-cffi
+    export ADMIN_TOKEN="…mesmo valor que está no Railway…"
     python importar_termux.py https://elei-es-production.up.railway.app
+
+Ou passa o token como 2º argumento:
+    python importar_termux.py https://.../ MEU_TOKEN
 
 curl-cffi usa libcurl-impersonate, que mimica exatamente o handshake TLS
 e as flags HTTP/2 do Chrome — engana o Akamai do TSE que bloqueia curl
 padrão. Precisa rodar do celular (IP residencial BR).
 """
 import json
+import os
 import sys
 import time
+
+# Token exigido pelo /api/admin/*. Lê da env ADMIN_TOKEN ou do 2º argv.
+ADMIN_TOKEN = (
+    (sys.argv[2] if len(sys.argv) > 2 else "")
+    or os.environ.get("ADMIN_TOKEN", "")
+)
+_HDR = {"X-Admin-Token": ADMIN_TOKEN} if ADMIN_TOKEN else {}
 
 try:
     from curl_cffi import requests
@@ -44,7 +56,7 @@ total_cand = 0
 # 1) Limpa candidatos falsos (seed) antes de importar os reais
 print("Limpando seed antigo…")
 try:
-    r = requests.post(f"{APP}/api/admin/limpar-seed", timeout=30)
+    r = requests.post(f"{APP}/api/admin/limpar-seed", timeout=30, headers=_HDR)
     print(f"  removidos: {r.json().get('removidos')}")
 except Exception as e:
     print(f"  aviso: {e}")
@@ -80,6 +92,7 @@ def enviar_detalhe(sq: str, detalhe: dict) -> bool:
             f"{APP}/api/admin/atualizar-detalhe",
             json={"sq_candidato": sq, "detalhe": detalhe},
             timeout=30,
+            headers=_HDR,
         )
         return r.status_code == 200 and r.json().get("ok")
     except Exception:
@@ -98,6 +111,7 @@ def baixar_foto(sq: str, uf: str) -> bool:
             f"{APP}/api/admin/upload-foto",
             json={"sq_candidato": sq, "b64": b64},
             timeout=30,
+            headers=_HDR,
         )
         return resp.status_code == 200
     except Exception:
@@ -135,6 +149,7 @@ for cargo, nome, ufs in CARGOS:
                 f"{APP}/api/admin/importar-candidatos",
                 json={"cargo": cargo, "uf": uf, "json": data},
                 timeout=30,
+                headers=_HDR,
             )
             if resp.status_code == 200:
                 res = resp.json()

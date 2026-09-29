@@ -261,6 +261,12 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   height: 20px; max-height: 20px;
   max-width: 60px;
   overflow: hidden;
+  /* Fundo branco garante que logos com traços escuros (PT, PCdoB, etc)
+     fiquem visíveis mesmo se o container tiver tema escuro. */
+  background: #fff;
+  border-radius: 4px;
+  padding: 2px 4px;
+  box-sizing: border-box;
 }
 .badge-part-logo {
   height: 100%; max-height: 20px;
@@ -272,8 +278,9 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .badge-part-logo.erro { display: none; }
 /* No modal a logo pode ser um pouco maior */
 .modal-urna .badge-part-wrap {
-  height: 26px; max-height: 26px;
-  width: 100px; max-width: 100px;         /* largura fixa + object-fit resolve */
+  height: 30px; max-height: 30px;
+  width: 108px; max-width: 108px;
+  padding: 3px 6px;                        /* respiração pro logo dentro do fundo branco */
 }
 .modal-urna .badge-part-logo {
   height: 26px; max-height: 26px;
