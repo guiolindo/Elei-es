@@ -103,14 +103,17 @@ async def _api(client: httpx.AsyncClient, metodo: str, **payload) -> dict:
 
 async def _send(client, chat_id: int, texto: str, keyboard: dict | None = None,
                 foto: str | None = None) -> None:
+    # Telegram exige objeto válido em reply_markup — passar null dá 400.
+    # Omitimos o campo quando não há teclado.
+    extras: dict[str, Any] = {}
+    if keyboard is not None:
+        extras["reply_markup"] = keyboard
     if foto:
         await _api(client, "sendPhoto", chat_id=chat_id, photo=foto,
-                   caption=texto[:1024], parse_mode="Markdown",
-                   reply_markup=keyboard)
+                   caption=texto[:1024], parse_mode="Markdown", **extras)
         return
     await _api(client, "sendMessage", chat_id=chat_id, text=texto,
-               parse_mode="Markdown", disable_web_page_preview=True,
-               reply_markup=keyboard)
+               parse_mode="Markdown", disable_web_page_preview=True, **extras)
 
 
 # ================== parsing de args ==================

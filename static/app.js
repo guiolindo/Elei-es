@@ -22,6 +22,35 @@ const state = {
   proporcional: null,
 };
 
+// ============ persistência de preferências ============
+// Salva cargo/UF/filtros no localStorage pro usuário reencontrar
+// tudo do jeito que deixou na última visita. Falha silenciosamente
+// (modo anônimo, storage cheio, etc).
+const PREFS_KEY = "elei-es:prefs:v1";
+function salvarPrefs() {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({
+      cargo: state.cargo,
+      abrangencia: state.abrangencia,
+      filtro: state.filtro,
+    }));
+  } catch(e) {}
+}
+function carregarPrefs() {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (typeof p.cargo === "number") state.cargo = p.cargo;
+    if (typeof p.abrangencia === "string") state.abrangencia = p.abrangencia;
+    if (p.filtro && typeof p.filtro === "object") state.filtro = {
+      texto: p.filtro.texto || "",
+      partido: p.filtro.partido || "",
+      ordenar: p.filtro.ordenar || "votos",
+    };
+  } catch(e) {}
+}
+
 // ============ helpers ============
 const fmt = new Intl.NumberFormat("pt-BR");
 const fmtNum = n => fmt.format(n ?? 0);
@@ -907,14 +936,15 @@ function atualizarContagemRegressiva() {
   const seg = Math.floor((diff % 60_000) / 1000);
   el.classList.remove("oculto");
   el.innerHTML = `
-    <div class="cd-titulo">A apuração começa em</div>
-    <div class="cd-grid">
-      <div><span class="cd-num">${String(dias).padStart(2,"0")}</span><span class="cd-lab">dias</span></div>
-      <div><span class="cd-num">${String(horas).padStart(2,"0")}</span><span class="cd-lab">h</span></div>
-      <div><span class="cd-num">${String(min).padStart(2,"0")}</span><span class="cd-lab">min</span></div>
-      <div><span class="cd-num">${String(seg).padStart(2,"0")}</span><span class="cd-lab">seg</span></div>
-    </div>
-    <div class="cd-sub">Domingo, 5 de outubro · 17h de Brasília</div>
+    <span class="cd-icone">⏳</span>
+    <span class="cd-titulo">Apuração começa em</span>
+    <span class="cd-nums">
+      <b>${String(dias).padStart(2,"0")}</b>d
+      <b>${String(horas).padStart(2,"0")}</b>h
+      <b>${String(min).padStart(2,"0")}</b>m
+      <b>${String(seg).padStart(2,"0")}</b>s
+    </span>
+    <span class="cd-sub">· 5/10 17h BRT</span>
   `;
 }
 
@@ -1059,8 +1089,8 @@ async function pedirNotificacoes() {
 
 // ============ boot ============
 async function boot() {
-  $("sel-cargo").addEventListener("change", (e) => { state.cargo = +e.target.value; onFiltroChange(); });
-  $("sel-uf").addEventListener("change", (e) => { state.abrangencia = e.target.value; onFiltroChange(); });
+  $("sel-cargo").addEventListener("change", (e) => { state.cargo = +e.target.value; salvarPrefs(); onFiltroChange(); });
+  $("sel-uf").addEventListener("change", (e) => { state.abrangencia = e.target.value; salvarPrefs(); onFiltroChange(); });
   $("btn-fechar").addEventListener("click", fecharComparacao);
   $("btn-comparar").addEventListener("click", abrirComparacao);
   $("btn-notif").addEventListener("click", pedirNotificacoes);
@@ -1118,15 +1148,18 @@ async function boot() {
     clearTimeout(buscaTimer);
     buscaTimer = setTimeout(() => {
       state.filtro.texto = e.target.value;
+      salvarPrefs();
       renderLista();
     }, 150);
   });
   $("filtro-partido").addEventListener("change", (e) => {
     state.filtro.partido = e.target.value;
+    salvarPrefs();
     renderLista();
   });
   $("ordenar").addEventListener("change", (e) => {
     state.filtro.ordenar = e.target.value;
+    salvarPrefs();
     renderLista();
   });
 
@@ -1153,8 +1186,22 @@ async function boot() {
     }
   } catch (e) { /* ok */ }
 
+  // Ordem: 1) prefs salvas 2) URL da share (sobrescreve) 3) ajusta UF ↔ cargo
+  carregarPrefs();
   aplicarEstadoDaURL();
+  // Reflete no <select> antes do primeiro carregamento
+  const selCargo = $("sel-cargo"); if (selCargo) selCargo.value = state.cargo;
   ajustarUFParaCargo();
+  // Restaura filtros nos inputs (localStorage → UI)
+  const bn = $("busca-nome"); if (bn && state.filtro.texto) bn.value = state.filtro.texto;
+  const fp = $("filtro-partido"); if (fp && state.filtro.partido) fp.value = state.filtro.partido;
+  const ord = $("ordenar"); if (ord && state.filtro.ordenar) ord.value = state.filtro.ordenar;
+
+  // Rola pro topo ao abrir — o browser às vezes restaura scroll velho
+  // e a página aparece "no meio" ou "no fim" pro usuário
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  window.scrollTo(0, 0);
+
   await carregarCandidatos();
   await refreshApuracao();
   await carregarEventos();

@@ -689,32 +689,29 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   .cand-foto, .badge-part-logo { max-height: 90px; }
 }
 
-/* ============ UX: contagem regressiva pro dia D ============ */
+/* ============ UX: faixa fininha com contagem regressiva ============ */
 .countdown {
-  margin: 16px 24px 0;
-  padding: 20px 24px;
-  background: linear-gradient(135deg, rgba(240,180,41,0.15), rgba(59,130,246,0.15));
-  border: 1px solid rgba(240,180,41,0.3);
-  border-radius: 12px;
-  text-align: center;
-  animation: fade-in 0.4s ease-out;
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: linear-gradient(90deg, rgba(240,180,41,0.10), rgba(59,130,246,0.10));
+  border-bottom: 1px solid rgba(240,180,41,0.25);
+  font-size: 13px;
+  color: var(--muted, #94a3b8);
+  animation: fade-in 0.3s ease-out;
 }
-.cd-titulo { font-size: 14px; text-transform: uppercase; letter-spacing: 1.2px;
-  color: var(--muted, #94a3b8); font-weight: 700; margin-bottom: 12px; }
-.cd-grid { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
-.cd-grid > div { display: flex; flex-direction: column; align-items: center;
-  min-width: 64px; padding: 8px 14px; background: rgba(0,0,0,0.2);
-  border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
-.cd-num { font-family: 'JetBrains Mono', monospace; font-size: 32px;
-  font-weight: 700; color: var(--gold, #f0b429); font-variant-numeric: tabular-nums; }
-.cd-lab { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
-  color: var(--muted, #94a3b8); margin-top: 2px; }
-.cd-sub { margin-top: 12px; font-size: 13px; color: var(--muted, #94a3b8); }
-@media (max-width: 640px) {
-  .countdown { margin: 12px 12px 0; padding: 14px; }
-  .cd-num { font-size: 24px; }
-  .cd-grid { gap: 10px; }
-  .cd-grid > div { min-width: 52px; padding: 6px 10px; }
+.cd-icone { font-size: 14px; }
+.cd-titulo { font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px;
+  font-size: 11px; }
+.cd-nums { font-family: 'JetBrains Mono', monospace; font-size: 14px;
+  color: #e6edf3; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
+.cd-nums b { color: var(--gold, #f0b429); font-weight: 700; margin: 0 1px; }
+.cd-sub { font-size: 11px; opacity: 0.8; }
+@media (max-width: 480px) {
+  .countdown { padding: 6px 10px; gap: 6px; font-size: 11px; }
+  .cd-titulo { display: none; }        /* deixa só ⏳ 03d 12h ... */
+  .cd-nums { font-size: 12px; }
+  .cd-sub { display: none; }
 }
 
 /* ============ UX: banner de eleito + confete ============ */
