@@ -65,3 +65,4 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 ### Adicionado
 - Projeto criado.
 - Schema inicial (candidatos, snapshots, eventos, comparações).
+
