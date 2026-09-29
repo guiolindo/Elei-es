@@ -1,32 +1,46 @@
 """Cálculo de eleitos em pleitos proporcionais (Deputado Federal/Estadual).
 
-Regras (Lei 4.737/1965, alterada pela 13.165/2015 e EC 97/2017):
+Regras vigentes em 2026 (Código Eleitoral + Lei 14.211/2021 + jurisprudência STF):
 
 1. **Quociente Eleitoral (QE)** = int(votos_validos / vagas).
-   Votos válidos incluem votos nominais + votos de legenda.
+   Votos válidos = votos nominais + votos de legenda.
 
-2. **Quociente Partidário (QP)** de cada partido/federação = int(votos_do_partido / QE).
-   É quantas vagas iniciais o partido leva.
+2. **Quociente Partidário (QP)** = int(votos_da_unidade / QE).
+   "Unidade" = partido isolado ou federação partidária (contam como um).
 
-3. **Cláusula de barreira** (art. 108 do CE após 2015):
+3. **Barreira nas vagas do QP** (art. 108 do CE, red. Lei 13.165/2015):
    Candidato só se elege se tiver ≥ 10% do QE em votos nominais.
-   Se um partido tem 3 vagas mas só 2 candidatos passam do 10%, ganha só 2.
-   A terceira vaga volta ao pool de sobras.
+   Se um partido tem 3 vagas mas só 2 candidatos passam do 10%, ganha 2 e
+   a 3ª vaga volta ao pool de sobras.
 
-4. **Sobras** — distribuídas por D'Hondt (maior média):
-   Média = votos_partido / (vagas_atual + 1).
-   Só concorre a sobras o partido que atingiu o QE original.
-   Vaga vai pro candidato mais votado do partido que ainda esteja
-   acima da cláusula de barreira.
+4. **Sobras — Fase 1 (Regra 80/20)** (art. 109 §2º CE, red. Lei 14.211/2021):
+   Só concorrem à distribuição de vagas remanescentes:
+     - Partidos/federações com votos ≥ 80% do QE, E
+     - Candidatos com votos ≥ 20% do QE.
+   Distribuição por maiores médias (D'Hondt): média = votos / (vagas+1).
 
-5. **Federações** (EC 97/2017 + lei 14.208/2021):
-   Federação de 3+ partidos age como um só partido — soma votos,
-   compete a vagas em bloco, distribui internamente entre os partidos
-   membros pela ordem dos mais votados.
+5. **Sobras — Fase 2 (Residual)** (STF ADI 7228/7263, 2024):
+   Se sobrarem vagas após a Fase 1 (nenhum partido preenche 80/20), a
+   distribuição continua por maiores médias entre TODOS os partidos com
+   candidatos disponíveis, ignorando o corte de 80%. Sem essa fase, vagas
+   podem ficar sem preenchimento — o STF derrubou essa possibilidade.
+
+6. **Federações partidárias** (art. 11-A LO Partidos, red. Lei 14.208/2021):
+   Federação de 2+ partidos age como um só partido pra todos os efeitos
+   proporcionais: soma votos, compete a vagas em bloco, distribui
+   internamente pelos candidatos mais votados. Os partidos membros
+   preservam registro e estrutura próprios.
+
+Nota sobre relatórios: `ResultadoPartido.votos_partido` traz os votos
+específicos daquele partido (útil pra relatórios de desempenho por
+legenda), enquanto `votos_unidade` traz o total da unidade (partido isolado
+ou federação inteira), que é o que efetivamente entra no cálculo do QP.
 
 Referências:
-- CE arts. 106-113 (proporcional)
-- CE art. 108 (barreira 10% QE)
+- Código Eleitoral (Lei 4.737/1965), arts. 106-113.
+- Lei 14.211/2021 — regra 80/20.
+- STF ADI 7228 e ADI 7263 (2024) — fase residual.
+- Lei 14.208/2021 + EC 97/2017 — federações.
 """
 from __future__ import annotations
 
@@ -58,11 +72,13 @@ class ResultadoCandidato:
 class ResultadoPartido:
     partido: int
     federacao: str | None
-    votos_totais: int
+    votos_partido: int   # votos daquela legenda específica (nominais+legenda desse partido)
+    votos_unidade: int   # votos da unidade (partido isolado ou federação inteira)
     vagas_qp: int        # vagas por quociente partidário
-    vagas_sobras: int    # vagas ganhas nas sobras
+    vagas_sobras: int    # vagas ganhas nas sobras (Fase 1 + Fase 2)
     total_vagas: int
     passou_qe: bool
+    passou_80_qe: bool   # elegível pra Fase 1 das sobras (Lei 14.211/2021)
 
 
 @dataclass
@@ -116,26 +132,36 @@ def calcular_eleitos_proporcional(
     votos_legenda = votos_legenda_por_partido or {}
 
     # 1) Agrupa candidatos por "unidade eleitoral" (partido isolado OU federação)
+    #    e também totaliza VOTOS POR PARTIDO individualmente (não misturados
+    #    com a federação) — necessário pro ResultadoPartido correto.
     def unidade_de(part: int) -> str:
         fed = _federacao_de(part, federacoes)
         return fed if fed else f"P{part}"
 
+    votos_por_partido: dict[int, int] = {}
     votos_por_unidade: dict[str, int] = {}
     for c in cands:
+        votos_por_partido[c.partido_numero] = votos_por_partido.get(c.partido_numero, 0) + c.votos
         u = unidade_de(c.partido_numero)
         votos_por_unidade[u] = votos_por_unidade.get(u, 0) + c.votos
     for part, votos in votos_legenda.items():
+        votos_por_partido[part] = votos_por_partido.get(part, 0) + votos
         u = unidade_de(part)
         votos_por_unidade[u] = votos_por_unidade.get(u, 0) + votos
 
-    # 2) QE e QP
+    # 2) QE e barreiras
     votos_validos = sum(votos_por_unidade.values())
     qe = votos_validos // vagas if vagas > 0 else 0
-    barreira = qe // 10  # 10% do QE
+    barreira_qp = qe // 10              # 10% do QE — barreira nas vagas diretas do QP
+    barreira_sobra_cand = int(qe * 0.20)  # 20% do QE — barreira do candidato nas sobras
+    corte_80_qe = int(qe * 0.80)          # 80% do QE — barreira da unidade nas sobras (Fase 1)
 
     vagas_por_unidade: dict[str, int] = {}
     for u, v in votos_por_unidade.items():
         vagas_por_unidade[u] = v // qe if qe > 0 else 0
+
+    # Aliases pra compat com trechos abaixo
+    barreira = barreira_qp
 
     # 3) Distribuição por unidade (candidatos ordenados internamente por votos,
     # respeitando a barreira). Se um partido levou 5 vagas mas só 3 candidatos
@@ -156,27 +182,48 @@ def calcular_eleitos_proporcional(
     vagas_usadas = sum(vagas_efetivas_por_unidade.values())
     vagas_sobras_por_unidade: dict[str, int] = {u: 0 for u in vagas_por_unidade}
 
-    # 4) Sobras — método D'Hondt (maior média). Só concorrem quem atingiu QE.
-    concorrentes_sobras = [u for u, v in vagas_por_unidade.items() if v >= 1]
+    # 4) Sobras — Lei 14.211/2021 + STF ADI 7228/7263 (2024).
     vagas_restantes = vagas - vagas_usadas
-    while vagas_restantes > 0 and concorrentes_sobras:
-        # Média = votos / (vagas_efetivas + sobras_ja_dadas + 1)
-        def media(u):
-            total_atual = vagas_efetivas_por_unidade[u] + vagas_sobras_por_unidade[u]
-            return votos_por_unidade[u] / (total_atual + 1)
 
-        # Filtra os que ainda têm candidatos disponíveis passando na barreira
-        elegiveis = []
-        for u in concorrentes_sobras:
+    def media_dhondt(u: str) -> float:
+        total_atual = vagas_efetivas_por_unidade[u] + vagas_sobras_por_unidade[u]
+        return votos_por_unidade[u] / (total_atual + 1)
+
+    # ---- Fase 1: Regra 80/20 ----
+    # Só concorrem partidos/federações com votos ≥ 80% do QE, cujos
+    # candidatos disponíveis tenham ≥ 20% do QE.
+    while vagas_restantes > 0:
+        elegiveis: list[str] = []
+        for u, v_total in votos_por_unidade.items():
+            if v_total < corte_80_qe:
+                continue  # unidade não atingiu 80% do QE
             total_ja = vagas_efetivas_por_unidade[u] + vagas_sobras_por_unidade[u]
             candidatos_u = cands_por_unidade.get(u, [])
-            passam_barreira = sum(1 for c in candidatos_u if c.votos >= barreira)
+            # Precisa ter candidato ainda disponível E que passe da barreira 20% QE
+            passam_20 = sum(1 for c in candidatos_u if c.votos >= barreira_sobra_cand)
+            if passam_20 > total_ja:
+                elegiveis.append(u)
+        if not elegiveis:
+            break  # ninguém preenche Fase 1 → cai pra Fase 2
+        vencedor = max(elegiveis, key=media_dhondt)
+        vagas_sobras_por_unidade[vencedor] += 1
+        vagas_restantes -= 1
+
+    # ---- Fase 2: Residual (STF ADI 7228/7263, 2024) ----
+    # Se ainda sobram vagas, distribuir por maiores médias entre todos os
+    # partidos com candidatos disponíveis, ignorando o corte de 80% e
+    # aplicando só a barreira original de 10% do QE.
+    while vagas_restantes > 0:
+        elegiveis = []
+        for u in votos_por_unidade:
+            total_ja = vagas_efetivas_por_unidade[u] + vagas_sobras_por_unidade[u]
+            candidatos_u = cands_por_unidade.get(u, [])
+            passam_barreira = sum(1 for c in candidatos_u if c.votos >= barreira_qp)
             if passam_barreira > total_ja:
                 elegiveis.append(u)
         if not elegiveis:
-            break
-
-        vencedor = max(elegiveis, key=media)
+            break  # não há mais candidatos válidos
+        vencedor = max(elegiveis, key=media_dhondt)
         vagas_sobras_por_unidade[vencedor] += 1
         vagas_restantes -= 1
 
@@ -213,24 +260,30 @@ def calcular_eleitos_proporcional(
                 federacao=fed,
             ))
 
+    # Resultado por partido — mantém DUAS métricas separadas: os votos
+    # específicos daquela legenda e os votos da unidade eleitoral
+    # (partido isolado ou federação inteira). Antes tudo ficava misturado
+    # no mesmo campo — QA apontou que distorcia relatórios individuais.
     resultado_partidos: list[ResultadoPartido] = []
     partidos_ja_registrados = set()
     for c in cands:
-        u = unidade_de(c.partido_numero)
-        chave = (c.partido_numero, u)
-        if chave in partidos_ja_registrados:
+        p_num = c.partido_numero
+        if p_num in partidos_ja_registrados:
             continue
-        partidos_ja_registrados.add(chave)
-        # Nota: se for federação, mostramos as vagas totais da federação
-        # (nem sempre é a mesma pra cada partido membro)
+        partidos_ja_registrados.add(p_num)
+        u = unidade_de(p_num)
+        v_partido = votos_por_partido.get(p_num, 0)
+        v_unidade = votos_por_unidade.get(u, 0)
         resultado_partidos.append(ResultadoPartido(
-            partido=c.partido_numero,
+            partido=p_num,
             federacao=u if not u.startswith("P") else None,
-            votos_totais=votos_por_unidade.get(u, 0),
+            votos_partido=v_partido,
+            votos_unidade=v_unidade,
             vagas_qp=vagas_por_unidade.get(u, 0),
             vagas_sobras=vagas_sobras_por_unidade.get(u, 0),
             total_vagas=vagas_efetivas_por_unidade.get(u, 0) + vagas_sobras_por_unidade.get(u, 0),
             passou_qe=vagas_por_unidade.get(u, 0) >= 1,
+            passou_80_qe=v_unidade >= corte_80_qe,
         ))
 
     return ResultadoProporcional(

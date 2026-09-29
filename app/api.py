@@ -304,11 +304,13 @@ async def apuracao_proporcional(
             {
                 "partido": p.partido,
                 "federacao": p.federacao,
-                "votos_totais": p.votos_totais,
+                "votos_partido": p.votos_partido,
+                "votos_unidade": p.votos_unidade,
                 "vagas_qp": p.vagas_qp,
                 "vagas_sobras": p.vagas_sobras,
                 "total_vagas": p.total_vagas,
                 "passou_qe": p.passou_qe,
+                "passou_80_qe": p.passou_80_qe,
             }
             for p in r.partidos
         ],

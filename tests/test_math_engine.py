@@ -77,6 +77,42 @@ def test_segundo_turno_definido():
     assert segundo_turno_definido(cands, t) is True
 
 
+def test_segundo_turno_nao_definido_lider_pode_vencer_1t():
+    """QA bug #1: 2º turno era declarado definido só olhando 3º vs 2º,
+    ignorando a possibilidade de o líder ainda vencer no 1º turno.
+    Cenário: A=450k (45%), B=300k (30%), C=50k (5%), restantes=200k.
+    - 3º NÃO alcança 2º (50k+200k=250k < 300k) → check antigo passava
+    - MAS: A pode ir a 650k dos 1200k válidos máximos → maioria absoluta
+      no 1º turno é possível → não pode dizer que vai pra 2º turno."""
+    # apto=1200, apto_tz=1000, restantes=200 (dado direto)
+    t = totais(100, 70, 1200, 1000, 800)
+    cands = [
+        CandidatoResumo("A", 450),
+        CandidatoResumo("B", 300),
+        CandidatoResumo("C", 50),
+    ]
+    # A pode chegar a 650 dos 1000 válidos máximos (800+200) → 650*2=1300 > 1000
+    # → líder ainda pode vencer no 1º turno, então NÃO é 2º turno definido
+    assert segundo_turno_definido(cands, t) is False
+
+
+def test_segundo_turno_definido_apos_1t_impossivel():
+    """Complemento do teste acima: quando o líder também não pode mais
+    fechar 1º turno E o 3º está eliminado do top-2, aí sim é 2t definido."""
+    # Agora líder tem 450 dos 900 apurados; restantes só 60
+    # A+60=510, dobrando=1020, válidos_max=900+60=960 → 1020>960 SIM pode vencer
+    # Precisa forçar líder pra impossibilitar 1t:
+    # Ex.: A=400, B=350, C=50, validos=900, restantes=50 → A_max=450, max_validos=950
+    # 450*2=900, não > 950 → não pode vencer 1t. 3º: 50+50=100 < 350 → não alcança 2º.
+    t = totais(100, 90, 1000, 950, 900)
+    cands = [
+        CandidatoResumo("A", 400),
+        CandidatoResumo("B", 350),
+        CandidatoResumo("C", 50),
+    ]
+    assert segundo_turno_definido(cands, t) is True
+
+
 def test_segundo_turno_nao_definido_no_fio():
     t = totais(100, 90, 1000, 900, 900)
     cands = [
@@ -221,6 +257,52 @@ def test_projecao_final_zero_apurado_nao_quebra():
     t = totais(100, 0, 1000, 0, 0)
     cand = CandidatoResumo("A", 0)
     assert projecao_final(cand, t) == 0
+
+
+def test_senador_2026_precisa_de_2_vagas():
+    """QA bug #3: senador em 2026 elege 2 por UF (renovação 2/3), não 1.
+    O 2º colocado deve ser considerado eleito também."""
+    from math_engine.engine import eleitos_majoritario_multivaga
+    # 3 candidatos, top-2 muito à frente do 3º, restantes pequenos → 2 eleitos
+    t = totais(100, 90, 1000, 900, 900)
+    cands = [
+        CandidatoResumo("A", 400),
+        CandidatoResumo("B", 300),
+        CandidatoResumo("C", 100),
+    ]
+    eleitos = eleitos_majoritario_multivaga(cands, t, vagas=2)
+    assert len(eleitos) == 2
+    assert eleitos[0].sq_candidato == "A"
+    assert eleitos[1].sq_candidato == "B"
+
+
+def test_senador_2026_top2_no_fio_nao_declara():
+    """Se o 3º ainda pode alcançar o 2º, não fecha ninguém em senador (2 vagas)."""
+    from math_engine.engine import eleitos_majoritario_multivaga
+    t = totais(100, 90, 1000, 900, 900)
+    cands = [
+        CandidatoResumo("A", 400),
+        CandidatoResumo("B", 300),
+        CandidatoResumo("C", 200),  # +100 restantes = 300 = empate técnico
+    ]
+    assert eleitos_majoritario_multivaga(cands, t, vagas=2) == []
+
+
+def test_avaliar_apuracao_senador_2026_declara_top_2():
+    """avaliar_apuracao pra senador (cargo 5) usa 2 vagas por padrão em 2026."""
+    from math_engine.engine import avaliar_apuracao
+    t = totais(100, 90, 1000, 900, 900)
+    cands = [
+        CandidatoResumo("A", 500),
+        CandidatoResumo("B", 250),
+        CandidatoResumo("C", 100),
+    ]
+    ev = avaliar_apuracao(cands, t, cod_cargo=5)
+    tipos = [e["tipo"] for e in ev]
+    # Deve emitir 2 ELEITO_MAJORITARIO (para A e B)
+    assert tipos.count("ELEITO_MAJORITARIO") == 2
+    sq_eleitos = {e["sq_candidato_a"] for e in ev if e["tipo"] == "ELEITO_MAJORITARIO"}
+    assert sq_eleitos == {"A", "B"}
 
 
 def test_detectar_virada_ignora_candidato_novo_no_snapshot_atual():

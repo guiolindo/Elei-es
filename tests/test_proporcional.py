@@ -28,24 +28,52 @@ def test_qe_e_qp_basico():
     assert votos_por_p[22] == 1
 
 
-def test_barreira_10pct_qe():
-    # Candidato com poucos votos não elege mesmo se partido tem vaga
+def test_barreira_10pct_qe_com_fase_1_80_20():
+    """Barreira do QP (10% QE) + Regra 80/20 na sobra (Lei 14.211/2021).
+
+    Cenário: QE=4525, barreira QP=452, corte 80% QE=3620, barreira sobra
+    candidato=905 (20% QE).
+    - PT ('1', '2'): 5050 votos totais. QP=1 → cand.1 (5000v) eleito;
+      cand.2 tem 50v < 452 (não passa barreira) e < 905 (não elege na sobra).
+    - PL ('3'): 4000 votos, sem QP direto (4000 < 4525) mas 4000 >= 3620
+      (passa 80% do QE) e o candidato tem 4000 >= 905 (passa 20% QE).
+      Elegível na Fase 1 das sobras → leva a vaga sobrante.
+    Antes da Lei 14.211/2021 esse candidato não elegia — regra atual sim."""
     cands = [
-        c("1", "A", 1300, 13, 5000),   # passa
-        c("2", "B", 1301, 13, 50),     # abaixo dos 10% do QE
-        c("3", "C", 2200, 22, 4000),
+        c("1", "A", 1300, 13, 5000),
+        c("2", "B", 1301, 13, 50),     # < 10% QE
+        c("3", "C", 2200, 22, 4000),   # sem QP direto, mas passa 80/20
     ]
     r = calcular_eleitos_proporcional(cands, vagas=2, federacoes={})
-    # QE = 9050 / 2 = 4525; barreira = 452
-    # PT: 5050 votos → QP = 1
-    # PL: 4000 → QP = 0
-    # Sobra 1 vaga → PT (única unidade com QE)
-    # Mas o segundo candidato do PT (50 votos) < barreira 452 → não elege
-    # A vaga sobra volta pro pool mas ninguém mais tem candidato passando
     status = {rc.sq_candidato: rc.status for rc in r.candidatos}
     assert status["1"] == "eleito"
     assert status["2"] == "nao_atingiu_barreira"
-    assert status["3"] in {"partido_sem_vaga", "suplente"}
+    assert status["3"] == "eleito"  # Fase 1 da sobra (Lei 14.211/2021)
+
+
+def test_fase_2_residual_stf_2024():
+    """Fase 2 residual (STF ADI 7228/7263, 2024): quando ninguém preenche
+    80/20, vagas restantes vão pra maiores médias entre todos.
+
+    Aqui todos ficam abaixo de 80% do QE, mas há candidatos válidos:
+    2 vagas, 4 candidatos de 3 partidos, votos baixos e distribuídos."""
+    cands = [
+        c("1", "A", 1300, 13, 500),
+        c("2", "B", 1301, 13, 100),
+        c("3", "C", 2200, 22, 400),
+        c("4", "D", 4500, 45, 300),
+    ]
+    r = calcular_eleitos_proporcional(cands, vagas=2, federacoes={})
+    # votos_validos=1300, QE=650, corte 80%=520, barreira 10%=65, sobra=130.
+    # Ninguém tem QP (todos <650). Ninguém tem votos >= 520 (80% QE) →
+    # Fase 1 vazia. Fase 2 distribui: maiores médias entre unidades com
+    # candidatos válidos (>= 65v).
+    # PT: 600/1=600, PL: 400/1=400, PSDB: 300/1=300. PT leva 1ª → PT: 600/2=300.
+    # Depois: PL 400 > PT 300 e PSDB 300 → PL leva 2ª.
+    status = {rc.sq_candidato: rc.status for rc in r.candidatos}
+    # PT candidato 1 (mais votado do PT) e PL candidato 3 eleitos
+    assert status["1"] == "eleito"
+    assert status["3"] == "eleito"
 
 
 def test_federacao_soma_votos():

@@ -67,20 +67,33 @@ def eleito_1t_presidencial(candidatos: Sequence[CandidatoResumo], totais: Totais
 
 
 def segundo_turno_definido(candidatos: Sequence[CandidatoResumo], totais: TotaisResumo) -> bool:
-    """2º turno matematicamente definido: 2º colocado tem vantagem sobre o 3º
-    maior que qualquer soma de votos restantes que ainda possam ir ao 3º.
+    """2º turno matematicamente definido — **duas** condições estritas:
+
+    1. O 1º colocado NÃO consegue mais vencer no 1º turno (i.e., não
+       atinge > 50% dos válidos no melhor cenário pra ele).
+    2. O 3º colocado NÃO consegue mais ultrapassar o 2º.
+
+    Faltava (1) na versão anterior — era possível declarar "2º turno
+    definido" quando o líder ainda podia disparar acima de 50% e vencer
+    no primeiro turno, invalidando o próprio conceito. Bug relatado pelo
+    QA e coberto pelo test_segundo_turno_nao_definido_lider_pode_vencer_1t.
     """
     if len(candidatos) < 3:
         return False
-    b = candidatos[1]
-    c = candidatos[2]
+    a, b, c = candidatos[0], candidatos[1], candidatos[2]
     restantes = votos_restantes_max(totais)
-    # estrito: c.votos + restantes < b.votos
-    return c.votos + restantes < b.votos
+    total_validos_max = totais.qt_votos_validos + restantes
+    # Cond. 1: no MELHOR cenário pro líder (ele leva todos os restantes),
+    # ainda assim não ultrapassa 50% dos válidos possíveis?
+    lider_pode_vencer_1t = (a.votos + restantes) * 2 > total_validos_max
+    if lider_pode_vencer_1t:
+        return False
+    # Cond. 2: 3º não alcança 2º, mesmo levando tudo
+    return (c.votos + restantes) < b.votos
 
 
 def eleito_majoritario(candidatos: Sequence[CandidatoResumo], totais: TotaisResumo) -> bool:
-    """Governador/Senador/Prefeito (majoritário simples): eleito quando 1º
+    """Governador/Prefeito (majoritário simples de 1 vaga): eleito quando 1º
     colocado é inalcançável pelo 2º, mesmo se todos os votos restantes forem
     para ele.
     """
@@ -90,6 +103,43 @@ def eleito_majoritario(candidatos: Sequence[CandidatoResumo], totais: TotaisResu
     b = candidatos[1]
     restantes = votos_restantes_max(totais)
     return b.votos + restantes < a.votos
+
+
+def eleitos_majoritario_multivaga(
+    candidatos: Sequence[CandidatoResumo], totais: TotaisResumo, vagas: int,
+) -> list[CandidatoResumo]:
+    """Majoritário com N vagas (Senador em ano de 2/3 = 2 vagas por UF em 2026).
+
+    Retorna a lista dos top-N candidatos SOMENTE se todos os N estão
+    matematicamente garantidos — ou seja, o N-ésimo colocado tem margem
+    estrita sobre o (N+1)-ésimo levando em conta os restantes. Se ainda
+    houver possibilidade de troca no top-N, retorna [].
+
+    QA apontou: em 2026 elege-se 2 senadores por estado. A versão anterior
+    tratava senador como 1 vaga só (eleito_majoritario), o que declarava
+    eleito o líder mesmo com margem estreita sobre o 2º — mas em 2026 o 2º
+    também é eleito, então "eleição definida" precisa envolver o 3º.
+    """
+    if vagas < 1 or not candidatos:
+        return []
+    if len(candidatos) <= vagas:
+        # Todos os que existem seriam eleitos se ninguém mais pode entrar
+        return list(candidatos) if votos_restantes_max(totais) == 0 else []
+    restantes = votos_restantes_max(totais)
+    n_esimo = candidatos[vagas - 1]
+    primeiro_suplente = candidatos[vagas]
+    # Todos os top-N estão fechados se o N-ésimo é inalcançável pelo suplente
+    if n_esimo.votos > primeiro_suplente.votos + restantes:
+        return list(candidatos[:vagas])
+    return []
+
+
+# Vagas majoritárias por cargo/ano — Senador varia (2026: 2 vagas por UF)
+VAGAS_MAJORITARIO_PADRAO = {
+    1: 1,   # Presidente (2º turno se ninguém tiver maioria)
+    3: 1,   # Governador (2º turno se ninguém tiver maioria; 1 eleito)
+    5: 2,   # Senador em 2026 (renovação de 2/3). Em 2018/2022 era 1.
+}
 
 
 def matematicamente_eliminado(
@@ -106,7 +156,11 @@ def matematicamente_eliminado(
     """
     if candidato not in candidatos:
         return False
-    ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
+    # Se `candidatos` já é a lista ordenada, evita re-sort (fast path).
+    if all(candidatos[i].votos >= candidatos[i+1].votos for i in range(len(candidatos)-1)):
+        ordenados = list(candidatos)
+    else:
+        ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
     restantes = votos_restantes_max(totais)
     max_final_cand = candidato.votos + restantes
     # Precisa ficar melhor que o `posicoes_relevantes`-ésimo colocado
@@ -130,8 +184,13 @@ def virada_iminente(
     """
     if len(candidatos) < 2:
         return False, 0.0
-    ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
-    diff = ordenados[0].votos - ordenados[1].votos
+    # Fast path: se já vem ordenado, evita nova ordenação
+    if candidatos[0].votos >= candidatos[1].votos:
+        a, b = candidatos[0], candidatos[1]
+    else:
+        ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
+        a, b = ordenados[0], ordenados[1]
+    diff = a.votos - b.votos
     restantes = votos_restantes_max(totais)
     if restantes <= 0:
         return False, 0.0
@@ -149,8 +208,11 @@ def margem_de_seguranca(
     """
     if len(candidatos) < 2:
         return 100.0
-    ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
-    a, b = ordenados[0], ordenados[1]
+    if candidatos[0].votos >= candidatos[1].votos:
+        a, b = candidatos[0], candidatos[1]
+    else:
+        ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
+        a, b = ordenados[0], ordenados[1]
     restantes = votos_restantes_max(totais)
     # Cenário pior pro líder: tudo vira pro 2º
     # Ele mantém vitória se a.votos > b.votos + restantes
@@ -226,18 +288,28 @@ def avaliar_apuracao(
     candidatos: Sequence[CandidatoResumo],
     totais: TotaisResumo,
     cod_cargo: int,
+    vagas_majoritario: int | None = None,
 ) -> list[dict]:
     """Retorna eventos matemáticos disparados por este snapshot.
 
     Só executa se >= APURACAO_MIN_PCT das seções foram totalizadas — antes
     disso o limite superior é gigante e nenhuma desigualdade fecha.
-    Cargo 1 = Presidente. Demais majoritários (3=Governador, 5=Senador)
-    usam a regra maioria simples.
+
+    Cargos:
+      - 1 (Presidente): regra 1º turno / 2º turno.
+      - 3 (Governador): maioria simples (2º turno se ninguém > 50%).
+      - 5 (Senador): 2026 elege 2 por UF; usa `eleitos_majoritario_multivaga`.
+
+    `vagas_majoritario` sobrescreve o default do cargo (útil pra municipal
+    ou ano com renovação de 1/3).
     """
     if pct_apurado(totais) < APURACAO_MIN_PCT:
         return []
+    # Otimização: ordena UMA vez. As funções internas trabalham em cima
+    # do já-ordenado (Sequence).
     ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
     eventos: list[dict] = []
+
     if cod_cargo == 1:
         if eleito_1t_presidencial(ordenados, totais):
             eventos.append({
@@ -256,19 +328,36 @@ def avaliar_apuracao(
                 },
             })
     else:
-        if eleito_majoritario(ordenados, totais):
-            eventos.append({
-                "tipo": "ELEITO_MAJORITARIO",
-                "sq_candidato_a": ordenados[0].sq_candidato,
-                "detalhes": {"votos": ordenados[0].votos, "cod_cargo": cod_cargo},
-            })
+        vagas = vagas_majoritario if vagas_majoritario is not None else \
+                VAGAS_MAJORITARIO_PADRAO.get(cod_cargo, 1)
+        if vagas > 1:
+            eleitos = eleitos_majoritario_multivaga(ordenados, totais, vagas)
+            for pos, e in enumerate(eleitos, start=1):
+                eventos.append({
+                    "tipo": "ELEITO_MAJORITARIO",
+                    "sq_candidato_a": e.sq_candidato,
+                    "detalhes": {"votos": e.votos, "cod_cargo": cod_cargo,
+                                 "vagas": vagas, "posicao": pos},
+                })
+        else:
+            if eleito_majoritario(ordenados, totais):
+                eventos.append({
+                    "tipo": "ELEITO_MAJORITARIO",
+                    "sq_candidato_a": ordenados[0].sq_candidato,
+                    "detalhes": {"votos": ordenados[0].votos, "cod_cargo": cod_cargo},
+                })
 
-    # Reporta MATEMATICAMENTE_ELIMINADO só se ninguém foi eleito ainda
-    # (senão vira ruído — óbvio que todos os outros estão eliminados quando
-    # tem eleito). Só olha candidatos que ainda apareciam como contenders
-    # (top 5) e que não são já 1º ou 2º colocado.
+    # Reporta MATEMATICAMENTE_ELIMINADO só se ninguém foi eleito ainda.
+    # `pos_relevantes` = número de "cadeiras/vagas de continuidade":
+    #   - Presidente: top 2 (2 turno)
+    #   - Governador: top 1 (só ganha 1)
+    #   - Senador 2026: top 2 (elege 2 por UF)
     if not eventos:
-        pos_relevantes = 2 if cod_cargo == 1 else 1
+        if cod_cargo == 1:
+            pos_relevantes = 2
+        else:
+            pos_relevantes = vagas_majoritario if vagas_majoritario is not None else \
+                             VAGAS_MAJORITARIO_PADRAO.get(cod_cargo, 1)
         for c in ordenados[pos_relevantes:5]:
             if matematicamente_eliminado(c, ordenados, totais, pos_relevantes):
                 eventos.append({
