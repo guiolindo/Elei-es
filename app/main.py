@@ -80,6 +80,11 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(_sync_candidatos_loop()))
         log.info("poller + descoberta + sync candidatos iniciados (intervalo=%ss)",
                  settings.poll_interval_seconds)
+    # Bot do Telegram: só sobe se TELEGRAM_BOT_TOKEN estiver setado.
+    if (settings.telegram_bot_token or "").strip():
+        from notif.telegram_bot import loop_bot
+        tasks.append(asyncio.create_task(loop_bot()))
+        log.info("telegram bot iniciado (@%s)", settings.telegram_bot_username)
     try:
         yield
     finally:

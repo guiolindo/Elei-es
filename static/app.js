@@ -1130,6 +1130,19 @@ async function boot() {
     renderLista();
   });
 
+  // Link do bot do Telegram — só aparece quando backend confirma que
+  // TELEGRAM_BOT_TOKEN está setado.
+  try {
+    const cfg = await get("/api/config-publica");
+    if (cfg?.telegram_bot) {
+      const a = $("btn-telegram");
+      if (a) {
+        a.href = `https://t.me/${cfg.telegram_bot}`;
+        a.classList.remove("oculto");
+      }
+    }
+  } catch(e) { /* ok */ }
+
   try {
     const ufs = await get("/api/ufs");
     const selUF = $("sel-uf");

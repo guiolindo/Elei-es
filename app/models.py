@@ -131,6 +131,36 @@ class Comparacao(Base):
     sq_candidato_b: Mapped[str] = mapped_column(String(32))
 
 
+class TelegramChatConfig(Base):
+    """Config por chat: pausa global, janela de silêncio (horários que não
+    envia — respeitando fuso BRT), idioma. Uma linha por chat."""
+    __tablename__ = "telegram_chat_config"
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    pausado_global: Mapped[bool] = mapped_column(Boolean, default=False)
+    silencio_inicio: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)  # hora BRT (0-23)
+    silencio_fim: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class TelegramSubscription(Base):
+    """Assinatura de um chat do Telegram: quais cargos/abrangências e quais
+    tipos de evento a pessoa quer receber. Uma linha por (chat_id, cargo,
+    abrangencia). tipos_evento é lista de strings ('ELEITO_1T', 'VIRADA',
+    'ELEITO_MAJORITARIO', 'SEGUNDO_TURNO_DEFINIDO', 'MATEMATICAMENTE_ELIMINADO').
+    """
+    __tablename__ = "telegram_subs"
+    __table_args__ = (
+        UniqueConstraint("chat_id", "cod_cargo", "abrangencia", name="uq_tg_sub"),
+        Index("ix_tg_cargo_abr", "cod_cargo", "abrangencia"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    cod_cargo: Mapped[int] = mapped_column(Integer)
+    abrangencia: Mapped[str] = mapped_column(CHAR(2))
+    tipos_evento: Mapped[list] = mapped_column(JSONB, default=list)
+
+
 class PushSubscription(Base):
     __tablename__ = "push_subscriptions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

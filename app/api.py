@@ -46,6 +46,18 @@ def _url_foto(sq_candidato: str, uf: str | None) -> str:
     )
 
 
+@router.get("/config-publica")
+async def config_publica() -> dict[str, Any]:
+    """Config exposta ao frontend (não sensível). Usa pra montar o link
+    do bot do Telegram só quando ele estiver configurado."""
+    from app.config import get_settings
+    s = get_settings()
+    return {
+        "telegram_bot": (s.telegram_bot_username if s.telegram_bot_token else None),
+        "eleicao_ano": s.eleicao_ano,
+    }
+
+
 @router.get("/cargos")
 async def listar_cargos(sess: AsyncSession = Depends(get_session)) -> list[dict[str, Any]]:
     r = await sess.execute(select(Cargo))

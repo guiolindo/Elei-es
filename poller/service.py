@@ -279,6 +279,15 @@ async def processar_alvo(
                 "eventos": eventos_novos,
             })
 
+        # Alertas via Telegram (só quando o snapshot é confiável e existem
+        # eventos novos). Importado tarde pra não travar setup se módulo faltar.
+        if eventos_novos and not suspeito:
+            try:
+                from notif.telegram_bot import enviar_notificacoes
+                await enviar_notificacoes(eventos_novos, alvo.cod_cargo, alvo.abrangencia)
+            except Exception:
+                log.exception("notificação telegram falhou")
+
 
 async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
     """Loop principal. Processa alvos em paralelo (limitado por semáforo)

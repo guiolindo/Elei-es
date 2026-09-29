@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # Token exigido nos endpoints /api/admin/*. Se vazio, admin fica aberto
     # (útil só em dev). Em produção sempre setar via env var.
     admin_token: str = ""
+    # Bot do Telegram — se preenchido, sobe long-polling e envia alertas.
+    # Deixe vazio pra desligar. Username sem @ (ex.: "avisoeleicao_bot").
+    telegram_bot_token: str = ""
+    telegram_bot_username: str = "avisoeleicao_bot"
 
 
 @lru_cache
