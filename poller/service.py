@@ -172,7 +172,17 @@ async def processar_alvo(
                 await sess.flush()
                 log.info("stub criado para %d candidatos que faltavam", len(faltando))
 
+        # Dedup por sq_candidato — se o TSE reenvia o mesmo candidato
+        # duas vezes no JSON (raro mas já ocorreu por bug de agregação),
+        # o insert falharia por PK (snapshot_id, sq_candidato). Mantém
+        # o primeiro (que veio primeiro na ordenação por votos).
+        sqs_vistos: set[str] = set()
         for pos, c in enumerate(ordenados, start=1):
+            if c.sq_candidato in sqs_vistos:
+                log.warning("candidato %s duplicado no snapshot %s, ignorando",
+                            c.sq_candidato, snap.id)
+                continue
+            sqs_vistos.add(c.sq_candidato)
             sess.add(SnapshotCandidato(
                 snapshot_id=snap.id,
                 sq_candidato=c.sq_candidato,

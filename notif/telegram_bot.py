@@ -101,6 +101,19 @@ async def _api(client: httpx.AsyncClient, metodo: str, **payload) -> dict:
     return j
 
 
+def _md_escape(s: str) -> str:
+    """Escapa caracteres reservados do Markdown legacy do Telegram
+    (`_`, `*`, `` ` ``, `[`) em strings que serão intercaladas em
+    texto formatado. Nomes de candidatos com "_" (raro mas real)
+    ou reticências apostrofadas quebravam a formatação e o
+    Telegram devolvia erro 400 "can't parse entities".
+    """
+    if not s:
+        return s
+    return s.replace("\\", "\\\\").replace("_", "\\_").replace("*", "\\*") \
+            .replace("`", "\\`").replace("[", "\\[")
+
+
 async def _send(client, chat_id: int, texto: str, keyboard: dict | None = None,
                 foto: str | None = None) -> None:
     # Telegram exige objeto válido em reply_markup — passar null dá 400.
@@ -229,14 +242,15 @@ async def _snapshot_atual(sess, cargo: int, abr: str) -> tuple[Snapshot, Snapsho
 
 
 async def _nome_partido(sess, sq: str) -> tuple[str, str]:
+    """Retorna (nome_urna, sigla_partido) já escapados pra Markdown."""
     c = await sess.get(Candidato, sq)
     if not c:
-        return sq, ""
+        return _md_escape(sq), ""
     sigla = ""
     if c.partido_numero:
         p = await sess.get(Partido, c.partido_numero)
         sigla = p.sigla if p else ""
-    return (c.nome_urna or c.nome), sigla
+    return _md_escape(c.nome_urna or c.nome), _md_escape(sigla)
 
 
 def _barra(pct: float, largura: int = 12) -> str:
@@ -340,10 +354,10 @@ async def cmd_candidato(client, chat_id: int, args: list[str]) -> None:
         ocupacao = raw.get("ocupacao") or "?"
         nasc = raw.get("dataDeNascimento") or "?"
         partes.append(
-            f"*{c.nome_urna}* ({p.get('sigla', '?')}, {c.numero})\n"
+            f"*{_md_escape(c.nome_urna)}* ({_md_escape(p.get('sigla', '?'))}, {c.numero})\n"
             f"{CARGOS.get(c.cod_cargo, c.cod_cargo)} · {c.uf or 'BR'}\n"
-            f"Nome: {c.nome}\n"
-            f"Ocupação: {ocupacao}\nNasc.: {nasc}\nSituação: {situacao}"
+            f"Nome: {_md_escape(c.nome)}\n"
+            f"Ocupação: {_md_escape(ocupacao)}\nNasc.: {nasc}\nSituação: {_md_escape(situacao)}"
         )
     await _send(client, chat_id, "\n\n———\n\n".join(partes))
 
@@ -377,13 +391,14 @@ async def cmd_vs(client, chat_id: int, args: list[str]) -> None:
         for c in cs[:2]:
             _, sig = await _nome_partido(sess, c.sq_candidato)
             sc = placar.get(c.sq_candidato)
+            nome_esc = _md_escape(c.nome_urna)
             if sc:
                 linhas.append(
-                    f"*{c.nome_urna}* ({sig}, {c.numero})\n"
+                    f"*{nome_esc}* ({sig}, {c.numero})\n"
                     f"  {sc.votos:,} votos · {float(sc.pct_validos):.2f}%\n"
                     f"  `{_barra(float(sc.pct_validos))}`".replace(",", "."))
             else:
-                linhas.append(f"*{c.nome_urna}* ({sig}, {c.numero}) — sem dados")
+                linhas.append(f"*{nome_esc}* ({sig}, {c.numero}) — sem dados")
         if len(cs) >= 2 and all(c.sq_candidato in placar for c in cs[:2]):
             a = placar[cs[0].sq_candidato]; b = placar[cs[1].sq_candidato]
             diff = a.votos - b.votos
@@ -525,7 +540,7 @@ async def cmd_cola(client, chat_id: int, args: list[str]) -> None:
     foto = (f"https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img/"
             f"{settings.eleicao_cod_divulga}/{c.sq_candidato}/{c.uf or 'BR'}")
     await _send(client, chat_id,
-                f"🗳 *{c.nome_urna}* — {c.numero}\n_{c.nome}_",
+                f"🗳 *{_md_escape(c.nome_urna)}* — {c.numero}\n_{_md_escape(c.nome)}_",
                 foto=foto)
 
 
@@ -1004,9 +1019,25 @@ async def enviar_notificacoes(eventos: list[dict], cargo: int, uf: str) -> None:
         for ev in eventos:
             if ev["tipo"] not in mensagens:
                 mensagens[ev["tipo"]] = await _formatar_mensagem(sess, ev, cargo, uf)
+    # Bot API do Telegram tem limite de 30 msgs/s pra bots. Enviar
+    # serial pra 1000+ chats travaria o poller por dezenas de segundos.
+    # Paralelismo com semáforo controla concorrência sem estourar rate.
+    sem = asyncio.Semaphore(20)  # 20 concorrentes → ~30 msg/s comfortavelmente
+
+    async def _enviar_um(client, chat_id: int, texto: str) -> None:
+        async with sem:
+            try:
+                await _api(client, "sendMessage",
+                           chat_id=chat_id, text=texto,
+                           parse_mode="Markdown",
+                           disable_web_page_preview=True)
+            except Exception:
+                log.exception("envio telegram chat=%s falhou", chat_id)
+
     async with httpx.AsyncClient() as client:
         for ev in eventos:
             texto = mensagens[ev["tipo"]]
+            tarefas = []
             for s in subs:
                 if ev["tipo"] not in (s.tipos_evento or []):
                     continue
@@ -1015,10 +1046,6 @@ async def enviar_notificacoes(eventos: list[dict], cargo: int, uf: str) -> None:
                     continue
                 if _em_silencio(cfg):
                     continue
-                try:
-                    await _api(client, "sendMessage",
-                               chat_id=s.chat_id, text=texto,
-                               parse_mode="Markdown",
-                               disable_web_page_preview=True)
-                except Exception:
-                    log.exception("envio telegram chat=%s falhou", s.chat_id)
+                tarefas.append(_enviar_um(client, s.chat_id, texto))
+            if tarefas:
+                await asyncio.gather(*tarefas, return_exceptions=True)
