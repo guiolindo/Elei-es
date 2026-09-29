@@ -750,6 +750,193 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .ajuda-sub { margin-top: 16px; font-size: 12px; color: var(--muted, #94a3b8);
   line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; }
 
+/* ==================================================================
+   MOBILE APP CHROME (só ativa em <=768px)
+   Reformula a experiência: bottom-nav com tabs, top bar compacto,
+   chips clicáveis pra cargo/UF (bottom sheet), FAB de comparar.
+   Em desktop tudo isso fica escondido — o layout original manda.
+================================================================== */
+.m-top, .m-chips, .m-stats, .m-nav, .m-fab, .m-sheet { display: none; }
+
+@media (max-width: 768px) {
+  /* Esconde toda a chrome desktop */
+  .hero, .btn-topo { display: none !important; }
+
+  /* Reservar espaço pro bottom nav (56px) + safe area */
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  main.page { padding: 8px 12px 12px; margin-top: 0; }
+
+  /* --- Top bar compacto --- */
+  .m-top {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; padding-top: calc(10px + env(safe-area-inset-top));
+    background: linear-gradient(180deg, #0f172a, #0b1220);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .m-brand { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .m-logo { font-size: 22px; }
+  .m-title { font-size: 15px; font-weight: 700; color: #e6edf3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-title b { color: var(--gold, #f0b429); }
+  .m-conexao { display: flex; align-items: center; gap: 5px; font-size: 11px;
+    color: var(--muted, #94a3b8); }
+  .m-conexao .dot { width: 8px; height: 8px; border-radius: 50%;
+    background: #64748b; transition: background .2s; }
+  .m-conexao .dot.on { background: #10b981; box-shadow: 0 0 8px #10b98188;
+    animation: pulso 2s infinite; }
+  .m-icon-btn { width: 40px; height: 40px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,.08); color: #fff; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; }
+  .m-icon-btn:active { transform: scale(0.94); }
+
+  /* --- Chips de cargo/UF --- */
+  .m-chips {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 10px 12px; background: #0b1220;
+    position: sticky; top: 60px; z-index: 49;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .m-chip {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    padding: 10px 14px; border-radius: 12px;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+    color: #fff; cursor: pointer; position: relative; text-align: left;
+    min-height: 52px;
+  }
+  .m-chip:active { background: rgba(255,255,255,.10); }
+  .m-chip-lab { font-size: 10px; color: var(--muted, #94a3b8);
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .m-chip-val { font-size: 15px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .m-chip-arrow { position: absolute; right: 12px; top: 50%;
+    transform: translateY(-50%); color: var(--muted, #94a3b8); font-size: 12px; }
+
+  /* --- Stats compactos horizontais --- */
+  .m-stats { display: flex; gap: 8px; padding: 8px 12px 0; }
+  .m-stat { flex: 1; padding: 10px 12px; border-radius: 10px;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);
+    display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .m-stat-lab { font-size: 10px; color: var(--muted, #94a3b8);
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .m-stat-val { font-size: 18px; font-weight: 700; color: var(--gold, #f0b429);
+    font-variant-numeric: tabular-nums; }
+  .m-stat-bar { width: 100%; height: 4px; background: rgba(255,255,255,.06);
+    border-radius: 2px; overflow: hidden; margin-top: 4px; }
+  .m-stat-bar > div { height: 100%; background: var(--gold, #f0b429);
+    transition: width .5s ease; width: 0%; }
+
+  /* --- Tabs: só uma section visível por vez --- */
+  main.page > section, main.page > .page-header, main.page > .filtro-lista,
+  main.page > .prop-info, main.page > footer.rodape {
+    display: none;
+  }
+  main.page.m-tab-placar > .page-header,
+  main.page.m-tab-placar > .filtro-lista,
+  main.page.m-tab-placar > .grid-candidatos,
+  main.page.m-tab-placar > .prop-info { display: block; }
+  main.page.m-tab-placar > .filtro-lista { display: flex; }
+  main.page.m-tab-mapa > .mapa-secao { display: block; }
+  main.page.m-tab-comparar > .comparacao { display: block; }
+  main.page.m-tab-eventos > .timeline-secao { display: block; }
+  main.page.m-tab-mais > .rodape { display: block; }
+
+  /* Ajustes visuais dentro das tabs */
+  .filtro-lista { grid-template-columns: 1fr; gap: 8px; padding: 8px 0; }
+  .filtro-lista input, .filtro-lista select { min-height: 44px; font-size: 15px; }
+  .grid-candidatos { grid-template-columns: 1fr !important; gap: 10px; }
+  .cand-card { padding: 14px; }
+  .cand-foto { max-height: 100px !important; }
+  .cand-card button, .cand-card [role=button] { min-height: 44px; }
+  .comparacao { display: block; padding: 0; }
+  .cards-comp { grid-template-columns: 1fr !important; gap: 12px; }
+
+  /* --- Bottom navigation --- */
+  .m-nav {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(11, 18, 32, 0.95); backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255,255,255,.08);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .m-nav-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 8px 4px 10px; background: none; border: none;
+    color: var(--muted, #94a3b8); cursor: pointer;
+    transition: color .15s ease;
+  }
+  .m-nav-ico { font-size: 22px; line-height: 1; }
+  .m-nav-lab { font-size: 10px; font-weight: 600; letter-spacing: 0.2px; }
+  .m-nav-item.ativo { color: var(--gold, #f0b429); }
+  .m-nav-item.ativo .m-nav-ico { transform: scale(1.08); transition: transform .2s; }
+  .m-nav-item:active { transform: scale(0.92); }
+
+  /* --- FAB (Compare) --- */
+  .m-fab {
+    position: fixed; right: 16px; bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 90;
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 20px; border-radius: 30px; border: none;
+    background: linear-gradient(135deg, #f0b429, #f97316);
+    color: #0b0f19; font-weight: 700; font-size: 14px; cursor: pointer;
+    box-shadow: 0 6px 20px rgba(240,180,41,.4), 0 2px 6px rgba(0,0,0,.3);
+    animation: fab-in .3s cubic-bezier(.2,1.5,.4,1);
+  }
+  .m-fab-icone { font-size: 18px; }
+  .m-fab:active { transform: scale(0.94); }
+  @keyframes fab-in { from { transform: translateY(80px) scale(.8); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; } }
+
+  /* --- Bottom sheet --- */
+  .m-sheet {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: flex-end;
+    animation: sheet-fade .2s ease-out;
+  }
+  .m-sheet.oculto { display: none; }
+  .m-sheet-back { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+  .m-sheet-card {
+    position: relative; width: 100%; max-height: 75vh;
+    background: #0b1220; border-radius: 20px 20px 0 0;
+    padding: 12px 16px 24px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 40px rgba(0,0,0,.5);
+    animation: sheet-up .25s cubic-bezier(.2,1,.3,1);
+    overflow-y: auto;
+  }
+  .m-sheet-grip { width: 40px; height: 4px; background: rgba(255,255,255,.2);
+    border-radius: 2px; margin: 0 auto 12px; }
+  .m-sheet-titulo { margin: 0 0 12px; font-size: 16px; }
+  .m-sheet-lista { display: flex; flex-direction: column; gap: 4px; }
+  .m-sheet-opt {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 12px; border-radius: 10px;
+    background: rgba(255,255,255,.03); border: 1px solid transparent;
+    color: #fff; font-size: 15px; cursor: pointer; text-align: left;
+  }
+  .m-sheet-opt:active { background: rgba(255,255,255,.08); }
+  .m-sheet-opt.ativo { background: rgba(240,180,41,.15); border-color: rgba(240,180,41,.4); }
+  .m-sheet-opt.ativo::after { content: "✓"; color: var(--gold, #f0b429); font-weight: 700; }
+  .m-sheet-opt-grupo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    padding: 6px 0; }
+  .m-sheet-opt-grupo .m-sheet-opt { padding: 12px 8px; justify-content: center;
+    font-weight: 600; font-size: 14px; }
+  @keyframes sheet-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  /* Countdown mais discreto ainda no mobile — vira flag no topo */
+  .countdown { position: sticky; top: 0; z-index: 51; }
+
+  /* Toasts subindo do bottom nav */
+  #toasts { bottom: 80px !important; }
+}
+
+/* Em telas >768px o layout mobile fica invisível */
+@media (min-width: 769px) {
+  .m-top, .m-chips, .m-stats, .m-nav, .m-fab, .m-sheet { display: none !important; }
+}
+
 /* ============ Rodapé legal ============ */
 .rodape {
   margin: 60px auto 20px;

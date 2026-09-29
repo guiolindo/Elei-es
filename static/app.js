@@ -346,6 +346,7 @@ function atualizarChipCount() {
   const n = state.selecionados.length;
   $("chip-count").textContent = `${n} selecionado(s)`;
   $("btn-comparar").disabled = n < 2;
+  atualizarFabMobile();
 }
 
 // ============ modal de detalhes ============
@@ -1081,6 +1082,149 @@ function toggleModoTV() {
   }
 }
 
+// ============ MOBILE APP CHROME ============
+// Só ativa em <=768px. Bottom-nav com tabs, chips clicáveis de cargo/UF,
+// bottom sheet pra escolher, FAB de comparar. Sincroniza com os selects
+// desktop pra qualquer mudança se refletir dos dois lados.
+
+const NOMES_CARGO = { 1: "Presidente", 3: "Governador", 5: "Senador",
+                      6: "Dep. Federal", 7: "Dep. Estadual" };
+const NOMES_UF_LONG = { BR: "Brasil" };
+// Preenchido dinamicamente quando /api/ufs chega
+function sincronizarChipsMobile() {
+  const cargoEl = $("m-chip-cargo-val");
+  const ufEl = $("m-chip-uf-val");
+  if (cargoEl) cargoEl.textContent = NOMES_CARGO[state.cargo] || "—";
+  if (ufEl) ufEl.textContent = NOMES_UF_LONG[state.abrangencia] || state.abrangencia;
+  // Também sincroniza indicador de conexão mobile
+  const dotDesk = document.querySelector("#conexao .dot");
+  const dotMob = $("m-dot");
+  if (dotDesk && dotMob) dotMob.classList.toggle("on", dotDesk.classList.contains("on"));
+  // Copia últ. snapshot e apurado
+  const p = $("pct-apurado")?.textContent;
+  if (p) { const m = $("m-pct"); if (m) m.textContent = p; }
+  const u = $("ultimo")?.textContent;
+  if (u) { const m = $("m-ultimo"); if (m) m.textContent = u; }
+  const prog = $("prog-apurado")?.style.width;
+  if (prog) { const m = $("m-prog"); if (m) m.style.width = prog; }
+  // Sincroniza texto de "ao vivo"/"reconectando"
+  const lab = $("conexao-label")?.textContent;
+  if (lab) { const m = $("m-live-label"); if (m) m.textContent = lab; }
+}
+
+function abrirBottomSheet(titulo, opcoes, aoEscolher, layoutGrid = false) {
+  const sheet = $("m-sheet");
+  const lista = $("m-sheet-lista");
+  const t = $("m-sheet-titulo");
+  if (!sheet || !lista) return;
+  t.textContent = titulo;
+  lista.innerHTML = "";
+  const grupo = layoutGrid ? document.createElement("div") : lista;
+  if (layoutGrid) { grupo.className = "m-sheet-opt-grupo"; lista.appendChild(grupo); }
+  for (const opt of opcoes) {
+    const btn = document.createElement("button");
+    btn.className = "m-sheet-opt" + (opt.ativo ? " ativo" : "");
+    btn.textContent = opt.label;
+    btn.addEventListener("click", () => {
+      sheet.classList.add("oculto");
+      aoEscolher(opt.value);
+    });
+    grupo.appendChild(btn);
+  }
+  sheet.classList.remove("oculto");
+}
+
+function fecharBottomSheet() {
+  $("m-sheet")?.classList.add("oculto");
+}
+
+function trocarTabMobile(tab) {
+  const page = document.querySelector("main.page");
+  if (!page) return;
+  page.classList.remove("m-tab-placar", "m-tab-mapa", "m-tab-comparar",
+                       "m-tab-eventos", "m-tab-mais");
+  page.classList.add(`m-tab-${tab}`);
+  document.querySelectorAll(".m-nav-item").forEach(b => {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle("ativo", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  // Se for compare mas nada selecionado, mostra aviso
+  if (tab === "comparar" && state.selecionados.length < 2) {
+    toast("Selecione pelo menos 2 candidatos na aba Placar", "warn");
+    setTimeout(() => trocarTabMobile("placar"), 100);
+    return;
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  try { localStorage.setItem("elei-es:m-tab", tab); } catch(e) {}
+}
+
+function atualizarFabMobile() {
+  const fab = $("m-fab-comparar");
+  if (!fab) return;
+  const n = state.selecionados.length;
+  $("m-fab-count").textContent = n;
+  fab.classList.toggle("oculto", n < 2);
+}
+
+function bootMobile() {
+  // Sync inicial dos chips
+  sincronizarChipsMobile();
+
+  // Chip Cargo → bottom sheet
+  $("m-chip-cargo")?.addEventListener("click", () => {
+    abrirBottomSheet("Escolher cargo",
+      Object.entries(NOMES_CARGO).map(([k, v]) => ({
+        label: v, value: +k, ativo: +k === state.cargo,
+      })),
+      (v) => {
+        state.cargo = v;
+        $("sel-cargo").value = v;
+        salvarPrefs();
+        onFiltroChange();
+        sincronizarChipsMobile();
+      });
+  });
+
+  // Chip UF → bottom sheet em grade 3 colunas
+  $("m-chip-uf")?.addEventListener("click", () => {
+    const opts = Array.from($("sel-uf").options).map(o => ({
+      label: o.value, value: o.value, ativo: o.value === state.abrangencia,
+    }));
+    abrirBottomSheet("Escolher local", opts, (v) => {
+      state.abrangencia = v;
+      $("sel-uf").value = v;
+      salvarPrefs();
+      onFiltroChange();
+      sincronizarChipsMobile();
+    }, true);
+  });
+
+  // Fecha sheet ao clicar no fundo
+  $("m-sheet")?.querySelector(".m-sheet-back")?.addEventListener("click", fecharBottomSheet);
+
+  // Bottom nav
+  document.querySelectorAll(".m-nav-item").forEach(b => {
+    b.addEventListener("click", () => trocarTabMobile(b.dataset.tab));
+  });
+  // Restaura última tab (default: placar)
+  let tabInicial = "placar";
+  try { tabInicial = localStorage.getItem("elei-es:m-tab") || "placar"; } catch(e) {}
+  trocarTabMobile(tabInicial);
+
+  // FAB de comparar
+  $("m-fab-comparar")?.addEventListener("click", () => {
+    trocarTabMobile("comparar");
+    abrirComparacao();
+  });
+
+  // Botão notif mobile → mesma função do desktop
+  $("m-btn-notif")?.addEventListener("click", pedirNotificacoes);
+
+  // Sincroniza a cada 2s (barato — só lê DOM)
+  setInterval(sincronizarChipsMobile, 2000);
+}
+
 async function pedirNotificacoes() {
   if (!("Notification" in window)) return toast("Navegador sem suporte a notificações.", "warn");
   const p = await Notification.requestPermission();
@@ -1207,6 +1351,7 @@ async function boot() {
   await carregarEventos();
   atualizarMapa();
   conectarWS();
+  bootMobile();
 }
 
 boot().catch(e => { console.error(e); toast("Erro: " + e.message, "danger"); });

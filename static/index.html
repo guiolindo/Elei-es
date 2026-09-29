@@ -13,6 +13,43 @@
 </head>
 <body>
 
+<!-- ============ Chrome MOBILE ============ (só visível em <=768px) -->
+<header class="m-top">
+  <div class="m-brand">
+    <span class="m-logo">🗳️</span>
+    <span class="m-title">Apuração <b>2026</b></span>
+  </div>
+  <div class="m-conexao">
+    <span class="dot" id="m-dot"></span>
+    <span id="m-live-label">ao vivo</span>
+  </div>
+  <button class="m-icon-btn" id="m-btn-notif" aria-label="Notificações">🔔</button>
+</header>
+
+<div class="m-chips">
+  <button class="m-chip" id="m-chip-cargo">
+    <span class="m-chip-lab">Cargo</span>
+    <span class="m-chip-val" id="m-chip-cargo-val">Presidente</span>
+    <span class="m-chip-arrow">▾</span>
+  </button>
+  <button class="m-chip" id="m-chip-uf">
+    <span class="m-chip-lab">Local</span>
+    <span class="m-chip-val" id="m-chip-uf-val">Brasil</span>
+    <span class="m-chip-arrow">▾</span>
+  </button>
+</div>
+
+<!-- Stats compactos horizontais mobile -->
+<div class="m-stats">
+  <div class="m-stat">
+    <span class="m-stat-lab">Apurado</span>
+    <span class="m-stat-val" id="m-pct">—</span>
+    <div class="m-stat-bar"><div id="m-prog"></div></div>
+  </div>
+  <div class="m-stat"><span class="m-stat-lab">Últ.</span><span class="m-stat-val" id="m-ultimo">—</span></div>
+</div>
+
+<!-- ============ Chrome DESKTOP ============ (só visível em >768px) -->
 <header class="hero">
   <div class="hero-bg"></div>
   <nav class="nav">
@@ -221,6 +258,41 @@
 
 <button class="btn-topo" id="btn-topo" aria-label="Voltar ao topo" title="Voltar ao topo">↑</button>
 <div id="toasts"></div>
+
+<!-- ============ Bottom sheet (mobile only) ============ -->
+<div class="m-sheet oculto" id="m-sheet" role="dialog" aria-modal="true">
+  <div class="m-sheet-back"></div>
+  <div class="m-sheet-card">
+    <div class="m-sheet-grip"></div>
+    <h3 class="m-sheet-titulo" id="m-sheet-titulo">Escolher</h3>
+    <div class="m-sheet-lista" id="m-sheet-lista"></div>
+  </div>
+</div>
+
+<!-- ============ FAB de comparar (mobile only) ============ -->
+<button class="m-fab oculto" id="m-fab-comparar" aria-label="Comparar selecionados">
+  <span class="m-fab-icone">⚖</span>
+  <span class="m-fab-txt">Comparar <span id="m-fab-count">0</span></span>
+</button>
+
+<!-- ============ Bottom nav (mobile only) ============ -->
+<nav class="m-nav" role="tablist">
+  <button class="m-nav-item ativo" data-tab="placar" role="tab" aria-selected="true">
+    <span class="m-nav-ico">📊</span><span class="m-nav-lab">Placar</span>
+  </button>
+  <button class="m-nav-item" data-tab="mapa" role="tab" aria-selected="false">
+    <span class="m-nav-ico">🗺</span><span class="m-nav-lab">Mapa</span>
+  </button>
+  <button class="m-nav-item" data-tab="comparar" role="tab" aria-selected="false">
+    <span class="m-nav-ico">⚖</span><span class="m-nav-lab">Comparar</span>
+  </button>
+  <button class="m-nav-item" data-tab="eventos" role="tab" aria-selected="false">
+    <span class="m-nav-ico">🕐</span><span class="m-nav-lab">Eventos</span>
+  </button>
+  <button class="m-nav-item" data-tab="mais" role="tab" aria-selected="false">
+    <span class="m-nav-ico">☰</span><span class="m-nav-lab">Mais</span>
+  </button>
+</nav>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script type="module" src="/static/app.js"></script>
