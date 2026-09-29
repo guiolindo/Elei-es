@@ -221,7 +221,37 @@ async def processar_alvo(
 
         eventos_novos: list[dict] = []
         if not suspeito:
-            resumos = [CandidatoResumo(c.sq_candidato, c.votos) for c in ordenados]
+            # No 2º turno, incluir idade dos candidatos pra o motor poder
+            # aplicar art. 110 CE (desempate por idade) se necessário.
+            # Lê dataDeNascimento do raw_divulga que o Termux importou.
+            idades: dict[str, int] = {}
+            if alvo.turno == 2 and ordenados:
+                from datetime import date
+                sqs = [c.sq_candidato for c in ordenados]
+                r_cands = await sess.execute(
+                    select(Candidato.sq_candidato, Candidato.raw_divulga)
+                    .where(Candidato.sq_candidato.in_(sqs))
+                )
+                hoje = date.today()
+                for sq, raw in r_cands.all():
+                    dn = (raw or {}).get("dataDeNascimento")
+                    if not dn:
+                        continue
+                    # Formato do TSE: "dd/mm/yyyy" ou "yyyy-mm-dd"
+                    try:
+                        if "/" in dn:
+                            d, m, y = dn.split("/")
+                        else:
+                            y, m, d = dn.split("-")
+                        nasc = date(int(y), int(m), int(d))
+                        idade = hoje.year - nasc.year - (
+                            (hoje.month, hoje.day) < (nasc.month, nasc.day))
+                        idades[sq] = idade
+                    except (ValueError, AttributeError):
+                        continue
+            resumos = [CandidatoResumo(c.sq_candidato, c.votos,
+                                        idade_anos=idades.get(c.sq_candidato))
+                       for c in ordenados]
             tot = TotaisResumo(
                 qt_secoes_total=parsed.totais.qt_secoes_total,
                 qt_secoes_totalizadas=parsed.totais.qt_secoes_totalizadas,
@@ -231,10 +261,14 @@ async def processar_alvo(
             )
             eventos = avaliar_apuracao(resumos, tot, cod_cargo=alvo.cod_cargo, turno=alvo.turno)
 
-            # Detecta viradas comparando com o snapshot anterior
-            q_anterior = (
-                select(SnapshotCandidato.sq_candidato, SnapshotCandidato.votos)
-                .join(Snapshot, Snapshot.id == SnapshotCandidato.snapshot_id)
+            # Detecta viradas comparando com o snapshot anterior.
+            # Bug antigo: `.limit(50)` no join pegava linhas de MÚLTIPLOS
+            # snapshots misturados (50 rows / ~12 cands ≈ 4 snapshots
+            # empilhados). Detector recebia timeline embaralhada.
+            # Correto: pegar ID do último snapshot não-suspeito, DEPOIS
+            # buscar TODOS os candidatos desse snapshot único.
+            q_id_anterior = (
+                select(Snapshot.id)
                 .where(
                     Snapshot.cod_cargo == alvo.cod_cargo,
                     Snapshot.abrangencia == alvo.abrangencia,
@@ -242,12 +276,17 @@ async def processar_alvo(
                     Snapshot.id != snap.id,
                 )
                 .order_by(Snapshot.coletado_em.desc())
-                .limit(50)  # top 50 candidatos do snapshot anterior
+                .limit(1)
             )
-            r_ant = await sess.execute(q_anterior)
-            resumos_ant = [CandidatoResumo(sq, v) for sq, v in r_ant.all()]
-            if resumos_ant:
-                eventos.extend(detectar_viradas(resumos, resumos_ant))
+            id_anterior = (await sess.execute(q_id_anterior)).scalar_one_or_none()
+            if id_anterior is not None:
+                q_cands_ant = select(
+                    SnapshotCandidato.sq_candidato, SnapshotCandidato.votos,
+                ).where(SnapshotCandidato.snapshot_id == id_anterior)
+                r_ant = await sess.execute(q_cands_ant)
+                resumos_ant = [CandidatoResumo(sq, v) for sq, v in r_ant.all()]
+                if resumos_ant:
+                    eventos.extend(detectar_viradas(resumos, resumos_ant))
 
             ja = await _eventos_existentes(sess, alvo.cod_cargo, alvo.abrangencia)
             for ev in eventos:

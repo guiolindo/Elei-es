@@ -81,6 +81,14 @@ As duas condições viram uma só — não há como ter maioria simples sem tamb
 
 **Chamada**: `avaliar_apuracao(candidatos, totais, cod_cargo=1, turno=2)`. O poller passa `turno` a partir do `AlvoColeta.turno` (que é preenchido pelo alvo de coleta — cargo 1 turno 1 é `presidente_1t`, cargo 1 turno 2 é `presidente_2t`).
 
+**Empate exato no 2T — Art. 110 do Código Eleitoral**:
+
+> "Em caso de empate haver-se-á por eleito o mais idoso, salvo se algum dos candidatos ainda não tiver a idade mínima fixada nesta Lei, caso em que se dará a eleição ao outro."
+
+Cenário: 100% apurado, dois candidatos com exatamente o mesmo número de votos. Formalmente vence o mais idoso.
+
+**Implementação**: `CandidatoResumo` aceita campo opcional `idade_anos`. Quando `restantes == 0` e `a.votos == b.votos`, o motor verifica se as idades foram fornecidas — se sim, emite `ELEITO_2T` pro mais velho com `detalhes.criterio_desempate = "idade_art_110_ce"`. Se as idades não foram fornecidas ou são iguais, o motor não decide (deixa pra Justiça Eleitoral). O poller lê `raw_divulga.dataDeNascimento` do candidato (importado pelo Termux) e calcula a idade automaticamente pra snapshots do 2T.
+
 ### 3.2. Senador maioria simples (CF art. 46)
 
 Senador NÃO precisa de maioria absoluta — os N mais votados vencem. Em ano de renovação 1/3 (2018, 2022), N=1. Em 2026 (renovação 2/3), N=2 — ver seção 4.

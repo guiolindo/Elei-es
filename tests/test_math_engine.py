@@ -225,6 +225,52 @@ def test_2t_no_fio_nao_declara_vencedor():
     assert "ELEITO_1T" not in tipos
 
 
+def test_2t_empate_desempate_por_idade_art_110_ce():
+    """Art. 110 do Código Eleitoral: em caso de empate no 2T (100%
+    apurado, mesmo número de votos), vence o mais idoso. Motor só
+    decide se as idades forem fornecidas em CandidatoResumo."""
+    from math_engine.engine import avaliar_apuracao
+    # 100% apurado, empate exato
+    t = totais(100, 100, 1000, 1000, 900)
+    cands = [
+        CandidatoResumo("A", 450, idade_anos=68),
+        CandidatoResumo("B", 450, idade_anos=55),
+    ]
+    ev = avaliar_apuracao(cands, t, cod_cargo=1, turno=2)
+    tipos = [e["tipo"] for e in ev]
+    assert "ELEITO_2T" in tipos
+    e = next(x for x in ev if x["tipo"] == "ELEITO_2T")
+    assert e["sq_candidato_a"] == "A", "Mais velho (68) deveria vencer"
+    assert e["detalhes"]["criterio_desempate"] == "idade_art_110_ce"
+    assert e["detalhes"]["margem"] == 0
+
+
+def test_2t_empate_sem_idade_nao_decide():
+    """Se as idades não foram fornecidas, o motor não presume e deixa
+    em disputa. TSE faz o desempate formalmente."""
+    from math_engine.engine import avaliar_apuracao
+    t = totais(100, 100, 1000, 1000, 900)
+    cands = [
+        CandidatoResumo("A", 450),
+        CandidatoResumo("B", 450),
+    ]
+    ev = avaliar_apuracao(cands, t, cod_cargo=1, turno=2)
+    assert ev == [], "Sem idade não pode decidir empate"
+
+
+def test_2t_empate_com_mesma_idade_nao_decide():
+    """Se as duas idades são iguais (raríssimo mas possível), o motor
+    também não decide."""
+    from math_engine.engine import avaliar_apuracao
+    t = totais(100, 100, 1000, 1000, 900)
+    cands = [
+        CandidatoResumo("A", 450, idade_anos=60),
+        CandidatoResumo("B", 450, idade_anos=60),
+    ]
+    ev = avaliar_apuracao(cands, t, cod_cargo=1, turno=2)
+    assert ev == []
+
+
 def test_2t_senador_nao_faz_sentido():
     """Senador não tem 2º turno. Se por algum motivo alguém chamar
     avaliar_apuracao com cargo=5 e turno=2, retorna vazio."""

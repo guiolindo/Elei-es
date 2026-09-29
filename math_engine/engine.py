@@ -19,6 +19,11 @@ APURACAO_MIN_PCT = 0.20  # motor só corre com >=20% das seções totalizadas
 class CandidatoResumo:
     sq_candidato: str
     votos: int
+    # Idade em anos completos na data da eleição. Opcional — só usada
+    # pra desempate no 2º turno (art. 110 Código Eleitoral: "em caso de
+    # empate haver-se-á por eleito o mais idoso"). Se não fornecida, o
+    # motor NÃO tenta desempatar e mantém a eleição em disputa.
+    idade_anos: int | None = None
 
 
 @dataclass(frozen=True)
@@ -371,6 +376,37 @@ def _avaliar_2_turno(
             "detalhes": {"votos_max": b.votos + restantes, "turno": 2,
                          "cod_cargo": cod_cargo},
         })
+        return eventos
+
+    # Caso raro: empate matemático quando 100% apurado (restantes==0).
+    # Art. 110 do Código Eleitoral: em caso de empate, considera-se
+    # eleito o mais idoso. Só aplicável se idade dos dois foi fornecida
+    # em CandidatoResumo. Sem idade, motor NÃO decide — mantém em
+    # disputa (TSE fará o desempate).
+    if restantes == 0 and a.votos == b.votos:
+        if a.idade_anos is not None and b.idade_anos is not None and a.idade_anos != b.idade_anos:
+            mais_velho, mais_novo = (a, b) if a.idade_anos > b.idade_anos else (b, a)
+            tipo_ganhador = "ELEITO_2T" if cod_cargo == 1 else "ELEITO_MAJORITARIO"
+            eventos.append({
+                "tipo": tipo_ganhador,
+                "sq_candidato_a": mais_velho.sq_candidato,
+                "detalhes": {
+                    "votos": mais_velho.votos,
+                    "cod_cargo": cod_cargo,
+                    "turno": 2,
+                    "margem": 0,
+                    "criterio_desempate": "idade_art_110_ce",
+                    "idade_vencedor": mais_velho.idade_anos,
+                    "idade_perdedor": mais_novo.idade_anos,
+                },
+            })
+            eventos.append({
+                "tipo": "MATEMATICAMENTE_ELIMINADO",
+                "sq_candidato_a": mais_novo.sq_candidato,
+                "detalhes": {"votos_max": mais_novo.votos, "turno": 2,
+                             "cod_cargo": cod_cargo,
+                             "criterio_desempate": "idade_art_110_ce"},
+            })
     return eventos
 
 
