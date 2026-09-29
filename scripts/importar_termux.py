@@ -51,19 +51,26 @@ except Exception as e:
 
 FOTO_BASE = "https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img"
 
-def buscar_detalhe(uf: str, sq: str) -> dict | None:
+def buscar_detalhe(ufs: list[str], sq: str) -> dict | None:
     """Puxa a ficha completa do candidato (nascimento, sexo, escolaridade,
-    ocupação, gastos, vice, coligação)."""
-    try:
-        r = requests.get(
-            f"{TSE_DETALHE}/{ANO}/{uf}/{COD}/candidato/{sq}",
-            impersonate="chrome",
-            timeout=15,
-        )
-        if r.status_code == 200:
-            return r.json()
-    except Exception:
-        pass
+    ocupação, gastos, vice, coligação). Presidente às vezes só responde
+    com a UF do domicílio eleitoral do candidato, não com BR — por isso
+    tentamos várias."""
+    for uf in ufs:
+        if not uf:
+            continue
+        try:
+            r = requests.get(
+                f"{TSE_DETALHE}/{ANO}/{uf}/{COD}/candidato/{sq}",
+                impersonate="chrome",
+                timeout=15,
+            )
+            if r.status_code == 200:
+                j = r.json()
+                if isinstance(j, dict) and j.get("id"):
+                    return j
+        except Exception:
+            continue
     return None
 
 
@@ -144,9 +151,20 @@ for cargo, nome, ufs in CARGOS:
                         sq = str(c.get("id") or "")
                         if not sq:
                             continue
-                        if baixar_foto(sq, uf_foto):
-                            n_fotos += 1
-                        det = buscar_detalhe(uf_foto, sq)
+                        # Pra presidente, tenta BR e as UFs do domicílio
+                        ufs_tentativa = [uf_foto]
+                        for k in ("ufCandidatura", "sgUe", "sgUf", "uf"):
+                            v = c.get(k)
+                            if v and v not in ufs_tentativa:
+                                ufs_tentativa.append(v)
+                        if cargo == 1:
+                            ufs_tentativa += ["SP","RJ","MG","DF","BR"]
+                        # Foto: mesma lógica — tenta as UFs até uma dar 200
+                        for uf_try in ufs_tentativa:
+                            if baixar_foto(sq, uf_try):
+                                n_fotos += 1
+                                break
+                        det = buscar_detalhe(ufs_tentativa, sq)
                         if det and enviar_detalhe(sq, det):
                             n_det += 1
                         time.sleep(0.15)
