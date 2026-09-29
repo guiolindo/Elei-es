@@ -193,6 +193,12 @@ def detectar_viradas(
     eventos = []
     # Só reporta viradas entre top-5 (evita ruído nos deputados)
     top = sorted(candidatos_atual, key=lambda c: c.votos, reverse=True)[:5]
+    # Sentinel = tamanho da lista (posição imaginária "atrás de todos");
+    # candidatos que não existiam no anterior ficam com essa posição e nunca
+    # são contados como "estavam à frente". Antes usávamos -1, que fazia
+    # `-1 < pos_anterior[sq]` retornar True e disparar viradas fantasma.
+    LEN_A = len(pos_anterior)
+    LEN_B = len(pos_atual)
     for c in top:
         sq = c.sq_candidato
         if sq not in pos_anterior or sq not in pos_atual:
@@ -202,8 +208,8 @@ def detectar_viradas(
             for outro in candidatos_atual:
                 if outro.sq_candidato == sq:
                     continue
-                if (pos_anterior.get(outro.sq_candidato, -1) < pos_anterior[sq] and
-                    pos_atual.get(outro.sq_candidato, -1) > pos_atual[sq]):
+                if (pos_anterior.get(outro.sq_candidato, LEN_A) < pos_anterior[sq] and
+                    pos_atual.get(outro.sq_candidato, LEN_B) > pos_atual[sq]):
                     eventos.append({
                         "tipo": "VIRADA",
                         "sq_candidato_a": sq,

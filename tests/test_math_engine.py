@@ -223,6 +223,27 @@ def test_projecao_final_zero_apurado_nao_quebra():
     assert projecao_final(cand, t) == 0
 
 
+def test_detectar_virada_ignora_candidato_novo_no_snapshot_atual():
+    """Regressão: quando aparecia um candidato novo (SQ inédito) num snapshot,
+    a versão antiga tratava a `pos_anterior` dele como -1 e reportava uma
+    virada fantasma — o líder atual 'passou' um cara que nunca estava lá."""
+    from math_engine.engine import detectar_viradas
+    anterior = [CandidatoResumo("A", 500), CandidatoResumo("B", 400)]
+    # Snapshot novo introduz "X" — não pode gerar virada A→X nem B→X
+    atual = [CandidatoResumo("A", 500), CandidatoResumo("B", 400), CandidatoResumo("X", 10)]
+    assert detectar_viradas(atual, anterior) == []
+
+
+def test_detectar_virada_real():
+    from math_engine.engine import detectar_viradas
+    anterior = [CandidatoResumo("A", 500), CandidatoResumo("B", 400)]
+    atual = [CandidatoResumo("A", 500), CandidatoResumo("B", 600)]  # B passou A
+    ev = detectar_viradas(atual, anterior)
+    assert len(ev) == 1
+    assert ev[0]["sq_candidato_a"] == "B"
+    assert ev[0]["sq_candidato_b"] == "A"
+
+
 def test_snapshot_com_totalizadas_maior_que_apto_nao_quebra():
     # anomalia TSE: restantes clampeado a 0 → decisão fecha imediatamente
     t = totais(100, 100, 1000, 1200, 900)
