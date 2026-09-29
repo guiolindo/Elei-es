@@ -1,31 +1,77 @@
-/* ============ Design tokens ============ */
+/* ============ Design tokens ============
+   Escala neutra semântica (base → elevado), cores primárias com AA,
+   focus ring consistente, radius e shadow scale. */
 :root {
-  --bg-0: #08090c;
-  --bg-1: #0f1218;
-  --bg-2: #161b24;
-  --bg-3: #1e2531;
-  --line: #303a4d;                        /* + contraste (era #262e3d) */
-  --line-2: #3d4860;                      /* + contraste */
-  --fg: #ecf0f7;
-  --fg-2: #b6c0d4;
-  --muted: #94a1b8;                       /* + contraste 4.7:1 (era 4.0:1) */
-  --a: #f0b429;          /* âmbar principal */
-  --b: #3b82f6;          /* azul */
-  --c: #ec4899;          /* magenta */
-  --d: #10b981;          /* verde esmeralda */
-  --grad-a: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
-  --grad-b: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  --grad-hero: radial-gradient(1200px 600px at 10% -10%, rgba(240,180,41,.15), transparent 60%),
-               radial-gradient(1000px 500px at 90% -20%, rgba(59,130,246,.18), transparent 60%),
-               linear-gradient(180deg, #0b0e14 0%, #0f1218 100%);
+  /* Superfícies (dark editorial) */
+  --surface-0: #08090c;      /* fundo mais profundo (body) */
+  --surface-1: #0f1218;      /* superfície base */
+  --surface-2: #161b24;      /* card */
+  --surface-3: #1e2531;      /* elevado (hover) */
+  --surface-4: #29334a;      /* muito elevado */
+  /* Aliases de compatibilidade com CSS anterior */
+  --bg-0: var(--surface-0); --bg-1: var(--surface-1);
+  --bg-2: var(--surface-2); --bg-3: var(--surface-3);
+
+  /* Linhas / bordas */
+  --line: #2b3444;
+  --line-2: #3a4560;
+  --line-3: #506180;
+
+  /* Texto */
+  --fg: #f2f5fa;             /* AAA em surface-0 */
+  --fg-2: #cbd3e2;
+  --muted: #97a2b9;          /* AA 4.7:1 em surface-1 */
+  --muted-2: #7a8398;
+
+  /* Marca — âmbar quente + violeta profundo (paleta editorial coesa) */
+  --brand: #f0b429;
+  --brand-2: #f97316;
+  --brand-soft: rgba(240,180,41,.12);
+  --accent: #7c5cff;         /* violeta pro contraste dos gráficos */
+  --accent-2: #3b82f6;
+
+  /* Cores categóricas (dataviz — 6 hues com luminância parelha) */
+  --a: #f0b429; --b: #3b82f6; --c: #ec4899; --d: #10b981;
+  --e: #a855f7; --f: #f97316;
+
+  /* Estados semânticos */
   --ok: #22c55e;
   --warn: #f59e0b;
   --danger: #ef4444;
-  --shadow-lg: 0 20px 60px rgba(0,0,0,.4);
+  --info: #38bdf8;
+
+  /* Gradientes */
+  --grad-a: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+  --grad-b: linear-gradient(135deg, #3b82f6 0%, #7c5cff 100%);
+  --grad-hero: radial-gradient(1200px 600px at 10% -10%, rgba(240,180,41,.10), transparent 60%),
+               radial-gradient(1000px 500px at 90% -20%, rgba(124,92,255,.12), transparent 60%),
+               linear-gradient(180deg, var(--surface-1) 0%, var(--surface-0) 100%);
+
+  /* Anéis de foco (acessibilidade) — visível mas não intrusivo */
+  --focus-ring: 0 0 0 3px rgba(240,180,41,.35);
+  --focus-ring-danger: 0 0 0 3px rgba(239,68,68,.35);
+
+  /* Sombras */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.35);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.30);
   --shadow: 0 8px 24px rgba(0,0,0,.35);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,.4);
+
+  /* Cantos */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
   --radius: 14px;
   --radius-lg: 20px;
+  --radius-xl: 28px;
 }
+
+/* Focus visible acessível em qualquer elemento interativo */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+button, select, input, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
@@ -39,10 +85,28 @@ html, body {
 button { font-family: inherit; }
 h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 
+/* ============ Top-nav do desktop ============ */
+.d-topnav {
+  display: flex; gap: 4px; padding: 8px 36px 0; align-items: center;
+  border-bottom: 1px solid transparent;
+}
+.d-topnav-link {
+  padding: 10px 16px; border-radius: 8px 8px 0 0;
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  text-decoration: none; transition: color .15s, background .15s;
+  position: relative;
+}
+.d-topnav-link:hover { color: var(--fg); background: rgba(255,255,255,.04); }
+.d-topnav-link.ativo { color: var(--fg); }
+.d-topnav-link.ativo::after {
+  content: ""; position: absolute; left: 16px; right: 16px; bottom: -1px;
+  height: 2px; background: var(--brand); border-radius: 1px 1px 0 0;
+}
+
 /* ============ Hero ============ */
 .hero {
   position: sticky; top: 0; z-index: 50;
-  padding: 20px 0 0;
+  padding: 0 0 0;
   background: var(--grad-hero);
   border-bottom: 1px solid var(--line);
   overflow: hidden;
@@ -73,10 +137,8 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 }
 .brand { display: flex; align-items: center; gap: 14px; }
 .logo {
-  width: 48px; height: 48px; border-radius: 12px;
-  background: var(--grad-a);
-  display: grid; place-items: center; font-size: 22px;
-  box-shadow: 0 8px 20px rgba(245,158,11,.35);
+  width: 44px; height: 44px; display: block;
+  filter: drop-shadow(0 4px 12px rgba(240,180,41,.35));
 }
 .brand-title { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
 .brand-title span {
@@ -118,28 +180,57 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,.55); }
 .btn-primary:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
 
-/* ============ Stats ============ */
+/* ============ Stats: hero + secundárias em grid 2-col ============ */
 .stats {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(320px, 1.2fr) 2.8fr;
+  gap: 16px;
   padding: 0 36px 24px;
 }
 .stat {
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 16px 18px;
-  backdrop-filter: blur(8px);
+  padding: 16px 20px;
 }
 .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; font-weight: 600; }
-.stat-value { font-size: 26px; font-weight: 800; margin-top: 6px; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stat-value { font-size: 26px; font-weight: 800; margin-top: 6px; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--fg); }
 .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+/* Stat hero (Apurado): número gigante, barra proeminente */
+.stat-hero {
+  background: linear-gradient(160deg, rgba(240,180,41,.14), rgba(124,92,255,.10));
+  border-color: rgba(240,180,41,.25);
+  padding: 20px 24px;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.stat-hero .stat-value {
+  font-size: 56px; margin-top: 8px; letter-spacing: -0.045em;
+  background: var(--grad-a); -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}
+.stat-hero .stat-progress { height: 8px; margin-top: 12px; border-radius: 4px; }
+.stat-hero .stat-sub { font-size: 13px; margin-top: 10px; }
+/* Grid interno das secundárias */
+.stat-secundarias {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+}
+.stat-mini { padding: 14px 16px; }
+.stat-mini .stat-value { font-size: 20px; margin-top: 4px; }
+.stat-mini .stat-sub { font-size: 11px; }
 .stat-progress {
-  height: 4px; background: var(--bg-3); border-radius: 2px; overflow: hidden; margin-top: 8px;
+  height: 4px; background: var(--surface-3); border-radius: 2px; overflow: hidden; margin-top: 8px;
 }
 .stat-progress > div { height: 100%; background: var(--grad-a); width: 0; transition: width .5s cubic-bezier(.4,0,.2,1); }
+
+@media (max-width: 1100px) {
+  .stats { grid-template-columns: 1fr; }
+  .stat-secundarias { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 900px) and (min-width: 769px) {
+  .stat-secundarias { grid-template-columns: repeat(2, 1fr); }
+  .stat-hero .stat-value { font-size: 44px; }
+}
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 4px; vertical-align: middle; }
 .dot.on { background: var(--ok); box-shadow: 0 0 10px var(--ok); animation: pulse 1.6s infinite; }
 @keyframes pulse {
@@ -783,7 +874,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
     position: sticky; top: 0; z-index: 50;
   }
   .m-brand { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-  .m-logo { font-size: 22px; }
+  .m-logo { width: 30px; height: 30px; display: block; }
   .m-title { font-size: 15px; font-weight: 700; color: #e6edf3;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .m-title b { color: var(--gold, #f0b429); }

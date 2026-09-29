@@ -1294,13 +1294,26 @@ async function boot() {
     el.textContent = rotulo;
   }, 5000);
 
-  // Header ganha sombra ao rolar + botão voltar ao topo
+  // Header ganha sombra ao rolar + botão voltar ao topo + scroll-spy do topnav
   const hero = document.querySelector(".hero");
   const btnTopo = $("btn-topo");
+  const topnavLinks = document.querySelectorAll(".d-topnav-link[data-anchor]");
+  const secoes = {
+    lista: $("lista-candidatos"),
+    mapa: document.querySelector(".mapa-secao"),
+    timeline: document.querySelector(".timeline-secao"),
+  };
   const onScroll = () => {
     const y = window.scrollY;
     hero.classList.toggle("scrolled", y > 8);
     btnTopo.classList.toggle("visible", y > 400);
+    // scroll-spy: qual section está mais visível
+    let ativa = "lista";
+    const meio = y + window.innerHeight / 3;
+    for (const [nome, el] of Object.entries(secoes)) {
+      if (el && el.offsetTop <= meio) ativa = nome;
+    }
+    topnavLinks.forEach(l => l.classList.toggle("ativo", l.dataset.anchor === ativa));
   };
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();

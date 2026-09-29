@@ -112,6 +112,12 @@
 
 <!-- ============ Chrome DESKTOP ============ (só visível em >768px) -->
 <header class="hero">
+  <nav class="d-topnav">
+    <a href="#lista-candidatos" class="d-topnav-link ativo" data-anchor="lista">Placar</a>
+    <a href="#mapa-secao" class="d-topnav-link" data-anchor="mapa">Mapa</a>
+    <a href="#timeline" class="d-topnav-link" data-anchor="timeline">Eventos</a>
+    <a href="/sobre" class="d-topnav-link">Sobre</a>
+  </nav>
   <div class="hero-bg"></div>
   <nav class="nav">
     <div class="brand">
@@ -155,36 +161,36 @@
   </nav>
 
   <section class="stats">
-    <div class="stat" title="Percentual das seções eleitorais já totalizadas">
+    <!-- Bloco principal: apurado com destaque -->
+    <div class="stat stat-hero" title="Percentual das seções eleitorais já totalizadas pelo TSE">
       <div class="stat-label">Apurado</div>
       <div class="stat-value" id="pct-apurado">—</div>
       <div class="stat-progress"><div id="prog-apurado"></div></div>
+      <div class="stat-sub"><span id="secoes">—</span> <span id="secoes-sub">de — seções</span></div>
     </div>
-    <div class="stat" title="Seções eleitorais totalizadas até agora">
-      <div class="stat-label">Seções</div>
-      <div class="stat-value" id="secoes">—</div>
-      <div class="stat-sub" id="secoes-sub">totalizadas / total</div>
-    </div>
-    <div class="stat" title="Eleitores que compareceram para votar">
-      <div class="stat-label">Comparecimento</div>
-      <div class="stat-value" id="comparecimento">—</div>
-      <div class="stat-sub" id="pct-comparecimento">eleitores</div>
-    </div>
-    <div class="stat" title="Eleitores aptos que não compareceram">
-      <div class="stat-label">Abstenções</div>
-      <div class="stat-value" id="abstencoes">—</div>
-      <div class="stat-sub" id="pct-abstencoes">não foram votar</div>
-    </div>
-    <div class="stat" title="Votos em branco e nulos (não vão para nenhum candidato)">
-      <div class="stat-label">Brancos · Nulos</div>
-      <div class="stat-value" id="brancos-nulos">—</div>
-      <div class="stat-sub">votos inválidos</div>
-    </div>
-    <div class="stat" title="Horário da última atualização do TSE. Verde pulsante = conectado ao vivo">
-      <div class="stat-label">Último snapshot</div>
-      <div class="stat-value" id="ultimo">—</div>
-      <div class="stat-sub" id="conexao">
-        <span class="dot"></span> <span id="conexao-label">conectando…</span>
+    <!-- Bloco secundário: métricas complementares -->
+    <div class="stat-secundarias">
+      <div class="stat stat-mini" title="Eleitores que foram votar">
+        <div class="stat-label">Comparecimento</div>
+        <div class="stat-value" id="comparecimento">—</div>
+        <div class="stat-sub" id="pct-comparecimento">dos aptos</div>
+      </div>
+      <div class="stat stat-mini" title="Eleitores aptos que não votaram">
+        <div class="stat-label">Abstenções</div>
+        <div class="stat-value" id="abstencoes">—</div>
+        <div class="stat-sub" id="pct-abstencoes">dos aptos</div>
+      </div>
+      <div class="stat stat-mini" title="Votos que não contam para nenhum candidato">
+        <div class="stat-label">Brancos e nulos</div>
+        <div class="stat-value" id="brancos-nulos">—</div>
+        <div class="stat-sub">votos inválidos</div>
+      </div>
+      <div class="stat stat-mini" title="Horário da última atualização recebida do TSE">
+        <div class="stat-label">Último dado</div>
+        <div class="stat-value" id="ultimo">—</div>
+        <div class="stat-sub" id="conexao">
+          <span class="dot"></span> <span id="conexao-label">conectando</span>
+        </div>
       </div>
     </div>
   </section>
@@ -277,7 +283,7 @@
     </div>
   </section>
 
-  <section class="timeline-secao">
+  <section class="timeline-secao" id="timeline">
     <div class="page-header">
       <div>
         <h2>Linha do tempo</h2>
