@@ -87,7 +87,12 @@ async def ficha(sq: str, sess: AsyncSession = Depends(get_session)) -> dict[str,
                 return v
         return None
     partido_raw = raw.get("partido") or {}
-    vice_raw = raw.get("vice") or raw.get("candidatoVice") or {}
+    # O detalhe (candidatura/buscar) traz `vices` (lista); o listar traz `vice`.
+    vices_raw = raw.get("vices")
+    if isinstance(vices_raw, list) and vices_raw and isinstance(vices_raw[0], dict):
+        vice_raw = vices_raw[0]
+    else:
+        vice_raw = raw.get("vice") or raw.get("candidatoVice") or {}
     vice_part = (vice_raw.get("partido") or {}) if isinstance(vice_raw, dict) else {}
     return {
         "sq_candidato": c.sq_candidato,
@@ -110,7 +115,7 @@ async def ficha(sq: str, sess: AsyncSession = Depends(get_session)) -> dict[str,
         "municipio_nascimento": _p("nomeMunicipioNascimento"),
         "gasto_campanha": raw.get("gastoCampanha"),
         "cnpj_campanha": _p("cnpjcampanha"),
-        "vice_nome": vice_raw.get("nomeUrna") or vice_raw.get("nomeCompleto") if isinstance(vice_raw, dict) else None,
+        "vice_nome": (vice_raw.get("nomeUrna") or vice_raw.get("nomeCompleto")) if isinstance(vice_raw, dict) else None,
         "vice_partido_sigla": vice_part.get("sigla") if isinstance(vice_part, dict) else None,
         "partido_nome": partido_raw.get("nome") if isinstance(partido_raw, dict) else None,
     }
@@ -576,6 +581,45 @@ async def importar_candidatos(
         return {"atualizados": 0, "aviso": "JSON não tinha candidatos ou schema desconhecido"}
     n = await _upsert(sess, cands)
     return {"atualizados": n, "cargo": cargo, "uf": uf_arg or "BR"}
+
+
+@router.post("/admin/atualizar-detalhe")
+async def atualizar_detalhe(
+    payload: dict[str, Any],
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Recebe o JSON de detalhe do candidato (endpoint candidatura/buscar do
+    TSE) e mescla em `raw_divulga`. Também atualiza campos denormalizados
+    (foto_url, coligacao, vice) quando o detalhe traz valores novos.
+
+    Body: { "sq_candidato": "...", "detalhe": { ...payload da rest/v1/candidatura/buscar... } }
+    """
+    sq = str(payload.get("sq_candidato") or "")
+    det = payload.get("detalhe") or {}
+    if not sq or not isinstance(det, dict):
+        return {"ok": False, "erro": "payload inválido"}
+    row = await sess.get(Candidato, sq)
+    if not row:
+        return {"ok": False, "erro": "candidato não encontrado"}
+    merged = dict(row.raw_divulga or {})
+    merged.update(det)
+    row.raw_divulga = merged
+    # Denormaliza alguns campos úteis quando presentes
+    if det.get("fotoUrl") and not row.foto_url:
+        row.foto_url = det["fotoUrl"]
+    if det.get("nomeColigacao") and not row.coligacao:
+        row.coligacao = det["nomeColigacao"]
+    vices = det.get("vices") or []
+    if vices and isinstance(vices, list) and isinstance(vices[0], dict):
+        v = vices[0]
+        vn = v.get("nomeUrna") or v.get("nomeCompleto")
+        if vn and not row.vice_nome:
+            row.vice_nome = vn
+        vp = (v.get("partido") or {}).get("sigla")
+        if vp and not row.vice_partido:
+            row.vice_partido = vp
+    await sess.commit()
+    return {"ok": True, "sq": sq}
 
 
 @router.get("/admin/diagnostico-ids")

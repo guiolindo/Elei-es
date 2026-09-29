@@ -35,6 +35,7 @@ CARGOS = [
 ]
 
 TSE = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidatura/listar"
+TSE_DETALHE = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidatura/buscar"
 
 ok = 0
 fail = 0
@@ -48,12 +49,40 @@ try:
 except Exception as e:
     print(f"  aviso: {e}")
 
-FOTO_BASE = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidato/foto"
+FOTO_BASE = "https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img"
 
-def baixar_foto(sq: str) -> bool:
+def buscar_detalhe(uf: str, sq: str) -> dict | None:
+    """Puxa a ficha completa do candidato (nascimento, sexo, escolaridade,
+    ocupação, gastos, vice, coligação)."""
+    try:
+        r = requests.get(
+            f"{TSE_DETALHE}/{ANO}/{uf}/{COD}/candidato/{sq}",
+            impersonate="chrome",
+            timeout=15,
+        )
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
+
+
+def enviar_detalhe(sq: str, detalhe: dict) -> bool:
+    try:
+        r = requests.post(
+            f"{APP}/api/admin/atualizar-detalhe",
+            json={"sq_candidato": sq, "detalhe": detalhe},
+            timeout=30,
+        )
+        return r.status_code == 200 and r.json().get("ok")
+    except Exception:
+        return False
+
+
+def baixar_foto(sq: str, uf: str) -> bool:
     """Baixa a foto do candidato do TSE e envia pro app."""
     try:
-        r = requests.get(f"{FOTO_BASE}/{ANO}/{sq}", impersonate="chrome", timeout=15)
+        r = requests.get(f"{FOTO_BASE}/{COD}/{sq}/{uf}", impersonate="chrome", timeout=15)
         if r.status_code != 200 or len(r.content) < 500:
             return False
         import base64
@@ -106,14 +135,23 @@ for cargo, nome, ufs in CARGOS:
                       f"(TSE tinha {n_cands})")
                 ok += 1
                 total_cand += res.get("atualizados", 0)
-                # Baixa fotos dos candidatos aptos (majoritários — poucos)
+                # Majoritários: baixa foto + ficha completa (poucos candidatos)
                 if cargo in (1, 3, 5):
+                    uf_foto = "BR" if cargo == 1 else uf
                     n_fotos = 0
+                    n_det = 0
                     for c in (data.get("candidatos") or [])[:20]:
-                        if baixar_foto(str(c.get("id"))):
+                        sq = str(c.get("id") or "")
+                        if not sq:
+                            continue
+                        if baixar_foto(sq, uf_foto):
                             n_fotos += 1
-                    if n_fotos:
-                        print(f"     └ {n_fotos} fotos baixadas")
+                        det = buscar_detalhe(uf_foto, sq)
+                        if det and enviar_detalhe(sq, det):
+                            n_det += 1
+                        time.sleep(0.15)
+                    if n_fotos or n_det:
+                        print(f"     └ {n_fotos} fotos, {n_det} detalhes")
             else:
                 print(f"[err POST] {nome} {uf}: HTTP {resp.status_code}")
                 fail += 1
