@@ -162,6 +162,35 @@ Todos exigem header `X-Admin-Token: <valor>`. Se `ADMIN_TOKEN` está vazio (dev)
 | `/api/admin/upload-foto` | POST | Recebe base64 e salva em `static/candidatos/` |
 | `/api/admin/sync-candidatos` | POST | Roda sincronizador programaticamente |
 
+## Capacidade e crescimento do banco
+
+Railway PostgreSQL não tem limite fixo — cresce com o uso (paga por GB armazenado). Estimativa realista pra dia D (~6h de apuração):
+
+| Tabela | Linhas | Tamanho |
+|---|---|---|
+| `snapshots` (JSONB raw) | ~40k | ~200MB |
+| `snapshot_totais` | ~40k | ~6MB |
+| `snapshot_candidato` | ~500k | ~50MB |
+| `snapshot_municipio` | pode chegar a **30M** | 1-3GB |
+| `eventos` | <1000 | trivial |
+| **Total** | | **1.5-3.5GB** |
+
+O ofensor é `snapshot_municipio` — TSE inclui breakdown por município no JSON de governador por UF, e São Paulo sozinho gera ~6.450 rows/snapshot (645 municípios × ~10 candidatos).
+
+### Ajuste de autovacuum (migration 0005)
+
+Migration 0005 baixa o `autovacuum_vacuum_scale_factor` das tabelas quentes pra 5%. Sem isso, o autovacuum default (20%) demora demais e os índices ficam bloated.
+
+### Retenção pós-eleição
+
+Passada a apuração, é OK truncar `snapshot_municipio` — os dados já foram exibidos e podem ser reconstituídos do TSE se necessário. Como o `snapshots.raw` guarda o JSON original inteiro, `snapshot_municipio` é reconstruível.
+
+Comando de limpeza (rodar APÓS o dia D, com backup do banco):
+```sql
+TRUNCATE snapshot_municipio;
+VACUUM FULL snapshot_municipio;
+```
+
 ## Monitoramento
 
 - **Healthcheck**: `/health` retorna 200 (com `SELECT 1`) ou 503. Railway monitora automaticamente.
