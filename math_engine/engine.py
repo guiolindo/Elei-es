@@ -320,11 +320,66 @@ def detectar_viradas(
     return eventos
 
 
+def _avaliar_2_turno(
+    candidatos: Sequence[CandidatoResumo],
+    totais: TotaisResumo,
+    cod_cargo: int,
+) -> list[dict]:
+    """Motor específico do 2º turno.
+
+    Cenário: apenas 2 candidatos disputam. Vence quem tiver mais votos
+    ao final — não existe 3T. Portanto:
+
+    - Só faz sentido pra cargos com 2T (Presidente, Governador).
+    - Emite ELEITO_2T (Pres) ou ELEITO_MAJORITARIO turno=2 (Gov) quando
+      o 2º colocado é matematicamente inalcançável pelo 1º:
+        b.votos + restantes_max < a.votos
+      Que, com apenas 2 candidatos, equivale a "o líder já garantiu
+      maioria absoluta dos válidos finais".
+    - Emite MATEMATICAMENTE_ELIMINADO pro segundo colocado quando ele
+      já não pode alcançar o 1º.
+    - Não emite SEGUNDO_TURNO_DEFINIDO (não existe 3º turno).
+    - Não emite VIRADA aqui — quem estava atrás pode virar e viraria
+      via detectar_viradas (chamado à parte pelo poller).
+    """
+    if cod_cargo not in (1, 3):
+        # Cargos sem 2T (Senador, Deputado) não deveriam nem chegar aqui
+        return []
+    ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
+    if len(ordenados) < 2:
+        return []
+    a, b = ordenados[0], ordenados[1]
+    restantes = votos_restantes_max(totais)
+    eventos: list[dict] = []
+    if b.votos + restantes < a.votos:
+        # Líder inalcançável = 2º eliminado = eleição decidida.
+        # Emite os DOIS eventos: vencedor + eliminado (relevância editorial).
+        tipo_ganhador = "ELEITO_2T" if cod_cargo == 1 else "ELEITO_MAJORITARIO"
+        eventos.append({
+            "tipo": tipo_ganhador,
+            "sq_candidato_a": a.sq_candidato,
+            "detalhes": {
+                "votos": a.votos,
+                "cod_cargo": cod_cargo,
+                "turno": 2,
+                "margem": a.votos - b.votos,
+            },
+        })
+        eventos.append({
+            "tipo": "MATEMATICAMENTE_ELIMINADO",
+            "sq_candidato_a": b.sq_candidato,
+            "detalhes": {"votos_max": b.votos + restantes, "turno": 2,
+                         "cod_cargo": cod_cargo},
+        })
+    return eventos
+
+
 def avaliar_apuracao(
     candidatos: Sequence[CandidatoResumo],
     totais: TotaisResumo,
     cod_cargo: int,
     vagas_majoritario: int | None = None,
+    turno: int = 1,
 ) -> list[dict]:
     """Retorna eventos matemáticos disparados por este snapshot.
 
@@ -332,15 +387,31 @@ def avaliar_apuracao(
     disso o limite superior é gigante e nenhuma desigualdade fecha.
 
     Cargos:
-      - 1 (Presidente): regra 1º turno / 2º turno.
-      - 3 (Governador): maioria simples (2º turno se ninguém > 50%).
-      - 5 (Senador): 2026 elege 2 por UF; usa `eleitos_majoritario_multivaga`.
+      - 1 (Presidente):  1T = eleito 1T ou 2T definido; 2T = eleito 2T
+      - 3 (Governador):  mesma regra do Presidente (CF art. 28 → art. 77)
+      - 5 (Senador):     maioria simples; 2026 elege 2/UF (multi-vaga)
+      - 6/7 (Dep):       proporcional, avaliar_apuracao não se aplica
 
-    `vagas_majoritario` sobrescreve o default do cargo (útil pra municipal
-    ou ano com renovação de 1/3).
+    `turno`:
+      - 1 (default): pode emitir ELEITO_1T, SEGUNDO_TURNO_DEFINIDO,
+                     ELEITO_MAJORITARIO (com maioria_absoluta True/False)
+      - 2:           só disputa entre 2 candidatos, quem tem mais vence.
+                     Emite ELEITO_2T (Presidente) ou ELEITO_MAJORITARIO
+                     com turno=2 (Governador). Não emite 2T definido.
+
+    Nota matemática do 2T: com apenas 2 candidatos, "inalcançabilidade"
+    e "maioria absoluta" colapsam na mesma condição (A > B + restantes),
+    porque validos = A + B → A × 2 > A + B + restantes ⇔ A > B + restantes.
+
+    `vagas_majoritario` sobrescreve o default do cargo (útil pra ano com
+    renovação de 1/3 do Senado).
     """
     if pct_apurado(totais) < APURACAO_MIN_PCT:
         return []
+    # 2º turno é uma máquina separada — só faz sentido pra cargos que
+    # exigem maioria absoluta no 1T (Presidente, Governador).
+    if turno == 2:
+        return _avaliar_2_turno(candidatos, totais, cod_cargo)
     # Otimização: ordena UMA vez. As funções internas trabalham em cima
     # do já-ordenado (Sequence).
     ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)

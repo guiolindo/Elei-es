@@ -173,6 +173,68 @@ def test_governador_com_maioria_absoluta_garantida_1t():
     assert any(e["tipo"] == "ELEITO_MAJORITARIO" for e in ev)
 
 
+def test_2t_presidente_eleito_emite_ELEITO_2T():
+    """No 2º turno só há 2 candidatos e quem tiver mais votos vence.
+    Motor deve emitir ELEITO_2T (não ELEITO_1T) e NÃO deve emitir
+    SEGUNDO_TURNO_DEFINIDO (não existe 3T)."""
+    from math_engine.engine import avaliar_apuracao
+    # apto=1000, apto_tz=950 → restantes = 50
+    t = totais(100, 95, 1000, 950, 900)
+    cands = [
+        CandidatoResumo("A", 500),
+        CandidatoResumo("B", 400),
+    ]
+    # A vence: 400 + 50 = 450 < 500 → matematicamente inalcançável (estrito)
+    ev = avaliar_apuracao(cands, t, cod_cargo=1, turno=2)
+    tipos = [e["tipo"] for e in ev]
+    assert "ELEITO_2T" in tipos, f"Faltou ELEITO_2T em {tipos}"
+    assert "ELEITO_1T" not in tipos, "2T não pode emitir ELEITO_1T"
+    assert "SEGUNDO_TURNO_DEFINIDO" not in tipos, "Não existe 3T"
+    e2t = next(e for e in ev if e["tipo"] == "ELEITO_2T")
+    assert e2t["sq_candidato_a"] == "A"
+    assert e2t["detalhes"]["turno"] == 2
+
+
+def test_2t_governador_emite_ELEITO_MAJORITARIO_com_turno_2():
+    """Governador no 2T: emite ELEITO_MAJORITARIO com detalhes.turno=2."""
+    from math_engine.engine import avaliar_apuracao
+    t = totais(100, 95, 1000, 950, 900)
+    cands = [
+        CandidatoResumo("A", 500),
+        CandidatoResumo("B", 400),
+    ]
+    ev = avaliar_apuracao(cands, t, cod_cargo=3, turno=2)
+    tipos = [e["tipo"] for e in ev]
+    assert "ELEITO_MAJORITARIO" in tipos
+    assert "ELEITO_2T" not in tipos  # ELEITO_2T é exclusivo do presidente
+    e = next(x for x in ev if x["tipo"] == "ELEITO_MAJORITARIO")
+    assert e["detalhes"]["turno"] == 2
+
+
+def test_2t_no_fio_nao_declara_vencedor():
+    """Se o 2º ainda pode alcançar o líder no 2T, ninguém é declarado."""
+    from math_engine.engine import avaliar_apuracao
+    t = totais(100, 85, 1000, 850, 850)
+    cands = [
+        CandidatoResumo("A", 450),
+        CandidatoResumo("B", 400),   # +150 restantes = 550 > 450 → pode virar
+    ]
+    ev = avaliar_apuracao(cands, t, cod_cargo=1, turno=2)
+    tipos = [e["tipo"] for e in ev]
+    assert "ELEITO_2T" not in tipos
+    assert "ELEITO_1T" not in tipos
+
+
+def test_2t_senador_nao_faz_sentido():
+    """Senador não tem 2º turno. Se por algum motivo alguém chamar
+    avaliar_apuracao com cargo=5 e turno=2, retorna vazio."""
+    from math_engine.engine import avaliar_apuracao
+    t = totais(100, 90, 1000, 900, 900)
+    cands = [CandidatoResumo("A", 500), CandidatoResumo("B", 300)]
+    ev = avaliar_apuracao(cands, t, cod_cargo=5, turno=2)
+    assert ev == []
+
+
 def test_governador_2_turno_definido():
     """Governador segue a mesma regra do Presidente (CF art. 28 → 77).
     Se o líder não pode fechar 1T e o 3º está eliminado do top-2,

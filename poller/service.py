@@ -47,10 +47,18 @@ _UFS = [
 ]
 
 ALVOS_PADRAO: list[AlvoColeta] = (
+    # ---- 1º turno ----
     [AlvoColeta(1, 1, "BR")]                       # Presidente nacional
     + [AlvoColeta(1, 1, uf) for uf in _UFS]        # Presidente por UF (mapa)
     + [AlvoColeta(1, 3, uf) for uf in _UFS]        # Governador de cada UF
     + [AlvoColeta(1, 5, uf) for uf in _UFS]        # Senador de cada UF
+    # ---- 2º turno ----
+    # Enquanto o TSE não abrir o 2T, os requests retornam 404 e o poller
+    # pula silenciosamente. Quando abrir, começa a coletar sozinho — sem
+    # precisar de deploy nem mudança de config.
+    + [AlvoColeta(2, 1, "BR")]                     # Presidente 2T nacional
+    + [AlvoColeta(2, 1, uf) for uf in _UFS]        # Presidente 2T por UF
+    + [AlvoColeta(2, 3, uf) for uf in _UFS]        # Governador 2T de cada UF
 )
 
 
@@ -221,7 +229,7 @@ async def processar_alvo(
                 qt_eleitorado_apto_totalizadas=parsed.totais.qt_eleitorado_apto_totalizadas,
                 qt_votos_validos=parsed.totais.qt_votos_validos,
             )
-            eventos = avaliar_apuracao(resumos, tot, cod_cargo=alvo.cod_cargo)
+            eventos = avaliar_apuracao(resumos, tot, cod_cargo=alvo.cod_cargo, turno=alvo.turno)
 
             # Detecta viradas comparando com o snapshot anterior
             q_anterior = (

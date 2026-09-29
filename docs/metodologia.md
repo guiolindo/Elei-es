@@ -57,6 +57,30 @@ Se qualquer uma falha, NÃO é eleito no 1T — vai a 2º turno (ou continua em 
 
 **Bug histórico**: versão anterior do motor só verificava condição 1. Cenário A=40%, B=20%, C=10%, restantes=5%: líder inalcançável mas sem maioria → deveria ir a 2T, mas motor declarava eleito. Coberto por `test_governador_precisa_maioria_absoluta_1t`.
 
+### 3.1.b. Regra do 2º turno (Presidente e Governador)
+
+Quando o 1º turno **não** decide (nenhum candidato tem maioria absoluta e o motor emitiu `SEGUNDO_TURNO_DEFINIDO`), o TSE realiza o 2º turno com os **dois mais votados**. Aí a apuração recomeça do zero, com um `cod_eleicao` diferente (`ELEICAO_COD_2T`) e um novo tipo de snapshot (`turno=2`).
+
+**No 2º turno só há 2 candidatos.** Não existe 3º turno. Vence quem tiver mais votos ao fim. Formalmente:
+```
+b.votos + restantes_max < a.votos
+```
+Que, com apenas 2 candidatos, colapsa matematicamente na condição de maioria absoluta:
+```
+validos_finais_max = A + B + restantes
+2A > validos_finais_max ⇔ A > B + restantes ⇔ a mesma condição acima
+```
+As duas condições viram uma só — não há como ter maioria simples sem também ter maioria absoluta em 2T.
+
+**Eventos emitidos no 2T:**
+- `ELEITO_2T` — pra Presidente.
+- `ELEITO_MAJORITARIO` com `detalhes.turno=2` — pra Governador.
+- `MATEMATICAMENTE_ELIMINADO` — pro perdedor quando inalcançável.
+- **Não emite** `SEGUNDO_TURNO_DEFINIDO` (não existe 3T).
+- **Não emite** `ELEITO_1T` (é a máquina errada).
+
+**Chamada**: `avaliar_apuracao(candidatos, totais, cod_cargo=1, turno=2)`. O poller passa `turno` a partir do `AlvoColeta.turno` (que é preenchido pelo alvo de coleta — cargo 1 turno 1 é `presidente_1t`, cargo 1 turno 2 é `presidente_2t`).
+
 ### 3.2. Senador maioria simples (CF art. 46)
 
 Senador NÃO precisa de maioria absoluta — os N mais votados vencem. Em ano de renovação 1/3 (2018, 2022), N=1. Em 2026 (renovação 2/3), N=2 — ver seção 4.
