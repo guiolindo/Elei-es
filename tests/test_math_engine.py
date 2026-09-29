@@ -173,6 +173,30 @@ def test_governador_com_maioria_absoluta_garantida_1t():
     assert any(e["tipo"] == "ELEITO_MAJORITARIO" for e in ev)
 
 
+def test_governador_2_turno_definido():
+    """Governador segue a mesma regra do Presidente (CF art. 28 → 77).
+    Se o líder não pode fechar 1T e o 3º está eliminado do top-2,
+    o motor DEVE emitir SEGUNDO_TURNO_DEFINIDO — igual pra presidente.
+    Antes esse evento só saía pra cargo=1."""
+    from math_engine.engine import avaliar_apuracao
+    # A=400, B=350, C=50, restantes=50. A_max=450, validos_max=950.
+    # 450*2=900 < 950 → líder não pode fechar 1T.
+    # C+50=100 < 350 → 3º fora.
+    t = totais(100, 90, 1000, 950, 900)
+    cands = [
+        CandidatoResumo("A", 400),
+        CandidatoResumo("B", 350),
+        CandidatoResumo("C", 50),
+    ]
+    ev = avaliar_apuracao(cands, t, cod_cargo=3)   # Governador
+    tipos = [e["tipo"] for e in ev]
+    assert "SEGUNDO_TURNO_DEFINIDO" in tipos, \
+        f"Governador deveria emitir 2T definido, emitiu {tipos}"
+    # Verifica que A vs B foram nomeados
+    e2t = next(e for e in ev if e["tipo"] == "SEGUNDO_TURNO_DEFINIDO")
+    assert {e2t["sq_candidato_a"], e2t["sq_candidato_b"]} == {"A", "B"}
+
+
 def test_senador_1_vaga_maioria_simples():
     """Senador segue art. 46 CF — maioria simples. Não exige maioria
     absoluta. (Regra hipotética pra ano de renovação 1/3; em 2026 são

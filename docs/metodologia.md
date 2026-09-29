@@ -24,6 +24,8 @@ lider.votos × 2 > qt_votos_validos + restantes_max
 
 ## 2. Segundo turno matematicamente definido
 
+Aplicável a **Presidente** e **Governador** — os dois cargos que exigem maioria absoluta no 1º turno (art. 28 CF remete a art. 77).
+
 **Duas condições estritas simultâneas**:
 1. **Líder não pode mais fechar 1º turno**:
    ```
@@ -34,7 +36,9 @@ lider.votos × 2 > qt_votos_validos + restantes_max
    c.votos + restantes_max < b.votos
    ```
 
-**Bug histórico corrigido**: versão anterior do motor só verificava a condição 2. Isso gerava falso positivo — se o líder ainda tem folga pra fechar 1T, o 2º turno NÃO está definido. QA achou, teste `test_segundo_turno_nao_definido_lider_pode_vencer_1t` cobre.
+**Bugs históricos corrigidos**:
+- (v1) Motor só verificava a condição 2 → falso positivo se líder ainda podia fechar 1T. Teste `test_segundo_turno_nao_definido_lider_pode_vencer_1t`.
+- (v2) Motor só emitia SEGUNDO_TURNO_DEFINIDO pra Presidente, ignorando Governador. Agora Presidente e Governador compartilham a mesma máquina (art. 28 CF é explícito: "observado, quanto ao mais, o disposto no art. 77"). Teste `test_governador_2_turno_definido`.
 
 ## 3. Majoritário — 1 vaga
 

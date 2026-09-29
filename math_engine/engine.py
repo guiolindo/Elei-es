@@ -346,12 +346,21 @@ def avaliar_apuracao(
     ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
     eventos: list[dict] = []
 
-    if cod_cargo == 1:
+    exige_ma = CARGO_EXIGE_MAIORIA_ABSOLUTA.get(cod_cargo, False)
+    vagas = vagas_majoritario if vagas_majoritario is not None else \
+            VAGAS_MAJORITARIO_PADRAO.get(cod_cargo, 1)
+
+    if exige_ma and vagas == 1:
+        # Presidente OU Governador: mesma regra constitucional (art. 77 §2º
+        # + art. 28). Bifurca em eleito 1T (maioria absoluta) ou 2T definido.
+        # Os dois cargos usam as mesmas duas funções — a distinção anterior
+        # (Presidente separado, Governador no bloco genérico) era artificial.
         if eleito_1t_presidencial(ordenados, totais):
             eventos.append({
-                "tipo": "ELEITO_1T",
+                "tipo": "ELEITO_1T" if cod_cargo == 1 else "ELEITO_MAJORITARIO",
                 "sq_candidato_a": ordenados[0].sq_candidato,
-                "detalhes": {"votos": ordenados[0].votos},
+                "detalhes": {"votos": ordenados[0].votos, "cod_cargo": cod_cargo,
+                             "maioria_absoluta": True},
             })
         elif segundo_turno_definido(ordenados, totais):
             eventos.append({
@@ -361,41 +370,41 @@ def avaliar_apuracao(
                 "detalhes": {
                     "votos_a": ordenados[0].votos,
                     "votos_b": ordenados[1].votos,
+                    "cod_cargo": cod_cargo,
                 },
             })
+    elif vagas > 1:
+        # Senador em ano de renovação 2/3 (2026 = 2 vagas por UF).
+        # Maioria simples multi-vaga: top-N são eleitos quando o N-ésimo
+        # é inalcançável pelo (N+1)-ésimo.
+        eleitos = eleitos_majoritario_multivaga(ordenados, totais, vagas)
+        for pos, e in enumerate(eleitos, start=1):
+            eventos.append({
+                "tipo": "ELEITO_MAJORITARIO",
+                "sq_candidato_a": e.sq_candidato,
+                "detalhes": {"votos": e.votos, "cod_cargo": cod_cargo,
+                             "vagas": vagas, "posicao": pos},
+            })
     else:
-        vagas = vagas_majoritario if vagas_majoritario is not None else \
-                VAGAS_MAJORITARIO_PADRAO.get(cod_cargo, 1)
-        if vagas > 1:
-            eleitos = eleitos_majoritario_multivaga(ordenados, totais, vagas)
-            for pos, e in enumerate(eleitos, start=1):
-                eventos.append({
-                    "tipo": "ELEITO_MAJORITARIO",
-                    "sq_candidato_a": e.sq_candidato,
-                    "detalhes": {"votos": e.votos, "cod_cargo": cod_cargo,
-                                 "vagas": vagas, "posicao": pos},
-                })
-        else:
-            exige_ma = CARGO_EXIGE_MAIORIA_ABSOLUTA.get(cod_cargo, False)
-            if eleito_majoritario(ordenados, totais, exige_maioria_absoluta=exige_ma):
-                eventos.append({
-                    "tipo": "ELEITO_MAJORITARIO",
-                    "sq_candidato_a": ordenados[0].sq_candidato,
-                    "detalhes": {"votos": ordenados[0].votos, "cod_cargo": cod_cargo,
-                                 "maioria_absoluta": exige_ma},
-                })
+        # Maioria simples 1 vaga (Senador em ano de 1/3, etc)
+        if eleito_majoritario(ordenados, totais, exige_maioria_absoluta=False):
+            eventos.append({
+                "tipo": "ELEITO_MAJORITARIO",
+                "sq_candidato_a": ordenados[0].sq_candidato,
+                "detalhes": {"votos": ordenados[0].votos, "cod_cargo": cod_cargo,
+                             "maioria_absoluta": False},
+            })
 
-    # Reporta MATEMATICAMENTE_ELIMINADO só se ninguém foi eleito ainda.
-    # `pos_relevantes` = número de "cadeiras/vagas de continuidade":
-    #   - Presidente: top 2 (2 turno)
-    #   - Governador: top 1 (só ganha 1)
-    #   - Senador 2026: top 2 (elege 2 por UF)
+    # MATEMATICAMENTE_ELIMINADO — pos_relevantes é o tamanho do grupo
+    # de "vagas de continuidade":
+    #   - Presidente + Governador (2 turnos): top 2 continua
+    #   - Senador 2026 (2 vagas): top 2 são eleitos
+    #   - Senador 2018/2022 (1 vaga): só o líder
     if not eventos:
-        if cod_cargo == 1:
-            pos_relevantes = 2
+        if exige_ma and vagas == 1:
+            pos_relevantes = 2   # Presidente e Governador — top 2 vai pra 2T
         else:
-            pos_relevantes = vagas_majoritario if vagas_majoritario is not None else \
-                             VAGAS_MAJORITARIO_PADRAO.get(cod_cargo, 1)
+            pos_relevantes = vagas
         for c in ordenados[pos_relevantes:5]:
             if matematicamente_eliminado(c, ordenados, totais, pos_relevantes):
                 eventos.append({
