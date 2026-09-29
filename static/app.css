@@ -162,22 +162,35 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   box-shadow: 0 0 0 3px rgba(240,180,41,.15);
 }
 .btn-ghost {
-  background: var(--bg-2); color: var(--fg);
+  position: relative; overflow: hidden;      /* ripple */
+  background: var(--surface-2); color: var(--fg);
   border: 1px solid var(--line-2); border-radius: 10px;
   padding: 10px 14px; cursor: pointer; font-size: 14px;
-  transition: all .15s;
+  transition: background var(--dur-fast), border-color var(--dur-fast),
+              color var(--dur-fast), transform var(--dur-fast);
+  display: inline-flex; align-items: center; gap: 6px;
 }
-.btn-ghost:hover { background: var(--bg-3); border-color: var(--a); }
-.btn-ghost .ico { font-size: 16px; }
+.btn-ghost:hover {
+  background: var(--surface-3); border-color: var(--brand);
+  color: var(--brand); transform: translateY(-1px);
+}
+.btn-ghost:active { transform: translateY(0) scale(.97); }
+.btn-ghost .ico { display: inline-flex; align-items: center; }
 
 .btn-primary {
+  position: relative; overflow: hidden;
   background: var(--grad-a); color: #1a1300;
   border: none; border-radius: 10px;
   padding: 10px 20px; font-size: 14px; font-weight: 700;
-  cursor: pointer; transition: transform .15s, box-shadow .15s, opacity .15s;
+  cursor: pointer;
+  transition: transform var(--dur-fast), box-shadow var(--dur-fast), opacity var(--dur-fast);
   box-shadow: 0 4px 14px rgba(245,158,11,.4);
 }
-.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,.55); }
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(245,158,11,.55);
+}
+.btn-primary:active:not(:disabled) { transform: translateY(0) scale(.98); }
 .btn-primary:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
 
 /* ============ Stats: hero + secundárias em grid 2-col ============ */
@@ -277,41 +290,152 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   box-shadow: 0 0 0 3px rgba(240,180,41,.15);
 }
 
-/* ============ Cards de candidatos ============ */
+/* ============ Cards de candidatos (redesign v2) ============
+   Layout coeso em 3 blocos verticais:
+     1) topo:      foto | (nome + partido) | check da seleção
+     2) métricas:  votos, %/delta, barra
+     3) rodapé:    2 botões explícitos (comparar / ver ficha)
+   Zero position:absolute nos elementos principais — cada peça tem
+   seu espaço no fluxo. */
 .grid-candidatos {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 14px;
 }
 .candidato {
+  --card-glow: transparent;
   position: relative;
-  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 16px 16px 40px;                 /* espaço pro botão detalhes absoluto */
+  padding: 14px 16px;
   cursor: pointer;
-  transition: all .2s cubic-bezier(.4,0,.2,1);
-  display: flex; gap: 14px;
+  transition: transform var(--dur-fast) var(--ease-out-quart),
+              border-color var(--dur-fast),
+              box-shadow var(--dur-fast),
+              background var(--dur-fast);
+  display: flex; flex-direction: column; gap: 12px;
   overflow: hidden;
-  min-height: 118px;                        /* altura mínima consistente */
 }
 .candidato::before {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(240,180,41,.08), transparent 40%);
-  opacity: 0; transition: opacity .2s;
+  background: radial-gradient(circle at 30% 0%, var(--card-glow), transparent 60%);
+  opacity: 0; transition: opacity var(--dur-base);
   pointer-events: none;
 }
-.candidato:hover { transform: translateY(-2px); border-color: var(--line-2); box-shadow: var(--shadow); }
+.candidato:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-2);
+  box-shadow: var(--shadow);
+  --card-glow: rgba(240,180,41,.15);
+}
 .candidato:hover::before { opacity: 1; }
 .candidato.selecionado {
-  border-color: var(--a);
-  box-shadow: 0 0 0 2px rgba(240,180,41,.3), var(--shadow);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(240,180,41,.35), var(--shadow);
+  --card-glow: rgba(240,180,41,.22);
 }
-.candidato.selecionado::after {
-  content: "✓"; position: absolute; top: 10px; right: 10px;
-  width: 22px; height: 22px; border-radius: 50%; background: var(--a); color: #000;
-  display: grid; place-items: center; font-weight: 700; font-size: 12px;
+.candidato.selecionado::before { opacity: 1; }
+
+/* Bloco 1: topo — foto + info + check */
+.cand-topo { display: flex; gap: 12px; align-items: flex-start; }
+.cand-check-vazio {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid var(--line-2);
+  flex-shrink: 0;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
 }
+.candidato:hover .cand-check-vazio { border-color: var(--muted); }
+.candidato.selecionado .cand-check-vazio {
+  background: var(--brand); border-color: var(--brand);
+  position: relative;
+  animation: check-in var(--dur-base) var(--ease-out-back);
+}
+.candidato.selecionado .cand-check-vazio::after {
+  content: ""; position: absolute; inset: 0;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center/60% no-repeat;
+}
+@keyframes check-in {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.cand-foto {
+  width: 60px; height: 78px; object-fit: cover; border-radius: 8px;
+  background: var(--surface-3); flex-shrink: 0;
+  transition: transform var(--dur-fast);
+}
+.candidato:hover .cand-foto { transform: scale(1.03); }
+
+.cand-info { flex: 1; min-width: 0; }
+.cand-nome {
+  font-weight: 700; font-size: 16px; letter-spacing: -0.015em;
+  line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cand-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 6px;
+  line-height: 1;
+}
+.cand-numero-tag {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 20px; padding: 0 6px;
+  background: var(--surface-3); border: 1px solid var(--line-2);
+  border-radius: 4px; color: var(--fg);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700; font-size: 12px;
+}
+.cand-uf-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--muted); letter-spacing: 0.4px;
+}
+
+/* Bloco 2: métricas */
+.cand-metricas { display: flex; flex-direction: column; gap: 6px; }
+.cand-votos {
+  font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums; color: var(--fg);
+}
+.cand-linha-inf { display: flex; gap: 8px; align-items: baseline; min-height: 16px; }
+.cand-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--fg-2);
+  white-space: nowrap;
+}
+
+/* Bloco 3: rodapé (dois botões explícitos, sem posicionamento absoluto) */
+.cand-rodape {
+  display: flex; gap: 8px; justify-content: space-between;
+  padding-top: 10px; margin-top: 2px;
+  border-top: 1px solid rgba(255,255,255,.04);
+}
+.cand-acao {
+  flex: 1;
+  background: transparent; color: var(--fg-2);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 8px 12px; font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  transition: background var(--dur-fast), color var(--dur-fast),
+              border-color var(--dur-fast), transform var(--dur-fast);
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  position: relative; overflow: hidden;      /* pra ripple funcionar */
+}
+.cand-acao:hover {
+  background: rgba(255,255,255,.05);
+  color: var(--fg);
+  border-color: var(--muted);
+}
+.cand-acao:active { transform: scale(.97); }
+.cand-comparar { border-color: rgba(240,180,41,.35); color: var(--brand); }
+.cand-comparar:hover { background: rgba(240,180,41,.10); border-color: var(--brand); }
+.candidato.selecionado .cand-comparar {
+  background: rgba(240,180,41,.15); color: var(--brand); border-color: var(--brand);
+}
+.cand-ver:hover { background: rgba(124,92,255,.10); border-color: var(--accent); color: #cfc4ff; }
 .cand-foto {
   width: 78px; height: 100px; object-fit: cover; border-radius: 10px;
   background: var(--bg-3); flex-shrink: 0;
@@ -450,13 +574,7 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .prop-info > div { display: flex; flex-direction: column; }
 .prop-info .rot { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .prop-info .val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
-.cand-detalhes {
-  position: absolute; bottom: 10px; right: 12px;
-  background: rgba(255,255,255,.05); border: 1px solid var(--line-2);
-  padding: 4px 10px; border-radius: 999px; font-size: 11px; color: var(--fg-2);
-  cursor: pointer; transition: all .15s;
-}
-.cand-detalhes:hover { background: var(--a); color: #000; border-color: var(--a); }
+/* .cand-detalhes removido no redesign — substituído por .cand-acao no rodapé */
 
 /* ============ Comparação ============ */
 .comparacao {
@@ -868,6 +986,24 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Entrada da página: hero, filtros e primeiros elementos entram em
+   fade+slide ao carregar, com stagger sutil. Se prefers-reduced-motion,
+   entra estático (regra acima já zera duração). */
+.hero .brand { animation: page-in var(--dur-slow) var(--ease-out-quart) both; }
+.hero .filtros { animation: page-in var(--dur-slow) 100ms var(--ease-out-quart) both; }
+.hero .stats { animation: page-in var(--dur-slow) 180ms var(--ease-out-quart) both; }
+.m-top, .m-tab-titulo, .m-chips { animation: page-in 350ms var(--ease-out-quart) both; }
+.m-chips { animation-delay: 60ms; }
+.m-nav { animation: nav-up 450ms var(--ease-out-back) both; }
+@keyframes page-in {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes nav-up {
+  from { opacity: 0; transform: translate3d(0, 100%, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 /* Entrada em cascata (staggered) — usada em listas de cards.

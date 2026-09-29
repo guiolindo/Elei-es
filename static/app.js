@@ -62,20 +62,25 @@ const REDUCED_MOTION = window.matchMedia?.("(prefers-reduced-motion: reduce)").m
  * `class="ripple-container"` (position:relative + overflow:hidden).
  */
 function addRipple(el) {
+  if (!el || el.__hasRipple) return;
+  el.__hasRipple = true;
   el.classList.add("ripple-container");
+  // pointerdown cobre mouse, touch e pen (Material spec)
   el.addEventListener("pointerdown", (ev) => {
     if (REDUCED_MOTION) return;
+    // Se clicar em elemento filho interativo (não é o botão em si),
+    // ainda mostra o ripple no ponto do clique
     const r = el.getBoundingClientRect();
-    const size = Math.max(r.width, r.height);
-    const x = ev.clientX - r.left - size / 2;
-    const y = ev.clientY - r.top - size / 2;
+    const size = Math.max(r.width, r.height) * 1.2;
+    const x = (ev.clientX ?? r.left + r.width/2) - r.left - size / 2;
+    const y = (ev.clientY ?? r.top + r.height/2) - r.top - size / 2;
     const span = document.createElement("span");
     span.className = "ripple";
     span.style.width = span.style.height = size + "px";
     span.style.left = x + "px"; span.style.top = y + "px";
     el.appendChild(span);
-    setTimeout(() => span.remove(), 550);
-  }, { passive: true });
+    setTimeout(() => span.remove(), 560);
+  });
 }
 
 /**
@@ -370,12 +375,24 @@ function renderLista() {
       badgeProp = `<div class="badge-prop ${cls}" title="${prop.status}">${label}${fed}</div>`;
     }
     const pillPart = badgePartidoHtml(c.partido);
+    // Layout redesenhado: header (foto + nome/partido) → métricas
+    // (votos + %/delta + barra) → footer (botão "ver ficha" integrado).
+    // Zero position:absolute nos elementos principais.
     div.innerHTML = `
-      <img class="cand-foto" src="${c.foto}" alt="" loading="lazy" decoding="async">
-      <div class="cand-info">
-        <div class="cand-nome">${c.nome_urna}</div>
-        <div class="cand-meta">${c.numero} · ${pillPart}${c.uf ? " · " + c.uf : ""}</div>
-        ${badgeProp}
+      <div class="cand-topo">
+        <img class="cand-foto" src="${c.foto}" alt="" loading="lazy" decoding="async">
+        <div class="cand-info">
+          <div class="cand-nome">${c.nome_urna}</div>
+          <div class="cand-meta">
+            <span class="cand-numero-tag">${c.numero}</span>
+            ${pillPart}
+            ${c.uf ? `<span class="cand-uf-tag">${c.uf}</span>` : ""}
+          </div>
+          ${badgeProp}
+        </div>
+        <div class="cand-check-vazio" aria-hidden="true"></div>
+      </div>
+      <div class="cand-metricas">
         <div class="cand-votos" data-sq="${c.sq_candidato}">—</div>
         <div class="cand-linha-inf">
           <span class="cand-pct" data-sq-pct="${c.sq_candidato}"></span>
@@ -383,11 +400,21 @@ function renderLista() {
         </div>
         <div class="cand-barra"><div data-sq-barra="${c.sq_candidato}" style="width:0%"></div></div>
       </div>
-      <button class="cand-detalhes" data-detalhes="${c.sq_candidato}">detalhes</button>`;
+      <div class="cand-rodape">
+        <button class="cand-acao cand-comparar" data-comparar="${c.sq_candidato}" aria-label="Selecionar para comparar">
+          ${sel >= 0 ? '<svg width="14" height="14"><use href="#i-x"/></svg> remover' : '＋ comparar'}
+        </button>
+        <button class="cand-acao cand-ver" data-detalhes="${c.sq_candidato}" aria-label="Ver ficha completa">
+          ver ficha →
+        </button>
+      </div>`;
     anexarFotoComRetry(div.querySelector("img.cand-foto"), c.nome_urna, c.partido);
+    // Ação primária do card = ver ficha (mais discoverable).
+    // Botões explícitos no rodapé pra ambas ações — sem ambiguidade.
     div.addEventListener("click", (e) => {
-      if (e.target.closest("[data-detalhes]")) return;
-      toggleSelecionar(c.sq_candidato);
+      if (e.target.closest("[data-comparar]") || e.target.closest("[data-detalhes]"))
+        return;
+      abrirModal(c.sq_candidato);
     });
     el.appendChild(div);
   }
@@ -397,17 +424,31 @@ function renderLista() {
       abrirModal(b.dataset.detalhes);
     });
   });
-  // Motion: primeira renderização entra em cascata; re-renderizações
-  // usam FLIP pra suavizar mudanças de posição (subiu/desceu no rank).
+  el.querySelectorAll("[data-comparar]").forEach(b => {
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleSelecionar(b.dataset.comparar);
+    });
+  });
+  // Motion: cada renderização (primeira ou por troca de filtro) entra
+  // em cascata; se for atualização de mesmo conjunto (rank mudou), FLIP.
   const cards = el.querySelectorAll(".candidato");
-  if (primeiraVez) {
+  // Detecta se o conjunto de SQs mudou desde a última renderização —
+  // se sim, é uma nova lista e vale a cascata; senão, só FLIP.
+  const sqsNovos = Array.from(cards).map(c => c.dataset.sqCard).sort().join(",");
+  const sqsAntes = el.dataset.sqsRenderizados || "";
+  const conjuntoMudou = sqsNovos !== sqsAntes;
+  if (primeiraVez || conjuntoMudou) {
     anexarEntradaCascata(cards);
     el.dataset.jaRenderizou = "1";
+    el.dataset.sqsRenderizados = sqsNovos;
   } else {
     flip.commit();
   }
-  // Ripple nos botões "detalhes" (touch feedback)
-  el.querySelectorAll(".cand-detalhes").forEach(addRipple);
+  // Ripple em ambos os botões do rodapé (funciona em mouse + touch)
+  el.querySelectorAll(".cand-acao").forEach(addRipple);
+  // Card inteiro também tem ripple (ação primária = ver ficha)
+  cards.forEach(addRipple);
 }
 
 function toggleSelecionar(sq) {
@@ -1467,6 +1508,10 @@ async function boot() {
 
   // Ordem: 1) prefs salvas 2) URL da share (sobrescreve) 3) ajusta UF ↔ cargo
   carregarPrefs();
+  // Ripple em botões desktop também (não só mobile — QA reclamou de
+  // "não vi animação"). Aplica em botões que já existem no DOM inicial.
+  document.querySelectorAll(".btn-ghost, .btn-primary, .d-topnav-link").forEach(addRipple);
+
   aplicarEstadoDaURL();
   // Reflete no <select> antes do primeiro carregamento
   const selCargo = $("sel-cargo"); if (selCargo) selCargo.value = state.cargo;
