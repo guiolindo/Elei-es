@@ -4,6 +4,9 @@ import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos
 const PALETA = ["#f0b429", "#3b82f6", "#ec4899", "#10b981", "#a855f7", "#f97316"];
 const TZ = "America/Sao_Paulo";
 const MAX_SEL = 4;
+// Início oficial da apuração 2026: domingo, 5/10/2026 às 17h de Brasília
+const DIA_D = new Date("2026-10-05T17:00:00-03:00");
+const TITULO_BASE = "Apuração 2026 · Brasil";
 
 const state = {
   cargo: 1,
@@ -803,6 +806,10 @@ async function refreshApuracao() {
   }
   atualizarPainelTotais();
   atualizarPainelProporcional();
+  atualizarTituloAba(state.ultimoSnapshot);
+  // Countdown só aparece enquanto TSE não publica dados de verdade
+  if (!state.ultimoSnapshot?.disponivel) atualizarContagemRegressiva();
+  else { const c = $("countdown"); if (c) c.classList.add("oculto"); }
   if (state.selecionados.length >= 2 && !$("comparacao").classList.contains("oculto")) {
     atualizarComparacao();
   }
@@ -860,9 +867,16 @@ function conectarWS() {
       if (state.selecionados.length >= 2) await inicializarGraficos();
       for (const ev of msg.eventos || []) {
         const nome = state.ficha[ev.sq_candidato_a]?.nome_urna || ev.sq_candidato_a;
-        toast(ev.tipo === "ELEITO_1T" ? `🎉 ${nome} eleito(a) no 1º turno!`
-            : ev.tipo === "SEGUNDO_TURNO_DEFINIDO" ? `⚡ 2º turno matematicamente definido`
-            : `✓ ${nome} eleito(a)`);
+        const num = state.ficha[ev.sq_candidato_a]?.partido;
+        const cor = num ? corDoPartido(num) : "#f0b429";
+        if (ev.tipo === "ELEITO_1T" || ev.tipo === "ELEITO_MAJORITARIO") {
+          comemorar(nome, cor);
+          toast(`🎉 ${nome} eleito(a)!`, "ok");
+        } else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
+          toast(`⚡ 2º turno matematicamente definido`, "ok");
+        } else {
+          toast(`✓ ${nome} eleito(a)`, "ok");
+        }
       }
       await carregarEventos();
     }
@@ -879,6 +893,162 @@ async function onFiltroChange() {
   await carregarEventos();
   atualizarMapa();
   conectarWS();
+}
+
+// ============ UX: contagem regressiva pro dia D ============
+function atualizarContagemRegressiva() {
+  const el = $("countdown");
+  if (!el) return;
+  const diff = DIA_D.getTime() - Date.now();
+  if (diff <= 0) { el.classList.add("oculto"); return; }
+  const dias = Math.floor(diff / 86_400_000);
+  const horas = Math.floor((diff % 86_400_000) / 3_600_000);
+  const min = Math.floor((diff % 3_600_000) / 60_000);
+  const seg = Math.floor((diff % 60_000) / 1000);
+  el.classList.remove("oculto");
+  el.innerHTML = `
+    <div class="cd-titulo">A apuração começa em</div>
+    <div class="cd-grid">
+      <div><span class="cd-num">${String(dias).padStart(2,"0")}</span><span class="cd-lab">dias</span></div>
+      <div><span class="cd-num">${String(horas).padStart(2,"0")}</span><span class="cd-lab">h</span></div>
+      <div><span class="cd-num">${String(min).padStart(2,"0")}</span><span class="cd-lab">min</span></div>
+      <div><span class="cd-num">${String(seg).padStart(2,"0")}</span><span class="cd-lab">seg</span></div>
+    </div>
+    <div class="cd-sub">Domingo, 5 de outubro · 17h de Brasília</div>
+  `;
+}
+
+// ============ UX: título dinâmico da aba ============
+function atualizarTituloAba(dados) {
+  if (!dados?.candidatos?.length) { document.title = TITULO_BASE; return; }
+  const lider = dados.candidatos[0];
+  const nome = state.ficha[lider.sq_candidato]?.nome_urna || "Líder";
+  const pct = lider.pct_validos.toFixed(0);
+  const apurado = dados.totais.pct_apurado.toFixed(0);
+  document.title = `${nome} ${pct}% · ${apurado}% apurado · ${TITULO_BASE}`;
+}
+
+// ============ UX: confete + celebração ao eleger ============
+function comemorar(nome, cor = "#f0b429") {
+  // Confete simples via canvas (leve, sem dependência externa)
+  const canvas = document.createElement("canvas");
+  canvas.className = "confete";
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext("2d");
+  const cores = [cor, "#fff", "#f0b429", "#3b82f6", "#10b981", "#ec4899"];
+  const N = 180;
+  const parts = Array.from({length: N}, () => ({
+    x: Math.random() * canvas.width,
+    y: -20 - Math.random() * 200,
+    vx: (Math.random() - 0.5) * 6,
+    vy: 2 + Math.random() * 5,
+    rot: Math.random() * Math.PI,
+    vr: (Math.random() - 0.5) * 0.2,
+    cor: cores[Math.floor(Math.random() * cores.length)],
+    tam: 6 + Math.random() * 8,
+  }));
+  let inicio = performance.now();
+  function tick(t) {
+    if (t - inicio > 5000) { canvas.remove(); return; }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const p of parts) {
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.vy += 0.08;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.cor;
+      ctx.fillRect(-p.tam/2, -p.tam/2, p.tam, p.tam * 0.5);
+      ctx.restore();
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // Banner grande com o nome
+  const banner = document.createElement("div");
+  banner.className = "banner-eleito";
+  banner.innerHTML = `<div class="be-emoji">🎉</div><div class="be-nome">${nome}</div><div class="be-sub">Matematicamente eleito(a)</div>`;
+  document.body.appendChild(banner);
+  setTimeout(() => banner.classList.add("saindo"), 3500);
+  setTimeout(() => banner.remove(), 4200);
+
+  // Beep discreto (só se navegador permitir e usuário já interagiu)
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ac.createOscillator(); const g = ac.createGain();
+    osc.frequency.value = 660; g.gain.value = 0.05;
+    osc.connect(g); g.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 0.25);
+    setTimeout(() => { const o2 = ac.createOscillator(); o2.frequency.value = 880;
+      o2.connect(g); o2.start(); o2.stop(ac.currentTime + 0.25); }, 200);
+  } catch(e) {}
+}
+
+// ============ UX: compartilhar estado atual ============
+async function compartilhar() {
+  const params = new URLSearchParams({
+    cargo: state.cargo,
+    uf: state.abrangencia,
+    sqs: state.selecionados.join(","),
+  });
+  const url = `${location.origin}${location.pathname}?${params}`;
+  const dados = state.ultimoSnapshot;
+  const lider = dados?.candidatos?.[0];
+  const nome = lider ? (state.ficha[lider.sq_candidato]?.nome_urna || "líder") : null;
+  const texto = nome
+    ? `${nome} lidera com ${lider.pct_validos.toFixed(1)}% dos votos válidos · ${dados.totais.pct_apurado.toFixed(1)}% apurado`
+    : "Acompanhe a apuração 2026 ao vivo";
+  if (navigator.share) {
+    try { await navigator.share({ title: TITULO_BASE, text: texto, url }); return; }
+    catch(e) { /* usuário cancelou — cai no fallback */ }
+  }
+  try { await navigator.clipboard.writeText(url); toast("🔗 Link copiado", "ok"); }
+  catch(e) { prompt("Copie o link:", url); }
+}
+
+// ============ UX: aplicar estado vindo da URL ============
+function aplicarEstadoDaURL() {
+  const p = new URLSearchParams(location.search);
+  if (p.has("cargo")) state.cargo = +p.get("cargo") || 1;
+  if (p.has("uf")) state.abrangencia = p.get("uf");
+  if (p.has("sqs")) state.selecionados = p.get("sqs").split(",").filter(Boolean).slice(0, MAX_SEL);
+  const selCargo = $("sel-cargo"); if (selCargo) selCargo.value = state.cargo;
+}
+
+// ============ UX: modal de atalhos ============
+function abrirAjuda() {
+  const html = `
+    <div class="ajuda-card">
+      <h3>Atalhos</h3>
+      <table class="ajuda">
+        <tr><td><kbd>/</kbd></td><td>Focar busca</td></tr>
+        <tr><td><kbd>c</kbd></td><td>Comparar selecionados</td></tr>
+        <tr><td><kbd>n</kbd></td><td>Ativar notificações</td></tr>
+        <tr><td><kbd>s</kbd></td><td>Compartilhar</td></tr>
+        <tr><td><kbd>f</kbd></td><td>Modo TV (foco no líder)</td></tr>
+        <tr><td><kbd>?</kbd></td><td>Esta ajuda</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Fechar</td></tr>
+      </table>
+      <p class="ajuda-sub">Todos os cálculos usam desigualdades estritas — só chamamos eleição quando é matematicamente impossível reverter.</p>
+    </div>`;
+  const modal = $("modal-cand");
+  const card = $("modal-card");
+  if (!modal || !card) return;
+  card.innerHTML = html;
+  modal.classList.remove("oculto");
+}
+
+// ============ UX: modo TV (foco no líder) ============
+function toggleModoTV() {
+  document.body.classList.toggle("modo-tv");
+  const isTV = document.body.classList.contains("modo-tv");
+  if (isTV && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else if (!isTV && document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
 }
 
 async function pedirNotificacoes() {
@@ -903,7 +1073,18 @@ async function boot() {
     if (e.key === "/") { e.preventDefault(); $("busca-nome")?.focus(); }
     else if (e.key === "c" && state.selecionados.length >= 2) $("btn-comparar")?.click();
     else if (e.key === "n") $("btn-notif")?.click();
+    else if (e.key === "s") compartilhar();
+    else if (e.key === "f") toggleModoTV();
+    else if (e.key === "?") abrirAjuda();
   });
+
+  // Botões de compartilhar / ajuda (se existirem no HTML)
+  $("btn-compartilhar")?.addEventListener("click", compartilhar);
+  $("btn-ajuda")?.addEventListener("click", abrirAjuda);
+
+  // Countdown regressivo enquanto TSE não abre a apuração
+  setInterval(atualizarContagemRegressiva, 1000);
+  atualizarContagemRegressiva();
 
   // Atualiza "há X segundos" no elemento #ultimo a cada 5s
   setInterval(() => {
@@ -959,6 +1140,7 @@ async function boot() {
     }
   } catch (e) { /* ok */ }
 
+  aplicarEstadoDaURL();
   ajustarUFParaCargo();
   await carregarCandidatos();
   await refreshApuracao();

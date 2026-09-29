@@ -40,11 +40,19 @@
           <option value="BR">Brasil</option>
         </select>
       </div>
-      <button class="btn-ghost" id="btn-notif" title="Ativar notificações" aria-label="Ativar notificações do navegador">
+      <button class="btn-ghost" id="btn-notif" title="Ativar notificações (n)" aria-label="Ativar notificações do navegador">
         <span class="ico" aria-hidden="true">🔔</span>
+      </button>
+      <button class="btn-ghost" id="btn-compartilhar" title="Compartilhar (s)" aria-label="Compartilhar">
+        <span class="ico" aria-hidden="true">↗</span>
+      </button>
+      <button class="btn-ghost" id="btn-ajuda" title="Atalhos (?)" aria-label="Ajuda e atalhos">
+        <span class="ico" aria-hidden="true">?</span>
       </button>
     </div>
   </nav>
+
+  <div id="countdown" class="countdown oculto" aria-live="polite"></div>
 
   <section class="stats">
     <div class="stat" title="Percentual das seções eleitorais já totalizadas">
