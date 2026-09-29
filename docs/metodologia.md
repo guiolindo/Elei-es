@@ -144,14 +144,25 @@ Uma **federação** (Lei 14.208/2021 + EC 97/2017) é um conjunto de partidos qu
 - Competem por vagas em bloco.
 - Distribuem internamente pelos candidatos mais votados.
 
-**Default hardcoded pra 2026** (baseado nas federações de 2022, ajuste se mudar):
+**5 federações registradas no TSE pras Eleições 2026** (verificado 2026-09-29 contra Portal TSE):
+
 ```python
-{
-    "F_BRASIL_ESPERANCA": {13, 65, 43},  # PT + PCdoB + PV
-    "F_PSOL_REDE": {50, 18},              # PSOL + REDE
-    "F_PSDB_CIDADANIA": {45, 23},         # PSDB + Cidadania
+FEDERACOES_2026_DEFAULT = {
+    "F_BRASIL_ESPERANCA":    {13, 65, 43},  # PT + PCdoB + PV       (herdada de 2022)
+    "F_PSDB_CIDADANIA":      {45, 23},      # PSDB + Cidadania      (herdada de 2022)
+    "F_PSOL_REDE":           {50, 18},      # PSOL + REDE           (herdada de 2022)
+    "F_UNIAO_PROGRESSISTA":  {44, 11},      # UNIÃO + PP            (NOVA — mar/2026)
+    "F_RENOVACAO_SOLIDARIA": {77, 25},      # SOLIDARIEDADE + PRD   (NOVA — dez/2025)
 }
 ```
+
+A federação **União Progressista** (União Brasil + Progressistas) foi aprovada pelo TSE em 26/03/2026 e forma o maior bloco da Câmara com 109 deputados + 15 senadores no ato da criação. A **Renovação Solidária** foi aprovada em dez/2025 juntando Solidariedade e PRD.
+
+Fontes primárias:
+- [Portal TSE — Federações registradas](https://www.tse.jus.br/partidos/federacoes-registradas-no-tse)
+- [TSE — União Progressista](https://www.tse.jus.br/partidos/federacoes-registradas-no-tse/uniao-progressista)
+- [TSE — Renovação Solidária](https://www.tse.jus.br/partidos/federacoes-registradas-no-tse/renovacao-solidaria)
+- [Agência Brasil — TSE aprova União Progressista (mar/2026)](https://agenciabrasil.ebc.com.br/justica/noticia/2026-03/tse-aprova-registro-da-federacao-uniao-progressista)
 
 Pra rodar com federações diferentes, passar `federacoes=...` na chamada.
 

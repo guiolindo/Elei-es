@@ -95,10 +95,30 @@ class ResultadoProporcional:
     partidos: list[ResultadoPartido]
 
 
-# Federações 2026 (padrão histórico 2022 — pode ajustar via arg)
+# Federações partidárias registradas no TSE pra as Eleições 2026.
+# Verificadas contra fontes primárias (Portal TSE + Agência Brasil + CNN)
+# em 2026-09-29. Cinco federações constam do calendário:
+#   1. Brasil da Esperança:  PT (13) + PCdoB (65) + PV (43)
+#      (herdada de 2022, mantida)
+#   2. PSDB Cidadania:       PSDB (45) + Cidadania (23)
+#      (herdada de 2022, mantida)
+#   3. PSOL Rede:            PSOL (50) + REDE (18)
+#      (herdada de 2022, mantida)
+#   4. União Progressista:   União Brasil (44) + Progressistas/PP (11)
+#      (nova em 2026; TSE aprovou 26/03/2026 — maior bloco da Câmara)
+#   5. Renovação Solidária:  Solidariedade (77) + PRD (25)
+#      (nova em 2026; TSE aprovou em dez/2025)
+#
+# Fontes:
+# - https://www.tse.jus.br/partidos/federacoes-registradas-no-tse
+# - https://www.tse.jus.br/partidos/federacoes-registradas-no-tse/uniao-progressista
+# - https://www.tse.jus.br/partidos/federacoes-registradas-no-tse/renovacao-solidaria
 FEDERACOES_2026_DEFAULT = {
-    "F_BRASIL_ESPERANCA": {13, 65, 43},  # PT + PCdoB + PV
-    "F_PSOL_REDE": {50, 18},              # PSOL + REDE
+    "F_BRASIL_ESPERANCA":  {13, 65, 43},  # PT + PCdoB + PV
+    "F_PSDB_CIDADANIA":    {45, 23},       # PSDB + Cidadania
+    "F_PSOL_REDE":         {50, 18},       # PSOL + REDE
+    "F_UNIAO_PROGRESSISTA": {44, 11},      # União Brasil + Progressistas (2026)
+    "F_RENOVACAO_SOLIDARIA": {77, 25},     # Solidariedade + PRD (2026)
 }
 
 
