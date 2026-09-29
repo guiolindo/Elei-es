@@ -36,14 +36,28 @@ lider.votos × 2 > qt_votos_validos + restantes_max
 
 **Bug histórico corrigido**: versão anterior do motor só verificava a condição 2. Isso gerava falso positivo — se o líder ainda tem folga pra fechar 1T, o 2º turno NÃO está definido. QA achou, teste `test_segundo_turno_nao_definido_lider_pode_vencer_1t` cobre.
 
-## 3. Majoritário — 1 vaga (Governador)
+## 3. Majoritário — 1 vaga
 
-**Fórmula**:
-```
-b.votos + restantes_max < a.votos
-```
+Duas famílias de regra na Constituição:
 
-**Base legal**: Código Eleitoral (Lei 4.737/1965), regras aplicáveis a Governadores nas eleições gerais (arts. 79-83 da CF regulam elegibilidade; art. 28 CF define governador).
+### 3.1. Governador — maioria absoluta (CF art. 28 → art. 77 §2º)
+
+O Governador é regido pelo art. 28 CF, que remete ao art. 77 (regras da eleição presidencial): "maioria absoluta dos votos válidos" no 1º turno, senão vai a 2T.
+
+**Duas condições estritas simultâneas**:
+1. **Líder inalcançável** pelo 2º: `b.votos + restantes_max < a.votos`
+2. **Maioria absoluta matematicamente garantida**: `a.votos × 2 > votos_validos + restantes_max`
+   (mesmo que TODOS os restantes virem válidos, o líder mantém >50%)
+
+Se qualquer uma falha, NÃO é eleito no 1T — vai a 2º turno (ou continua em disputa).
+
+**Bug histórico**: versão anterior do motor só verificava condição 1. Cenário A=40%, B=20%, C=10%, restantes=5%: líder inalcançável mas sem maioria → deveria ir a 2T, mas motor declarava eleito. Coberto por `test_governador_precisa_maioria_absoluta_1t`.
+
+### 3.2. Senador maioria simples (CF art. 46)
+
+Senador NÃO precisa de maioria absoluta — os N mais votados vencem. Em ano de renovação 1/3 (2018, 2022), N=1. Em 2026 (renovação 2/3), N=2 — ver seção 4.
+
+**Fórmula** (1 vaga, quando aplicável): `b.votos + restantes_max < a.votos`
 
 ## 4. Majoritário — múltiplas vagas (Senador 2026)
 

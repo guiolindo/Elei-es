@@ -92,17 +92,53 @@ def segundo_turno_definido(candidatos: Sequence[CandidatoResumo], totais: Totais
     return (c.votos + restantes) < b.votos
 
 
-def eleito_majoritario(candidatos: Sequence[CandidatoResumo], totais: TotaisResumo) -> bool:
-    """Governador/Prefeito (majoritário simples de 1 vaga): eleito quando 1º
-    colocado é inalcançável pelo 2º, mesmo se todos os votos restantes forem
-    para ele.
+def eleito_majoritario(
+    candidatos: Sequence[CandidatoResumo],
+    totais: TotaisResumo,
+    exige_maioria_absoluta: bool = False,
+) -> bool:
+    """Cargo majoritário de 1 vaga (Governador, Prefeito >200k, ou Senador
+    em ano de 1/3).
+
+    Duas famílias de regra na CF:
+    - **Maioria simples** (Senador — art. 46 CF; Prefeito de município
+      ≤200k eleitores — art. 29): eleito quando 1º é inalcançável pelo 2º.
+    - **Maioria absoluta** (Governador — art. 28 CF remete ao art. 77 §2º;
+      Prefeito >200k): além de inalcançável, o líder precisa ter GARANTIA
+      matemática de terminar com > 50% dos votos válidos. Se pode ficar
+      com ≤ 50%, vai a 2º turno.
+
+    `exige_maioria_absoluta=True` habilita a segunda regra.
+
+    Bug histórico: versão anterior tratava governador igual a senador —
+    declarava eleito no 1T mesmo quando ele ainda podia terminar com <50%
+    e ir a 2T. Coberto por test_governador_precisa_maioria_absoluta_1t.
     """
     if len(candidatos) < 2:
         return len(candidatos) == 1 and votos_restantes_max(totais) == 0
     a = candidatos[0]
     b = candidatos[1]
     restantes = votos_restantes_max(totais)
-    return b.votos + restantes < a.votos
+    # Condição base — inalcançável pelo 2º (vale pra ambas as famílias)
+    if not (b.votos + restantes < a.votos):
+        return False
+    if exige_maioria_absoluta:
+        # Pior cenário do líder: mantém votos atuais mas TODOS os restantes
+        # viram válidos (denominador cresce, numerador não). Precisa que
+        # 2 × a.votos > validos_finais_max
+        total_validos_max = totais.qt_votos_validos + restantes
+        return a.votos * 2 > total_validos_max
+    return True
+
+
+# Cargos que exigem maioria absoluta no 1º turno (senão vai a 2T).
+# Ver CF art. 77 §2º (Presidente), art. 28 (Governador), art. 29 XII (Prefeito >200k).
+CARGO_EXIGE_MAIORIA_ABSOLUTA = {
+    1: True,   # Presidente
+    3: True,   # Governador
+    5: False,  # Senador — art. 46 CF, maioria simples
+    # 4: True,   # Prefeito >200k (não no escopo — este app é federal/estadual)
+}
 
 
 def eleitos_majoritario_multivaga(
@@ -340,11 +376,13 @@ def avaliar_apuracao(
                                  "vagas": vagas, "posicao": pos},
                 })
         else:
-            if eleito_majoritario(ordenados, totais):
+            exige_ma = CARGO_EXIGE_MAIORIA_ABSOLUTA.get(cod_cargo, False)
+            if eleito_majoritario(ordenados, totais, exige_maioria_absoluta=exige_ma):
                 eventos.append({
                     "tipo": "ELEITO_MAJORITARIO",
                     "sq_candidato_a": ordenados[0].sq_candidato,
-                    "detalhes": {"votos": ordenados[0].votos, "cod_cargo": cod_cargo},
+                    "detalhes": {"votos": ordenados[0].votos, "cod_cargo": cod_cargo,
+                                 "maioria_absoluta": exige_ma},
                 })
 
     # Reporta MATEMATICAMENTE_ELIMINADO só se ninguém foi eleito ainda.

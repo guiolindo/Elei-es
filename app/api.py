@@ -189,12 +189,19 @@ async def apuracao_atual(
             "votos_brancos": tot.qt_votos_brancos,
             "votos_nulos": tot.qt_votos_nulos,
         },
+        # Projeção linear simples do total final por candidato: extrapola
+        # os votos atuais pela % apurada. Não é preditivo (não pondera
+        # perfil regional das seções faltantes) — é aritmético. Explícito
+        # como "projecao_linear" pra deixar claro que é estimativa,
+        # não predição do vencedor.
         "candidatos": [
             {
                 "sq_candidato": c.sq_candidato,
                 "votos": c.votos,
                 "pct_validos": float(c.pct_validos),
                 "posicao": c.posicao,
+                "projecao_linear": int(c.votos / (tot.qt_secoes_totalizadas / tot.qt_secoes_total))
+                    if tot.qt_secoes_total and tot.qt_secoes_totalizadas else c.votos,
             }
             for c in cands
         ],

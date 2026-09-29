@@ -692,13 +692,56 @@ async function atualizarComparacao() {
 }
 
 // ============ gráficos ============
+// Formatador do tooltip: mostra data + horário BRT do snapshot com
+// as séries de cada candidato ao passar o mouse sobre a linha.
+function tooltipHoraBRT(params) {
+  if (!Array.isArray(params) || !params.length) return "";
+  // Todos os params têm o mesmo x (timestamp). Pega do primeiro.
+  const ts = params[0].axisValue ?? params[0].value?.[0];
+  const d = new Date(ts);
+  const hora = d.toLocaleString("pt-BR", {
+    timeZone: TZ, day: "2-digit", month: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  });
+  const linhas = [`<div style="color:#94a1b8;font-size:11px;margin-bottom:4px">${hora} BRT</div>`];
+  for (const p of params) {
+    const v = Array.isArray(p.value) ? p.value[1] : p.value;
+    const num = typeof v === "number" ? fmtNum(Math.round(v)) : v;
+    linhas.push(
+      `<div style="display:flex;justify-content:space-between;gap:12px">
+        <span>${p.marker} ${p.seriesName}</span>
+        <b style="font-variant-numeric:tabular-nums">${num}</b>
+      </div>`
+    );
+  }
+  return linhas.join("");
+}
+
 function baseOpts(title) {
   return {
     backgroundColor: "transparent",
-    tooltip: { trigger: "axis", backgroundColor: "#161b24", borderColor: "#303a4d", textStyle: { color: "#ecf0f7" } },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "#161b24",
+      borderColor: "#303a4d",
+      textStyle: { color: "#ecf0f7", fontSize: 12 },
+      formatter: tooltipHoraBRT,
+      axisPointer: { type: "cross", label: { backgroundColor: "#1e2531" } },
+    },
     legend: { textStyle: { color: "#b6c0d4" }, top: 0, right: 10, icon: "roundRect" },
     grid: { left: 60, right: 20, top: 30, bottom: 30 },
-    xAxis: { type: "time", axisLine: { lineStyle: { color: "#303a4d" } }, axisLabel: { color: "#7d8899" } },
+    xAxis: {
+      type: "time",
+      axisLine: { lineStyle: { color: "#303a4d" } },
+      axisLabel: {
+        color: "#7d8899",
+        // Rótulos do eixo X em BRT (HH:mm quando cabe, dd/mm HH:mm no zoom)
+        formatter: (val) => {
+          const d = new Date(val);
+          return d.toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+        },
+      },
+    },
     yAxis: { type: "value", axisLine: { lineStyle: { color: "#303a4d" } }, axisLabel: { color: "#7d8899" }, splitLine: { lineStyle: { color: "#1e2531" } } },
     textStyle: { fontFamily: "Inter" },
   };
@@ -823,7 +866,15 @@ async function atualizarPainelTotais() {
     const barra = document.querySelector(`[data-sq-barra="${c.sq_candidato}"]`);
     const delta = document.querySelector(`[data-sq-delta="${c.sq_candidato}"]`);
     if (votos) animarNumero(votos, c.votos, 400);
-    if (pct) pct.textContent = c.pct_validos.toFixed(2) + "% dos válidos";
+    if (pct) {
+      const proj = c.projecao_linear;
+      const pctApur = dados.totais?.pct_apurado || 0;
+      // Só mostra projeção depois de 30% apurado (antes é ruído)
+      const projTxt = (proj && pctApur >= 30)
+        ? ` · proj. ${fmtNum(proj)}`
+        : "";
+      pct.textContent = c.pct_validos.toFixed(2) + "% dos válidos" + projTxt;
+    }
     if (barra) barra.style.width = (c.votos / maxV * 100) + "%";
     if (delta) {
       const ant = antMap.get(c.sq_candidato);

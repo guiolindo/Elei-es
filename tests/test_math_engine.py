@@ -134,6 +134,59 @@ def test_eleito_majoritario_governador():
     assert eleito_majoritario(cands, t) is True
 
 
+def test_governador_precisa_maioria_absoluta_1t():
+    """Governador é regido pelo art. 28 + 77 §2º CF: precisa de maioria
+    absoluta dos válidos no 1T ou vai a 2º turno. Antes o motor tratava
+    governador igual a senador (só inalcançabilidade)."""
+    from math_engine.engine import eleito_majoritario, avaliar_apuracao
+    # A=40%, B=20%, C=10% dos válidos, restantes muito pequenos.
+    # A é inalcançável pelo 2º (900-20=880 vs 200+? → depende).
+    # Mas A não tem maioria absoluta e nem consegue → deve ir a 2T.
+    t = totais(100, 95, 1000, 950, 950)
+    cands = [
+        CandidatoResumo("A", 400),
+        CandidatoResumo("B", 200),
+        CandidatoResumo("C", 100),
+    ]
+    # Sem exigir MA: 200 + 50 = 250 < 400 → inalcançável → seria eleito
+    assert eleito_majoritario(cands, t, exige_maioria_absoluta=False) is True
+    # Exigindo MA: 400 * 2 = 800, validos_max = 950 + 50 = 1000 → 800 > 1000? NÃO
+    # Portanto não tem maioria absoluta garantida → não eleito
+    assert eleito_majoritario(cands, t, exige_maioria_absoluta=True) is False
+    # avaliar_apuracao com cargo=3 (governador) NÃO deve emitir ELEITO_MAJORITARIO
+    ev = avaliar_apuracao(cands, t, cod_cargo=3)
+    tipos = [e["tipo"] for e in ev]
+    assert "ELEITO_MAJORITARIO" not in tipos
+
+
+def test_governador_com_maioria_absoluta_garantida_1t():
+    """Se o líder do governador tem maioria absoluta MATEMATICAMENTE
+    garantida (2 × votos_lider > validos_max), aí sim ganha em 1T."""
+    from math_engine.engine import eleito_majoritario, avaliar_apuracao
+    t = totais(100, 90, 1000, 900, 900)
+    cands = [
+        CandidatoResumo("A", 600),   # 600 * 2 = 1200 > validos_max=1000
+        CandidatoResumo("B", 200),
+    ]
+    assert eleito_majoritario(cands, t, exige_maioria_absoluta=True) is True
+    ev = avaliar_apuracao(cands, t, cod_cargo=3)
+    assert any(e["tipo"] == "ELEITO_MAJORITARIO" for e in ev)
+
+
+def test_senador_1_vaga_maioria_simples():
+    """Senador segue art. 46 CF — maioria simples. Não exige maioria
+    absoluta. (Regra hipotética pra ano de renovação 1/3; em 2026 são
+    2 vagas e cai no eleitos_majoritario_multivaga)."""
+    from math_engine.engine import eleito_majoritario
+    t = totais(100, 95, 1000, 950, 950)
+    cands = [
+        CandidatoResumo("A", 400),
+        CandidatoResumo("B", 200),
+    ]
+    # Sem exigir MA (regra correta de senador): inalcançável → eleito
+    assert eleito_majoritario(cands, t, exige_maioria_absoluta=False) is True
+
+
 def test_eleito_majoritario_no_fio_nao_eleito():
     t = totais(100, 85, 1000, 850, 850)
     cands = [
