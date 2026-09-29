@@ -51,6 +51,84 @@ function carregarPrefs() {
   } catch(e) {}
 }
 
+// ============ Motion helpers (performance-safe) ============
+// Só usa transform/opacity, honra prefers-reduced-motion, aplica
+// will-change só durante o movimento.
+
+const REDUCED_MOTION = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Ripple visual no ponto de clique. Container precisa ter
+ * `class="ripple-container"` (position:relative + overflow:hidden).
+ */
+function addRipple(el) {
+  el.classList.add("ripple-container");
+  el.addEventListener("pointerdown", (ev) => {
+    if (REDUCED_MOTION) return;
+    const r = el.getBoundingClientRect();
+    const size = Math.max(r.width, r.height);
+    const x = ev.clientX - r.left - size / 2;
+    const y = ev.clientY - r.top - size / 2;
+    const span = document.createElement("span");
+    span.className = "ripple";
+    span.style.width = span.style.height = size + "px";
+    span.style.left = x + "px"; span.style.top = y + "px";
+    el.appendChild(span);
+    setTimeout(() => span.remove(), 550);
+  }, { passive: true });
+}
+
+/**
+ * Staggered entry: aplica classe .anim-in-up com delay incremental.
+ * IntersectionObserver evita animar quando o card não está visível.
+ */
+function anexarEntradaCascata(elementos, base = 30, max = 350) {
+  if (REDUCED_MOTION) return;
+  elementos.forEach((el, i) => {
+    el.style.animationDelay = Math.min(i * base, max) + "ms";
+    el.classList.add("anim-in-up");
+  });
+}
+
+/**
+ * FLIP animation pra reordenação da lista de candidatos.
+ * 1) Antes: mede posições atuais (positions Map).
+ * 2) DOM: JS reordena os elementos.
+ * 3) Depois: mede novas posições, calcula delta, aplica transform
+ *    inicial invertido, deixa CSS transition levar de volta a zero.
+ */
+function flipReorder(container, itemsSelector = ".candidato") {
+  if (REDUCED_MOTION) return { commit: () => {} };
+  const items = Array.from(container.querySelectorAll(itemsSelector));
+  const before = new Map();
+  items.forEach(el => {
+    const sq = el.dataset.sqCard;
+    if (sq) before.set(sq, el.getBoundingClientRect());
+  });
+  return {
+    commit() {
+      const novos = Array.from(container.querySelectorAll(itemsSelector));
+      novos.forEach(el => {
+        const sq = el.dataset.sqCard;
+        if (!sq || !before.has(sq)) return;
+        const antes = before.get(sq);
+        const agora = el.getBoundingClientRect();
+        const dx = antes.left - agora.left;
+        const dy = antes.top - agora.top;
+        if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+        el.classList.add("moving");
+        el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+        el.style.transition = "transform 0s";
+        // Force reflow, then unset — CSS transition assume
+        void el.offsetWidth;
+        el.style.transition = "";
+        el.style.transform = "";
+        setTimeout(() => { el.classList.remove("moving"); el.style.willChange = ""; }, 550);
+      });
+    }
+  };
+}
+
 // ============ helpers ============
 const fmt = new Intl.NumberFormat("pt-BR");
 const fmtNum = n => fmt.format(n ?? 0);
@@ -259,10 +337,15 @@ function renderLista() {
     </div>`;
     return;
   }
+  // FLIP: mede posições antes de re-renderizar pra animar reordenação
+  const flip = flipReorder(el);
+
+  const primeiraVez = !el.dataset.jaRenderizou;
   for (const c of filtrados) {
     const sel = state.selecionados.indexOf(c.sq_candidato);
     const div = document.createElement("div");
     div.className = "candidato" + (sel >= 0 ? " selecionado" : "");
+    div.dataset.sqCard = c.sq_candidato;
     div.style.setProperty("--sel-cor", sel >= 0 ? PALETA[sel] : "");
     if (sel >= 0) {
       div.style.borderColor = PALETA[sel];
@@ -314,6 +397,17 @@ function renderLista() {
       abrirModal(b.dataset.detalhes);
     });
   });
+  // Motion: primeira renderização entra em cascata; re-renderizações
+  // usam FLIP pra suavizar mudanças de posição (subiu/desceu no rank).
+  const cards = el.querySelectorAll(".candidato");
+  if (primeiraVez) {
+    anexarEntradaCascata(cards);
+    el.dataset.jaRenderizou = "1";
+  } else {
+    flip.commit();
+  }
+  // Ripple nos botões "detalhes" (touch feedback)
+  el.querySelectorAll(".cand-detalhes").forEach(addRipple);
 }
 
 function toggleSelecionar(sq) {
@@ -644,7 +738,12 @@ async function atualizarPainelTotais() {
   }
   const t = dados.totais;
   $("pct-apurado").textContent = t.pct_apurado.toFixed(2) + "%";
-  $("prog-apurado").style.width = t.pct_apurado + "%";
+  const prog = $("prog-apurado");
+  prog.style.width = t.pct_apurado + "%";
+  // Shimmer só enquanto a apuração está viva (entre 0 e 100%)
+  prog.classList.toggle("rodando", t.pct_apurado > 0 && t.pct_apurado < 100);
+  // Big number pulsa suavemente durante a apuração ao vivo
+  $("pct-apurado").classList.toggle("pulse-live", t.pct_apurado > 0 && t.pct_apurado < 100);
   animarNumero($("secoes"), t.secoes_totalizadas);
   $("secoes-sub").textContent = `de ${fmtNum(t.secoes_total)}`;
   animarNumero($("comparecimento"), t.comparecimento);
@@ -1189,6 +1288,9 @@ function atualizarFabMobile() {
 function bootMobile() {
   // Sync inicial dos chips
   sincronizarChipsMobile();
+  // Ripple nos elementos touch (bottom nav, FAB, chips, ícones do topo)
+  document.querySelectorAll(".m-nav-item, .m-fab, .m-chip, .m-icon-btn, .btn-ghost")
+    .forEach(addRipple);
 
   // Chip Cargo → bottom sheet
   $("m-chip-cargo")?.addEventListener("click", () => {

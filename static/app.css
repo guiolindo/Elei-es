@@ -841,6 +841,127 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .ajuda-sub { margin-top: 16px; font-size: 12px; color: var(--muted, #94a3b8);
   line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; }
 
+/* ============================================================
+   Sistema de animações (Motion tokens)
+   Guiado pelas descobertas da pesquisa 2026:
+   - Só transform/opacity (GPU compositor thread → 60fps garantido)
+   - will-change apenas no elemento animando, removido após
+   - Respeita prefers-reduced-motion (motion sensitivity/vestibular)
+   - Micro-interações intencionais, não decorativas
+   ============================================================ */
+:root {
+  --ease-out-back: cubic-bezier(.34, 1.56, .64, 1);   /* spring suave */
+  --ease-out-quart: cubic-bezier(.25, 1, .5, 1);      /* saída rápida */
+  --ease-in-out: cubic-bezier(.4, 0, .2, 1);          /* Material */
+  --dur-instant: 100ms;
+  --dur-fast: 180ms;
+  --dur-base: 280ms;
+  --dur-slow: 500ms;
+}
+
+/* Base honrada em todos os movimentos: usuário com preferência de
+   redução tem experiência estática */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Entrada em cascata (staggered) — usada em listas de cards.
+   Estado inicial via classe `.anim-in-up`, o JS aplica delay por índice. */
+.anim-in-up {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  animation: anim-in-up-kf var(--dur-base) var(--ease-out-quart) forwards;
+}
+@keyframes anim-in-up-kf {
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Fade + zoom sutil pra elementos que aparecem (modal, banner) */
+.anim-pop {
+  animation: anim-pop-kf var(--dur-base) var(--ease-out-back);
+}
+@keyframes anim-pop-kf {
+  from { opacity: 0; transform: scale(.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Ripple pra touch feedback (mobile). O JS insere um <span.ripple>
+   posicionado no ponto do clique. */
+.ripple-container { position: relative; overflow: hidden; }
+.ripple {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: rgba(255, 255, 255, 0.35);
+  transform: scale(0); opacity: 1;
+  animation: ripple-kf 520ms var(--ease-out-quart);
+  will-change: transform, opacity;
+}
+@keyframes ripple-kf {
+  to { transform: scale(2.4); opacity: 0; }
+}
+
+/* Shimmer no progresso da apuração — indica "vivo" quando avança */
+.stat-progress > div.rodando::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+  animation: shimmer-kf 2s linear infinite;
+  transform: translateX(-100%);
+}
+.stat-progress { position: relative; }
+.stat-progress > div { position: relative; overflow: hidden; }
+@keyframes shimmer-kf {
+  to { transform: translateX(100%); }
+}
+
+/* Pulso suave em elementos que representam "ao vivo" — número apurado */
+.stat-hero .stat-value.pulse-live {
+  animation: pulse-live-kf 3s ease-in-out infinite;
+}
+@keyframes pulse-live-kf {
+  0%, 100% { text-shadow: 0 0 20px rgba(240,180,41,.35); }
+  50%      { text-shadow: 0 0 30px rgba(240,180,41,.65); }
+}
+
+/* Ícones do bottom nav: escala + brilho da barra dourada */
+.m-nav-item.ativo::before {
+  animation: nav-indicator-kf var(--dur-base) var(--ease-out-back);
+  transform-origin: center;
+}
+@keyframes nav-indicator-kf {
+  from { transform: scaleX(0.2); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
+/* Delta arrow — quando votos mudam, seta sobe/desce */
+.cand-delta.up { animation: delta-up-kf 600ms var(--ease-out-back); }
+.cand-delta.down { animation: delta-down-kf 600ms var(--ease-out-back); }
+@keyframes delta-up-kf {
+  0%   { transform: translate3d(0, 6px, 0); opacity: 0; }
+  50%  { transform: translate3d(0, -3px, 0); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+@keyframes delta-down-kf {
+  0%   { transform: translate3d(0, -6px, 0); opacity: 0; }
+  50%  { transform: translate3d(0, 3px, 0); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+
+/* Cards de candidato: mudança de posição no ranking (FLIP animation
+   via JS, o CSS só provê a transição) */
+.candidato {
+  transition: transform var(--dur-slow) var(--ease-in-out),
+              border-color var(--dur-fast),
+              box-shadow var(--dur-fast);
+}
+.candidato.moving {
+  will-change: transform;   /* removido pelo JS após o movimento */
+}
+
 /* ============ Iconografia SVG unificada ============ */
 svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
 .rodape-linha svg, .m-icon-btn svg {
