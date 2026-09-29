@@ -161,6 +161,11 @@ async def apuracao_atual(
         "disponivel": True,
         "coletado_em": snap.coletado_em.isoformat(),
         "gerado_em_tse": snap.gerado_em_tse.isoformat() if snap.gerado_em_tse else None,
+        "snapshot_id": snap.id,
+        # Hash SHA-256 do JSON bruto do TSE — permite ao usuário verificar
+        # que o conteúdo mostrado bate com o publicado pelo TSE (não foi
+        # alterado no meio do caminho). Exibido em /verificacao.
+        "hash_conteudo": snap.hash_conteudo,
         "totais": {
             "secoes_total": tot.qt_secoes_total,
             "secoes_totalizadas": tot.qt_secoes_totalizadas,

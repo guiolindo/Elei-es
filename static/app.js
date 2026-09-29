@@ -832,18 +832,27 @@ function statusProporcionalDe(sq) {
 }
 
 function conectarWS() {
-  if (state.ws) state.ws.close();
+  if (state.ws) { try { state.ws.close(); } catch(e){} }
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${proto}//${location.host}/ws/apuracao?cargo=${state.cargo}&abrangencia=${state.abrangencia}`);
   ws.onopen = () => {
     $("conexao").querySelector(".dot").classList.add("on");
     $("conexao-label").textContent = "ao vivo";
+    state.wsRetry = 0;
+    // Puxa snapshot fresco assim que reconecta (evita "buraco" de eventos)
+    refreshApuracao().catch(() => {});
   };
-  ws.onclose = () => {
+  const reconectar = () => {
     $("conexao").querySelector(".dot").classList.remove("on");
     $("conexao-label").textContent = "reconectando…";
-    setTimeout(conectarWS, 3000);
+    // Backoff exponencial com jitter: 1s, 2s, 4s, 8s, 15s teto
+    state.wsRetry = (state.wsRetry || 0) + 1;
+    const base = Math.min(15000, 1000 * Math.pow(2, state.wsRetry - 1));
+    const jitter = Math.floor(Math.random() * 500);
+    setTimeout(conectarWS, base + jitter);
   };
+  ws.onclose = reconectar;
+  ws.onerror = () => { try { ws.close(); } catch(e){} };
   ws.onmessage = async (m) => {
     const msg = JSON.parse(m.data);
     if (msg.type === "snapshot") {

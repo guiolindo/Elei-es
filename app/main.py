@@ -114,6 +114,32 @@ def create_app() -> FastAPI:
     app.include_router(ws_router)
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
+    # Cache-Control em GETs de apuração: 3s no browser + 5s no CDN.
+    # Reduz picos de carga no dia D sem comprometer o "ao vivo" (WS
+    # continua pushando eventos em tempo real).
+    @app.middleware("http")
+    async def _cache_publico(request: Request, call_next):
+        resp = await call_next(request)
+        if request.method == "GET" and request.url.path.startswith("/api/apuracao"):
+            resp.headers.setdefault(
+                "Cache-Control", "public, max-age=3, s-maxage=5, stale-while-revalidate=15"
+            )
+        return resp
+
+    @app.get("/health")
+    async def health():
+        """Endpoint leve pra healthcheck do Railway/uptime monitors.
+        Checa conexão com o banco; retorna 503 se cair."""
+        from sqlalchemy import text
+        from app.db import SessionLocal
+        try:
+            async with SessionLocal() as sess:
+                await sess.execute(text("SELECT 1"))
+            return {"ok": True}
+        except Exception as e:
+            from starlette.responses import JSONResponse
+            return JSONResponse({"ok": False, "erro": str(e)[:200]}, status_code=503)
+
     @app.get("/")
     async def index():
         return FileResponse("static/index.html")
