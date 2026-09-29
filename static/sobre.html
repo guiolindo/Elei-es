@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Sobre o Apuração 2026: FAQ, termos de uso, política de privacidade e bases legais. Site não oficial de acompanhamento da apuração das eleições gerais brasileiras de 2026." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<title>Sobre · Apuração 2026</title>
+<link rel="stylesheet" href="/static/app.css" />
+<style>
+.pagina-legal { max-width: 820px; margin: 0 auto; padding: 32px 20px 80px; }
+.pagina-legal h1 { font-size: 32px; margin-bottom: 8px; }
+.pagina-legal h2 { font-size: 22px; margin-top: 40px; margin-bottom: 12px;
+  padding-top: 20px; border-top: 1px solid rgba(255,255,255,.08); }
+.pagina-legal h3 { font-size: 16px; margin-top: 24px; margin-bottom: 6px; color: var(--gold, #f0b429); }
+.pagina-legal p, .pagina-legal li { line-height: 1.65; font-size: 15px; }
+.pagina-legal ul, .pagina-legal ol { margin-left: 22px; margin-bottom: 12px; }
+.pagina-legal a { color: var(--gold, #f0b429); text-decoration: underline; }
+.pagina-legal .aviso { background: rgba(240,180,41,.1); border-left: 3px solid #f0b429;
+  padding: 14px 18px; border-radius: 6px; margin: 16px 0; font-size: 14px; }
+.pagina-legal .aviso.warn { background: rgba(239,68,68,.1); border-color: #ef4444; }
+.pagina-legal .toc { background: rgba(255,255,255,.04); border-radius: 10px;
+  padding: 16px 22px; margin: 20px 0 32px; font-size: 14px; }
+.pagina-legal .toc a { display: block; padding: 4px 0; }
+.pagina-legal small { color: var(--muted, #94a3b8); font-size: 13px; }
+.pagina-legal .voltar { display: inline-block; margin-bottom: 20px; padding: 8px 16px;
+  border-radius: 6px; background: rgba(255,255,255,.08); color: #fff; text-decoration: none; }
+.faq-item { margin-bottom: 20px; }
+.faq-item summary { cursor: pointer; font-weight: 600; padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06); }
+.faq-item summary:hover { color: var(--gold, #f0b429); }
+.faq-item[open] summary { color: var(--gold, #f0b429); }
+.faq-item p { padding: 12px 0; }
+</style>
+</head>
+<body>
+
+<header class="hero" style="min-height: auto; padding: 20px 24px;">
+  <nav class="nav">
+    <a href="/" class="brand" style="text-decoration: none; color: inherit;">
+      <div class="logo">🗳️</div>
+      <div>
+        <div class="brand-title">Apuração <span>2026</span></div>
+        <div class="brand-sub">Sobre, FAQ e termos</div>
+      </div>
+    </a>
+  </nav>
+</header>
+
+<main class="pagina-legal">
+  <a href="/" class="voltar">‹ Voltar à apuração</a>
+
+  <h1>Sobre este site</h1>
+  <p><strong>Apuração 2026</strong> é um painel independente que consome os dados públicos publicados pelo Tribunal Superior Eleitoral (TSE) durante a apuração das Eleições Gerais de 2026, aplica um motor matemático de decisão (com desigualdades estritas) e apresenta o resultado em tempo real.</p>
+
+  <div class="aviso warn"><strong>Este site não é o TSE.</strong> Não somos vinculados ao Tribunal Superior Eleitoral, à Justiça Eleitoral ou a qualquer partido político. A fonte oficial e única com fé pública é <a href="https://resultados.tse.jus.br" target="_blank" rel="noopener">resultados.tse.jus.br</a>.</div>
+
+  <nav class="toc">
+    <strong>Nesta página:</strong>
+    <a href="#faq">1. Perguntas Frequentes (FAQ)</a>
+    <a href="#fontes">2. Fontes dos dados</a>
+    <a href="#metodologia">3. Metodologia matemática</a>
+    <a href="#termos">4. Termos de Uso</a>
+    <a href="#privacidade">5. Política de Privacidade (LGPD)</a>
+    <a href="#legal">6. Bases legais e propriedade intelectual</a>
+    <a href="#responsabilidade">7. Limitação de responsabilidade</a>
+    <a href="#contato">8. Contato</a>
+  </nav>
+
+  <!-- ===================== FAQ ===================== -->
+  <h2 id="faq">1. Perguntas Frequentes</h2>
+
+  <details class="faq-item" open>
+    <summary>Este site é oficial?</summary>
+    <p>Não. O site apenas consome os dados que o TSE publica em endpoints públicos e os apresenta em uma interface diferente. A fonte oficial de resultados é o próprio TSE em <a href="https://resultados.tse.jus.br" target="_blank" rel="noopener">resultados.tse.jus.br</a>.</p>
+  </details>
+
+  <details class="faq-item">
+    <summary>Quando começa a apuração?</summary>
+    <p>As urnas fecham às 17h (horário de Brasília) de domingo, <strong>5 de outubro de 2026</strong>. A totalização começa imediatamente e os primeiros resultados costumam sair minutos depois. O contador regressivo no topo do site marca o horário exato.</p>
+  </details>
+
+  <details class="faq-item">
+    <summary>O que significa "matematicamente eleito"?</summary>
+    <p>Significa que, mesmo se todos os votos ainda não computados fossem para o adversário mais próximo, ele ainda assim não conseguiria alcançar o líder. Usamos desigualdades <em>estritas</em> — se houver qualquer possibilidade de empate ou reversão, o motor não chama a eleição.</p>
+  </details>
+
+  <details class="faq-item">
+    <summary>Como vocês calculam isso?</summary>
+    <p>Para <strong>Presidente (1º turno)</strong>: o líder é declarado eleito se <code>votos_líder × 2 &gt; votos_válidos_atuais + votos_restantes_máximos</code>, garantindo maioria absoluta dos válidos (art. 77 §2º da Constituição).<br>
+    Para <strong>Governador/Senador (majoritário)</strong>: eleito se <code>votos_2º + restantes &lt; votos_1º</code>.<br>
+    Para <strong>2º turno definido</strong>: se <code>votos_3º + restantes &lt; votos_2º</code>.<br>
+    Todos os cálculos são conservadores — chamamos tarde se houver dúvida.</p>
+  </details>
+
+  <details class="faq-item">
+    <summary>Por que o número ainda diverge do TSE em alguns segundos?</summary>
+    <p>Nosso poller consulta o TSE a cada 20 segundos. Se você atualizar o site logo depois do TSE publicar um novo snapshot, há uma latência de até 20s até nós termos os novos dados.</p>
+  </details>
+
+  <details class="faq-item">
+    <summary>Como sei que os dados aqui batem com o TSE?</summary>
+    <p>Cada snapshot que exibimos tem um <strong>hash SHA-256</strong> do JSON bruto do TSE (visível no comando <code>/status</code> do bot ou no endpoint <code>/api/apuracao/atual</code>). Qualquer pessoa pode baixar o mesmo JSON do TSE, calcular o hash e verificar que é idêntico ao nosso.</p>
+  </details>
+
+  <details class="faq-item">
+    <summary>Como funciona o bot do Telegram?</summary>
+    <p>Você abre o bot, escolhe o cargo (Presidente, Governador ou Senador de um estado), marca quais tipos de evento quer receber (eleito no 1º turno, virada, etc.), e o bot envia alertas quando o motor matemático detecta esses eventos. Também dá pra consultar o placar ao vivo por comando (<code>/placar</code>, <code>/lider</code>, <code>/vs</code>, <code>/mapa</code>).</p>
+  </details>
+
+  <details class="faq-item">
+    <summary>Vocês guardam meus dados?</summary>
+    <p>Nada além do estritamente necessário. Ver <a href="#privacidade">seção 5</a>: só o <code>chat_id</code> do Telegram (número que o próprio Telegram nos manda quando você usa o bot) e suas escolhas de assinatura. Sem e-mail, sem senha, sem cookies de rastreio, sem terceiros. Nem sabemos seu nome.</p>
+  </details>
+
+  <details class="faq-item">
+    <summary>Posso usar os dados/screenshots em minha reportagem?</summary>
+    <p>Sim. Os dados são públicos do TSE. Nós agradecemos a citação como "Apuração 2026 (site não oficial)" ou similar, mas não é obrigatório. Cite também o TSE como fonte primária.</p>
+  </details>
+
+  <details class="faq-item">
+    <summary>Posso reportar erro ou bug?</summary>
+    <p>Sim. Contato na <a href="#contato">seção 8</a>.</p>
+  </details>
+
+  <!-- ===================== FONTES ===================== -->
+  <h2 id="fontes">2. Fontes dos dados</h2>
+  <p>Todos os dados exibidos vêm de endpoints públicos do TSE:</p>
+  <ul>
+    <li><strong>Resultados por seção (apuração ao vivo)</strong>: <code>resultados.tse.jus.br</code> — JSONs publicados pelo próprio TSE conforme cada seção é totalizada.</li>
+    <li><strong>Ficha de candidatos (nome, número, partido, foto, situação, ocupação, escolaridade)</strong>: <code>divulgacandcontas.tse.jus.br</code> — sistema Divulgação de Candidaturas e Contas Eleitorais (DivulgaCandContas), que o TSE disponibiliza publicamente para consulta cidadã.</li>
+    <li><strong>Logos oficiais dos partidos políticos</strong>: coletadas do site do TSE e dos sites institucionais dos próprios partidos, usadas em contexto informativo e educacional para identificação nominativa (ver <a href="#legal">seção 6</a>).</li>
+  </ul>
+  <p>Não somos afiliados ao TSE, nem sob endosso, patrocínio ou controle do TSE ou de qualquer partido político. Toda a coleta é feita sob os mesmos termos que qualquer cidadão brasileiro tem acesso a esses dados.</p>
+
+  <!-- ===================== METODOLOGIA ===================== -->
+  <h2 id="metodologia">3. Metodologia matemática</h2>
+  <p>Nosso motor de decisão está no arquivo <code>math_engine/engine.py</code> do repositório e segue estas regras:</p>
+  <ul>
+    <li><strong>Limite superior de votos restantes</strong>: <code>eleitorado_apto_das_seções_não_totalizadas</code>. É conservador — na prática, ~20% desses eleitores se abstêm e ~10% dos válidos viram brancos/nulos. Isso significa que <em>chamamos a eleição um pouco depois do estritamente necessário</em>, para <em>nunca</em> chamar antes.</li>
+    <li><strong>Todas as comparações são estritas</strong>. Se der empate técnico exato no fio da navalha, não chamamos. O TSE decide com recontagem.</li>
+    <li><strong>Threshold mínimo</strong>: 20% das seções totalizadas. Antes disso o limite superior é grande demais para qualquer desigualdade fechar.</li>
+    <li><strong>Cálculo proporcional</strong> (Deputado Federal/Estadual): Quociente Eleitoral (art. 106 da Lei 4.737/65), distribuição por D'Hondt (art. 108), cláusula de barreira 10% do QE (art. 108 §2º), federações partidárias unificadas (Lei 14.208/2021).</li>
+    <li><strong>Snapshots suspeitos</strong> (com totalizadas retrocedendo, por reprocessamento do TSE) são marcados e <strong>não</strong> disparam eventos de "eleito" nem notificações.</li>
+    <li><strong>Auditoria</strong>: cada snapshot armazena o hash SHA-256 do JSON bruto do TSE. Se um dia alguém quiser verificar que exibimos exatamente o que o TSE publicou, basta comparar os hashes.</li>
+  </ul>
+
+  <!-- ===================== TERMOS ===================== -->
+  <h2 id="termos">4. Termos de Uso</h2>
+
+  <h3>4.1. Aceitação</h3>
+  <p>Ao usar este site ou o bot do Telegram, você concorda com os termos abaixo. Se não concordar, não use.</p>
+
+  <h3>4.2. Uso permitido</h3>
+  <p>Você pode acessar, consultar, compartilhar e citar as informações deste site livremente, para qualquer finalidade lícita — inclusive jornalística, educacional, política, acadêmica ou pessoal.</p>
+
+  <h3>4.3. Uso proibido</h3>
+  <ul>
+    <li>Fazer scraping automatizado agressivo do site (respeite o <code>Cache-Control</code> — 5 segundos). Para acesso em massa, baixe diretamente do TSE.</li>
+    <li>Tentar sobrecarregar, invadir, ou explorar vulnerabilidades da infraestrutura.</li>
+    <li>Usar os dados para propaganda eleitoral irregular, desinformação, ou qualquer prática vedada pela <strong>Lei 9.504/1997</strong> (Lei das Eleições) e resoluções do TSE.</li>
+    <li>Distorcer ou manipular capturas de tela para atribuir ao site informações que ele não produziu.</li>
+  </ul>
+
+  <h3>4.4. Disponibilidade</h3>
+  <p>Fornecemos o serviço "no estado em que se encontra". Não há garantia de disponibilidade 24/7, precisão instantânea, ou continuidade. Podemos suspender ou encerrar o serviço a qualquer momento, sem aviso prévio.</p>
+
+  <h3>4.5. Alterações</h3>
+  <p>Estes termos podem ser atualizados a qualquer momento. A versão vigente é sempre a exibida nesta página.</p>
+
+  <!-- ===================== PRIVACIDADE ===================== -->
+  <h2 id="privacidade">5. Política de Privacidade (LGPD)</h2>
+  <p>Em conformidade com a <strong>Lei Geral de Proteção de Dados (Lei 13.709/2018)</strong>:</p>
+
+  <h3>5.1. O que coletamos no site</h3>
+  <ul>
+    <li><strong>Nada de dados pessoais.</strong> O site é público, não exige login, não usa cookies de rastreio nem analytics de terceiros.</li>
+    <li>Logs técnicos padrão do provedor (Railway) — endereço IP, user-agent, horário — retidos por até 30 dias apenas para fins de segurança e diagnóstico.</li>
+    <li>Se você habilitar notificações Web Push no navegador, armazenamos <em>apenas</em> o endpoint anônimo gerado pelo seu navegador (não é seu IP, não identifica você).</li>
+  </ul>
+
+  <h3>5.2. O que coletamos no bot do Telegram</h3>
+  <ul>
+    <li>Seu <code>chat_id</code> (número gerado pelo Telegram — não é seu telefone, não é seu nome).</li>
+    <li>Suas escolhas de assinatura (cargo, UF, tipos de evento).</li>
+    <li>Sua configuração (pausa global, janela de silêncio).</li>
+  </ul>
+  <p>Não coletamos: nome, e-mail, telefone, endereço, título de eleitor, CPF, foto de perfil, mensagens privadas fora do bot.</p>
+
+  <h3>5.3. Base legal (LGPD art. 7º)</h3>
+  <p>O tratamento é feito com base no <strong>consentimento</strong> do titular (você inicia interação com o bot voluntariamente) e no <strong>legítimo interesse</strong> para executar o serviço solicitado (art. 7º, I e IX).</p>
+
+  <h3>5.4. Compartilhamento</h3>
+  <p>Não compartilhamos, vendemos, cedemos ou transferimos seus dados a terceiros. Nunca. Os dados ficam apenas em nossa base PostgreSQL hospedada na Railway.</p>
+
+  <h3>5.5. Seus direitos</h3>
+  <p>Nos termos do art. 18 da LGPD, você pode a qualquer momento:</p>
+  <ul>
+    <li><strong>Consultar</strong> seus dados: comando <code>/minhas</code> no bot.</li>
+    <li><strong>Deletar</strong> seus dados: comando <code>/apagar_tudo</code> no bot (remove todas as assinaturas). Para deletar também a configuração, basta apagar a conversa — o registro fica órfão e é limpo periodicamente.</li>
+    <li><strong>Portabilidade</strong>: solicite via contato (seção 8).</li>
+  </ul>
+
+  <h3>5.6. Cookies</h3>
+  <p>O site usa apenas <code>localStorage</code> do próprio navegador para lembrar preferências (filtros, candidatos favoritos). Nada é enviado a nenhum servidor. Não usamos cookies de terceiros, pixels, fingerprint, ou qualquer rastreio publicitário.</p>
+
+  <!-- ===================== LEGAL ===================== -->
+  <h2 id="legal">6. Bases legais e propriedade intelectual</h2>
+
+  <h3>6.1. Dados eleitorais</h3>
+  <p>Os dados de apuração, candidatos e partidos são <strong>dados públicos</strong> divulgados pelo TSE em cumprimento à <strong>Lei de Acesso à Informação (Lei 12.527/2011)</strong> e à <strong>Lei 9.504/1997</strong>. Sua consulta, reprodução e reuso são explicitamente permitidos ao cidadão brasileiro.</p>
+
+  <h3>6.2. Fotos e nomes de candidatos</h3>
+  <p>Candidatos a cargo eletivo são <strong>pessoas públicas em contexto de exposição voluntária</strong>. Suas fotos oficiais e nomes de urna são disponibilizados pelo próprio TSE para consulta cidadã na plataforma DivulgaCandContas, sob a mesma base legal acima. A LGPD (art. 4º, III) exclui do seu escopo o tratamento de dados para fins jornalísticos e de interesse público quando limitado ao necessário para a finalidade, o que enquadra o uso feito aqui.</p>
+
+  <h3>6.3. Logos e siglas de partidos políticos</h3>
+  <p>Os logos e siglas dos partidos são usados neste site em caráter <strong>estritamente nominativo e informativo</strong> — apenas para identificar visualmente o partido ao qual cada candidato está filiado, sem nenhum vínculo, endosso ou associação comercial. Este uso enquadra-se no princípio do <strong>uso justo nominativo</strong> e não configura infração ao art. 195 da <strong>Lei de Propriedade Industrial (Lei 9.279/1996)</strong>, tampouco à <strong>Lei 9.096/1995</strong> (Lei dos Partidos Políticos). As logomarcas permanecem propriedade de seus respectivos detentores.</p>
+
+  <h3>6.4. Marcos legais aplicáveis</h3>
+  <ul>
+    <li><strong>CF/1988</strong> — art. 5º XIV (acesso à informação), art. 77 (regra de eleição presidencial), art. 220 (liberdade de comunicação).</li>
+    <li><strong>Lei 9.504/1997</strong> — Lei das Eleições.</li>
+    <li><strong>Lei 4.737/1965</strong> — Código Eleitoral.</li>
+    <li><strong>Lei 12.527/2011</strong> — Lei de Acesso à Informação (LAI).</li>
+    <li><strong>Lei 13.709/2018</strong> — Lei Geral de Proteção de Dados (LGPD).</li>
+    <li><strong>Lei 12.965/2014</strong> — Marco Civil da Internet.</li>
+    <li><strong>Lei 9.279/1996</strong> — Lei de Propriedade Industrial (uso nominativo de marcas).</li>
+    <li><strong>Lei 9.096/1995</strong> — Lei dos Partidos Políticos.</li>
+    <li><strong>Lei 14.208/2021</strong> — Federações partidárias.</li>
+    <li>Resoluções do TSE aplicáveis à Eleição de 2026 (em especial as que regulam a Divulgação Oficial dos Resultados e a propaganda eleitoral).</li>
+  </ul>
+
+  <h3>6.5. Código-fonte</h3>
+  <p>O código-fonte deste projeto é software livre. Contribuições e revisões são bem-vindas. Você pode inspecionar todo o algoritmo do motor matemático no arquivo <code>math_engine/engine.py</code>.</p>
+
+  <!-- ===================== RESPONSABILIDADE ===================== -->
+  <h2 id="responsabilidade">7. Limitação de responsabilidade</h2>
+  <div class="aviso warn">
+    <strong>Este site é uma ferramenta de acompanhamento independente e informativo.</strong> As informações aqui exibidas são derivadas de dados públicos do TSE, mas <em>não têm fé pública</em> e <em>não substituem</em> o resultado oficial da Justiça Eleitoral. Nenhuma decisão eleitoral, jurídica ou administrativa deve ser tomada com base neste site — sempre consulte a fonte oficial.
+  </div>
+  <p>Em nenhuma hipótese os operadores deste site serão responsáveis por danos diretos, indiretos, morais, materiais, lucros cessantes ou qualquer outro prejuízo decorrente do uso ou impossibilidade de uso das informações aqui apresentadas. O uso é por conta e risco do usuário.</p>
+  <p>Divergências entre este site e o resultado oficial do TSE devem sempre ser resolvidas a favor do TSE.</p>
+
+  <!-- ===================== CONTATO ===================== -->
+  <h2 id="contato">8. Contato</h2>
+  <p>Para reportar erros, solicitar remoção de dados ou tirar dúvidas legais, entre em contato via GitHub Issues do repositório do projeto.</p>
+  <p><small>Última atualização: 29 de setembro de 2026.</small></p>
+</main>
+
+</body>
+</html>

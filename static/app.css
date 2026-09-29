@@ -753,6 +753,25 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .ajuda-sub { margin-top: 16px; font-size: 12px; color: var(--muted, #94a3b8);
   line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; }
 
+/* ============ Rodapé legal ============ */
+.rodape {
+  margin: 60px auto 20px;
+  padding: 24px 20px;
+  max-width: 1100px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted, #94a3b8);
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+.rodape-linha { margin-bottom: 12px; }
+.rodape-linha a { color: var(--gold, #f0b429); text-decoration: none; margin: 0 4px; }
+.rodape-linha a:hover { text-decoration: underline; }
+.rodape-aviso { max-width: 720px; margin: 0 auto 8px; line-height: 1.6; }
+.rodape-aviso code { background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.rodape-legal { max-width: 720px; margin: 0 auto; font-size: 11px; opacity: .7; line-height: 1.5; }
+.rodape-legal a { color: inherit; text-decoration: underline; }
+
 /* ============ UX: modo TV (foco no líder) ============ */
 body.modo-tv .filtro-lista,
 body.modo-tv .mapa-secao,

@@ -573,19 +573,45 @@ async def _tratar_callback(client, cb: dict) -> None:
     user_id = cb["from"]["id"]
     msg_id = cb["message"]["message_id"]
     data = cb.get("data", "")
-    await _api(client, "answerCallbackQuery", callback_query_id=cb["id"])
+    ack_id = cb["id"]
+    ack_done = {"v": False}
+    async def ack(text: str | None = None, alert: bool = False) -> None:
+        if ack_done["v"]:
+            return
+        ack_done["v"] = True
+        payload = {"callback_query_id": ack_id}
+        if text:
+            payload["text"] = text
+            payload["show_alert"] = alert
+        await _api(client, "answerCallbackQuery", **payload)
+
+    # Volta genérica: qualquer callback terminado em "back" volta pra
+    # escolha de cargo do mesmo fluxo. Ex.: plcuback → escolher cargo do placar.
+    if data.endswith("back"):
+        prefix = data[:-4].rstrip(":")
+        # sub → sub:cargo | plc → placar cargo | mp → mapa cargo
+        base_prefix = {"subu": "subc", "sub": "subc",
+                       "plcu": "plc", "plc": "plc",
+                       "mpu": "mp", "mp": "mp"}.get(prefix, prefix)
+        await ack()
+        await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
+                   text="Escolha o cargo:", reply_markup=_kb_escolher_cargo(base_prefix))
+        return
 
     if data == "menu:home":
+        await ack()
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
                    text="🗳 *Menu principal*", parse_mode="Markdown",
                    reply_markup=_kb_principal())
         return
     if data == "menu:placar":
+        await ack()
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
                    text="Placar de qual cargo?", reply_markup=_kb_escolher_cargo("plc"))
         return
     if data.startswith("plc:"):
         cargo = int(data.split(":")[1])
+        await ack()
         if cargo == 1:
             await cmd_placar(client, chat_id, ["1"])
         else:
@@ -595,19 +621,24 @@ async def _tratar_callback(client, cb: dict) -> None:
         return
     if data.startswith("plcu:"):
         _, cargo, uf = data.split(":")
+        await ack()
         await cmd_placar(client, chat_id, [cargo, uf])
         return
     if data == "menu:mapa":
+        await ack()
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
                    text="Mapa de qual cargo?", reply_markup=_kb_escolher_cargo("mp"))
         return
     if data.startswith("mp:"):
+        await ack()
         await cmd_mapa(client, chat_id, [data.split(":")[1]])
         return
     if data == "menu:minhas":
+        await ack()
         await _listar_assinaturas(client, chat_id, msg_id)
         return
     if data == "menu:config":
+        await ack()
         async with SessionLocal() as sess:
             cfg = await sess.get(TelegramChatConfig, chat_id)
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
@@ -616,10 +647,12 @@ async def _tratar_callback(client, cb: dict) -> None:
         return
     # ---- assinatura ----
     if data == "sub:cargo":
+        await ack()
         await _tratar_assinar_start(client, chat_id, msg_id)
         return
     if data.startswith("subc:"):
         cod = int(data.split(":")[1])
+        await ack()
         est = _ESTADOS.setdefault(chat_id, {"tipos": [], "cargo": None, "uf": None})
         est["cargo"] = cod
         if cod == 1:
@@ -633,11 +666,9 @@ async def _tratar_callback(client, cb: dict) -> None:
                        text=f"{CARGOS[cod]} — escolha o estado:",
                        reply_markup=_kb_escolher_uf("subu", cod))
         return
-    if data == "sububack":
-        await _tratar_assinar_start(client, chat_id, msg_id)
-        return
     if data.startswith("subu:"):
         _, cargo, uf = data.split(":")
+        await ack()
         est = _ESTADOS.setdefault(chat_id, {"tipos": [], "cargo": None, "uf": None})
         est["cargo"] = int(cargo); est["uf"] = uf
         est["tipos"] = ["ELEITO_MAJORITARIO", "VIRADA"]
@@ -647,6 +678,7 @@ async def _tratar_callback(client, cb: dict) -> None:
         return
     if data.startswith("tipo:"):
         t = data.split(":")[1]
+        await ack()
         est = _ESTADOS.setdefault(chat_id, {"tipos": [], "cargo": None, "uf": None})
         if t in est["tipos"]:
             est["tipos"].remove(t)
@@ -658,9 +690,9 @@ async def _tratar_callback(client, cb: dict) -> None:
     if data == "sub:salvar":
         est = _ESTADOS.get(chat_id) or {}
         if not est.get("cargo") or not est.get("uf") or not est.get("tipos"):
-            await _api(client, "answerCallbackQuery", callback_query_id=cb["id"],
-                       text="Falta escolher cargo/UF/evento", show_alert=True)
+            await ack("Falta escolher cargo/UF/evento", alert=True)
             return
+        await ack()
         async with SessionLocal() as sess:
             stmt = pg_insert(TelegramSubscription).values(
                 criado_em=datetime.now(timezone.utc),
@@ -679,6 +711,7 @@ async def _tratar_callback(client, cb: dict) -> None:
         return
     if data.startswith("rm:"):
         sub_id = int(data.split(":")[1])
+        await ack()
         async with SessionLocal() as sess:
             await sess.execute(
                 delete(TelegramSubscription).where(and_(
@@ -690,6 +723,7 @@ async def _tratar_callback(client, cb: dict) -> None:
         return
     # ---- config ----
     if data == "cfg:toggle_pausa":
+        await ack()
         async with SessionLocal() as sess:
             cfg = await sess.get(TelegramChatConfig, chat_id)
             if not cfg:
@@ -704,12 +738,14 @@ async def _tratar_callback(client, cb: dict) -> None:
                    reply_markup=_kb_config(cfg))
         return
     if data == "cfg:silencio":
+        await ack()
         await _send(client, chat_id,
             "Envie a janela de silêncio no formato *HH-HH* (BRT).\n"
             "Ex.: `/silencio 00-07` (não envia entre 00h e 07h)\n"
             "Ou: `/silencio off` pra desligar.")
         return
     if data == "cfg:apagar_tudo":
+        await ack()
         async with SessionLocal() as sess:
             await sess.execute(
                 delete(TelegramSubscription).where(TelegramSubscription.chat_id == chat_id)
@@ -776,6 +812,20 @@ async def _tratar_mensagem(client, msg: dict) -> None:
         await _send(client, chat_id,
             "🏛 *Apuração oficial do TSE:*\nhttps://resultados.tse.jus.br",
             keyboard={"inline_keyboard": [[{"text": "Abrir TSE", "url": "https://resultados.tse.jus.br"}]]})
+    elif cmd in ("/sobre", "/faq", "/termos", "/privacidade"):
+        pag = {"/faq": "faq", "/termos": "termos",
+               "/privacidade": "privacidade"}.get(cmd, "")
+        url = f"{SITE_URL}/sobre" + (f"#{pag}" if pag else "")
+        await _send(client, chat_id,
+            "📖 *Sobre este site*\n\n"
+            "Site independente, *não é o TSE*. Fonte oficial: "
+            "resultados.tse.jus.br.\n\n"
+            "Não coletamos dados pessoais além do necessário. "
+            "Ver FAQ, termos, privacidade e metodologia completa:",
+            keyboard={"inline_keyboard": [
+                [{"text": "📖 Ler página completa", "url": url}],
+                [{"text": "🏛 TSE oficial", "url": "https://resultados.tse.jus.br"}],
+            ]})
     elif cmd == "/assinar":        await _tratar_assinar_start(client, chat_id)
     elif cmd == "/minhas":         await _listar_assinaturas(client, chat_id)
     elif cmd in ("/pausar", "/retomar"):
@@ -832,10 +882,16 @@ async def _tratar_mensagem(client, msg: dict) -> None:
 
 async def _processar_update(client, upd: dict) -> None:
     if "callback_query" in upd:
+        cb = upd["callback_query"]
         try:
-            await _tratar_callback(client, upd["callback_query"])
+            await _tratar_callback(client, cb)
         except Exception:
             log.exception("callback falhou")
+        # Garante que o botão sempre pare de girar (se algum branch esqueceu)
+        try:
+            await _api(client, "answerCallbackQuery", callback_query_id=cb["id"])
+        except Exception:
+            pass
         return
     msg = upd.get("message")
     if msg:

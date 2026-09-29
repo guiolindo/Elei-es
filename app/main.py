@@ -153,6 +153,23 @@ def create_app() -> FastAPI:
     async def importar_page():
         return FileResponse("static/importar.html")
 
+    @app.get("/sobre")
+    async def sobre_page():
+        return FileResponse("static/sobre.html")
+
+    @app.get("/faq")
+    async def faq_page():
+        # /faq é apelido pra /sobre#faq
+        return FileResponse("static/sobre.html")
+
+    @app.get("/termos")
+    async def termos_page():
+        return FileResponse("static/sobre.html")
+
+    @app.get("/privacidade")
+    async def privacidade_page():
+        return FileResponse("static/sobre.html")
+
     return app
 
 
