@@ -21,10 +21,14 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://apuracao:apuracao@localhost:5432/apuracao"
     port: int = 8000
-    # Base do resultado oficial via Cloudflare Worker (que roda em SP e
-    # passa pelo Akamai do TSE como IP BR).
-    tse_cdn_base: str = "https://apuracao-2026.gui342386.workers.dev/oficial/ele2026"
-    tse_fotos_base: str = "https://apuracao-2026.gui342386.workers.dev/fotos"
+    # Endpoints oficiais do TSE.
+    # - resultados.tse.jus.br NÃO tem Akamai — Railway acessa direto (IP SP).
+    # - divulgacandcontas.tse.jus.br tem Akamai — coleta via Termux
+    #   (scripts/importar_termux.py) alimenta o banco via /api/admin/*.
+    # Não usar Cloudflare Worker: Free tier 100k req/dia é apertado
+    # e Akamai bloqueia workers Cloudflare mesmo.
+    tse_cdn_base: str = "https://resultados.tse.jus.br/oficial/ele2026"
+    tse_fotos_base: str = "https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img"
     eleicao_ano: int = 2026
     # Código da eleição no divulgacandcontas (candidatos, fotos) — visto na URL
     # do site do TSE em 28/09/2026
@@ -35,7 +39,7 @@ class Settings(BaseSettings):
     poll_interval_seconds: int = 20
     # Base do endpoint de listagem de candidatos (divulga do TSE).
     # Formato: {base}/{ano}/{uf}/{cod_eleicao}/{cargo}/candidatos
-    tse_divulga_base: str = "https://apuracao-2026.gui342386.workers.dev/divulga/rest/v1/candidatura/listar"
+    tse_divulga_base: str = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidatura/listar"
     # Proxy para acessar TSE (o TSE bloqueia IPs fora do Brasil via Akamai).
     # Formato: http://usuario:senha@host:porta ou http://host:porta.
     # Se vazio, tenta acessar direto (funciona só se o app estiver hospedado no BR).
