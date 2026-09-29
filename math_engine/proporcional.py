@@ -19,11 +19,15 @@ Regras vigentes em 2026 (Código Eleitoral + Lei 14.211/2021 + jurisprudência S
      - Candidatos com votos ≥ 20% do QE.
    Distribuição por maiores médias (D'Hondt): média = votos / (vagas+1).
 
-5. **Sobras — Fase 2 (Residual)** (STF ADI 7228/7263, 2024):
+5. **Sobras — Fase 2 (Residual)** (art. 109, III CE + STF ADI 7228/7263, 2024):
    Se sobrarem vagas após a Fase 1 (nenhum partido preenche 80/20), a
-   distribuição continua por maiores médias entre TODOS os partidos com
-   candidatos disponíveis, ignorando o corte de 80%. Sem essa fase, vagas
-   podem ficar sem preenchimento — o STF derrubou essa possibilidade.
+   distribuição continua por maiores médias (D'Hondt) entre TODOS os
+   partidos com candidatos disponíveis, sem exigir 80% da unidade e
+   sem exigir mínimo do candidato (STF dispensou expressamente ambas
+   barreiras nessa fase residual). Isso pode fazer com que um candidato
+   com menos de 10% do QE se eleja, o que é intencional segundo a
+   decisão — o próprio Alexandre de Moraes apontou que a regra anterior
+   deixava vagas com bons candidatos vazias.
 
 6. **Federações partidárias** (art. 11-A LO Partidos, red. Lei 14.208/2021):
    Federação de 2+ partidos age como um só partido pra todos os efeitos
@@ -180,72 +184,96 @@ def calcular_eleitos_proporcional(
         vagas_efetivas_por_unidade[u] = min(vagas_teoricas, passam_barreira)
 
     vagas_usadas = sum(vagas_efetivas_por_unidade.values())
-    vagas_sobras_por_unidade: dict[str, int] = {u: 0 for u in vagas_por_unidade}
+    # Rastreamos SEPARADAMENTE as vagas ganhas em cada fase das sobras.
+    # A Fase 2 (80/20) exige barreira do candidato de 20% QE.
+    # A Fase 3 (residual, STF) NÃO exige barreira do candidato.
+    vagas_sobra_8020_por_unidade: dict[str, int] = {u: 0 for u in vagas_por_unidade}
+    vagas_sobra_residual_por_unidade: dict[str, int] = {u: 0 for u in vagas_por_unidade}
 
     # 4) Sobras — Lei 14.211/2021 + STF ADI 7228/7263 (2024).
     vagas_restantes = vagas - vagas_usadas
 
+    def total_sobras(u: str) -> int:
+        return vagas_sobra_8020_por_unidade[u] + vagas_sobra_residual_por_unidade[u]
+
     def media_dhondt(u: str) -> float:
-        total_atual = vagas_efetivas_por_unidade[u] + vagas_sobras_por_unidade[u]
+        total_atual = vagas_efetivas_por_unidade[u] + total_sobras(u)
         return votos_por_unidade[u] / (total_atual + 1)
 
-    # ---- Fase 1: Regra 80/20 ----
-    # Só concorrem partidos/federações com votos ≥ 80% do QE, cujos
-    # candidatos disponíveis tenham ≥ 20% do QE.
+    # ---- Fase 2 das sobras: Regra 80/20 (Lei 14.211/2021, art. 109 II) ----
+    # Só concorrem partidos/federações com ≥ 80% do QE, cujos candidatos
+    # ainda disponíveis tenham ≥ 20% do QE.
     while vagas_restantes > 0:
         elegiveis: list[str] = []
         for u, v_total in votos_por_unidade.items():
             if v_total < corte_80_qe:
-                continue  # unidade não atingiu 80% do QE
-            total_ja = vagas_efetivas_por_unidade[u] + vagas_sobras_por_unidade[u]
+                continue
+            total_ja = vagas_efetivas_por_unidade[u] + total_sobras(u)
             candidatos_u = cands_por_unidade.get(u, [])
-            # Precisa ter candidato ainda disponível E que passe da barreira 20% QE
             passam_20 = sum(1 for c in candidatos_u if c.votos >= barreira_sobra_cand)
             if passam_20 > total_ja:
                 elegiveis.append(u)
         if not elegiveis:
-            break  # ninguém preenche Fase 1 → cai pra Fase 2
+            break
         vencedor = max(elegiveis, key=media_dhondt)
-        vagas_sobras_por_unidade[vencedor] += 1
+        vagas_sobra_8020_por_unidade[vencedor] += 1
         vagas_restantes -= 1
 
-    # ---- Fase 2: Residual (STF ADI 7228/7263, 2024) ----
-    # Se ainda sobram vagas, distribuir por maiores médias entre todos os
-    # partidos com candidatos disponíveis, ignorando o corte de 80% e
-    # aplicando só a barreira original de 10% do QE.
+    # ---- Fase 3 das sobras: Residual (art. 109 III + STF ADI 7228/7263) ----
+    # Todos os partidos participam, sem 80% da unidade e SEM barreira do
+    # candidato. Um candidato com <10% do QE pode se eleger aqui — é
+    # intencional segundo a decisão do STF.
     while vagas_restantes > 0:
         elegiveis = []
         for u in votos_por_unidade:
-            total_ja = vagas_efetivas_por_unidade[u] + vagas_sobras_por_unidade[u]
+            total_ja = vagas_efetivas_por_unidade[u] + total_sobras(u)
             candidatos_u = cands_por_unidade.get(u, [])
-            passam_barreira = sum(1 for c in candidatos_u if c.votos >= barreira_qp)
-            if passam_barreira > total_ja:
+            if len(candidatos_u) > total_ja:
                 elegiveis.append(u)
         if not elegiveis:
-            break  # não há mais candidatos válidos
+            break
         vencedor = max(elegiveis, key=media_dhondt)
-        vagas_sobras_por_unidade[vencedor] += 1
+        vagas_sobra_residual_por_unidade[vencedor] += 1
         vagas_restantes -= 1
 
-    # 5) Monta o resultado — determina status de cada candidato
+    # Alias legado (soma das duas fases das sobras)
+    vagas_sobras_por_unidade = {u: total_sobras(u) for u in vagas_por_unidade}
+
+    # 5) Preenche as vagas de cada unidade em duas passadas:
+    #    - Vagas com barreira (QP + Fase 2 das sobras 80/20): só candidatos
+    #      que passam 10% do QE, em ordem de votação.
+    #    - Vagas residuais (Fase 3 STF): próximos mais votados sem exigência.
     resultado_cands: list[ResultadoCandidato] = []
     for u, candidatos_u in cands_por_unidade.items():
-        total_vagas_u = vagas_efetivas_por_unidade[u] + vagas_sobras_por_unidade[u]
-        eleitos_indices = set()
-        # Pega os N mais votados que passam da barreira
+        vagas_com_barreira = vagas_efetivas_por_unidade[u] + vagas_sobra_8020_por_unidade[u]
+        vagas_residuais = vagas_sobra_residual_por_unidade[u]
+        eleitos_indices: set[int] = set()
+
+        # Passada 1: preenche vagas com barreira (>= 10% QE) por candidatos
+        # que atendem, em ordem de votação
         eleitos_count = 0
         for i, c in enumerate(candidatos_u):
-            if eleitos_count >= total_vagas_u:
+            if eleitos_count >= vagas_com_barreira:
                 break
-            if c.votos >= barreira:
+            if c.votos >= barreira_qp:
                 eleitos_indices.add(i)
                 eleitos_count += 1
+
+        # Passada 2: preenche vagas residuais pelos próximos candidatos
+        # mais votados que ainda não foram eleitos (STF: sem barreira)
+        for i, c in enumerate(candidatos_u):
+            if vagas_residuais <= 0:
+                break
+            if i not in eleitos_indices:
+                eleitos_indices.add(i)
+                vagas_residuais -= 1
+
         for i, c in enumerate(candidatos_u):
             if i in eleitos_indices:
                 status = "eleito"
-            elif c.votos < barreira:
+            elif c.votos < barreira_qp:
                 status = "nao_atingiu_barreira"
-            elif vagas_por_unidade[u] == 0:
+            elif vagas_por_unidade[u] == 0 and vagas_sobras_por_unidade[u] == 0:
                 status = "partido_sem_vaga"
             else:
                 status = "suplente"
