@@ -659,6 +659,49 @@ async def atualizar_detalhe(
     return {"ok": True, "sq": sq}
 
 
+@router.post("/admin/reparsear-snapshots", dependencies=[Depends(_exigir_admin)])
+async def reparsear_snapshots(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Re-parseia snapshots existentes usando o parser atual e atualiza
+    snapshot_totais + snapshot_candidato.
+
+    Necessário quando um bug do parser gravou totais/votos errados —
+    o JSON bruto do TSE está salvo em `snapshots.raw`, então dá pra
+    reconstruir sem re-baixar do TSE.
+
+    Exemplo: parser antigo lia `s` como escalar (era dict) → todos os
+    totais viravam 0. Fix rodou, mas os snapshots já persistidos
+    continuavam com zeros. Este endpoint re-executa parse_snapshot
+    sobre raw e atualiza os campos calculados.
+    """
+    from poller.parser import parse_snapshot
+    r = await sess.execute(select(Snapshot))
+    snaps = r.scalars().all()
+    atualizados = 0
+    for snap in snaps:
+        try:
+            parsed = parse_snapshot(snap.raw or {})
+        except Exception:
+            continue
+        # Atualiza snapshot_totais
+        tot = (await sess.execute(
+            select(SnapshotTotais).where(SnapshotTotais.snapshot_id == snap.id)
+        )).scalar_one_or_none()
+        if tot:
+            tot.qt_secoes_total = parsed.totais.qt_secoes_total
+            tot.qt_secoes_totalizadas = parsed.totais.qt_secoes_totalizadas
+            tot.qt_eleitorado_apto = parsed.totais.qt_eleitorado_apto
+            tot.qt_eleitorado_apto_totalizadas = parsed.totais.qt_eleitorado_apto_totalizadas
+            tot.qt_comparecimento = parsed.totais.qt_comparecimento
+            tot.qt_abstencoes = parsed.totais.qt_abstencoes
+            tot.qt_votos_validos = parsed.totais.qt_votos_validos
+            tot.qt_votos_brancos = parsed.totais.qt_votos_brancos
+            tot.qt_votos_nulos = parsed.totais.qt_votos_nulos
+            atualizados += 1
+    await sess.commit()
+    return {"ok": True, "snapshots_reparsed": atualizados,
+            "total_snapshots": len(snaps)}
+
+
 @router.post("/admin/corrigir-partidos", dependencies=[Depends(_exigir_admin)])
 async def corrigir_partidos(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Repara candidatos cujo partido_numero foi derivado errado (bug
