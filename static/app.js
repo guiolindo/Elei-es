@@ -1191,11 +1191,29 @@ function atualizarContagemRegressiva() {
 
 // ============ UX: título dinâmico da aba ============
 function atualizarTituloAba(dados) {
-  if (!dados?.candidatos?.length) { document.title = TITULO_BASE; return; }
-  const lider = dados.candidatos[0];
+  // Título só mostra nome do líder quando a apuração está de fato em
+  // andamento (>0% apurado E líder com >0 votos). Antes o check era
+  // só "tem candidatos na lista" — mas o snapshot pré-apuração já tem
+  // candidatos com 0 votos, então a aba mostrava algo tipo
+  // "FULANO 0% · 0% apurado" com o primeiro nome da lista (que era o
+  // primeiro por ordem de numero/nome, não por votos). Bug reportado
+  // pelo usuário: todos os cargos exceto presidente mostravam nome
+  // de político no título mesmo sem apuração.
+  const t = dados?.totais;
+  const cands = dados?.candidatos;
+  if (!dados?.disponivel || !cands?.length ||
+      !t?.pct_apurado || t.pct_apurado <= 0) {
+    document.title = TITULO_BASE;
+    return;
+  }
+  const lider = cands[0];
+  if (!lider?.votos || lider.votos <= 0) {
+    document.title = TITULO_BASE;
+    return;
+  }
   const nome = state.ficha[lider.sq_candidato]?.nome_urna || "Líder";
   const pct = lider.pct_validos.toFixed(0);
-  const apurado = dados.totais.pct_apurado.toFixed(0);
+  const apurado = t.pct_apurado.toFixed(0);
   document.title = `${nome} ${pct}% · ${apurado}% apurado · ${TITULO_BASE}`;
 }
 
