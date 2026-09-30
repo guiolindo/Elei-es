@@ -826,12 +826,28 @@ async function inicializarGraficos() {
 async function atualizarPainelTotais() {
   const dados = state.ultimoSnapshot;
   if (!dados?.disponivel) {
-    $("pct-apurado").textContent = "0%";
-    $("secoes").textContent = "0 / 0";
-    $("comparecimento").textContent = "0";
-    $("brancos-nulos").textContent = "0 / 0";
+    // Limpa TODOS os campos — bug antigo só limpava metade e os subs
+    // (secoes-sub, pct-comparecimento, etc.) ficavam com dados do
+    // cargo anterior ("de 52.000 seções" mesmo depois de trocar
+    // pra um cargo sem dados).
+    $("pct-apurado").textContent = "—";
+    $("pct-apurado").classList.remove("pulse-live");
+    const prog = $("prog-apurado");
+    prog.style.width = "0%";
+    prog.classList.remove("rodando");
+    $("secoes").textContent = "—";
+    // Zera o dataset.valor pro animarNumero começar do 0 quando voltar
+    $("secoes").dataset.valor = "0";
+    $("secoes-sub").textContent = "aguardando dados do TSE";
+    $("comparecimento").textContent = "—";
+    $("comparecimento").dataset.valor = "0";
+    $("pct-comparecimento").textContent = "";
+    $("abstencoes").textContent = "—";
+    $("abstencoes").dataset.valor = "0";
+    $("pct-abstencoes").textContent = "";
+    $("brancos-nulos").textContent = "—";
     $("ultimo").textContent = "—";
-    $("prog-apurado").style.width = "0%";
+    delete $("ultimo").dataset.iso;
     return;
   }
   const t = dados.totais;
@@ -1132,6 +1148,16 @@ async function onFiltroChange() {
   ajustarUFParaCargo();
   state.selecionados = [];
   $("comparacao").classList.add("oculto");
+  // Limpa IMEDIATAMENTE state e UI — sem esperar o fetch retornar.
+  // Bug antigo: durante o network delay (centenas de ms), UI continuava
+  // mostrando totais/candidatos do cargo anterior. Se o novo cargo não
+  // tinha dados (Governador/Senador antes da apuração), os dados velhos
+  // ficavam grudados até um F5.
+  state.ultimoSnapshot = null;
+  state.snapshotAnterior = null;
+  state.proporcional = null;
+  state.wsRetry = 0;
+  atualizarPainelTotais();
   await carregarCandidatos();
   await refreshApuracao();
   await carregarEventos();

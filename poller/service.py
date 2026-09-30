@@ -52,10 +52,12 @@ ALVOS_PADRAO: list[AlvoColeta] = (
     + [AlvoColeta(1, 1, uf) for uf in _UFS]        # Presidente por UF (mapa)
     + [AlvoColeta(1, 3, uf) for uf in _UFS]        # Governador de cada UF
     + [AlvoColeta(1, 5, uf) for uf in _UFS]        # Senador de cada UF
+    + [AlvoColeta(1, 6, uf) for uf in _UFS]        # Deputado Federal
+    + [AlvoColeta(1, 7, uf) for uf in _UFS]        # Deputado Estadual
     # ---- 2º turno ----
     # Enquanto o TSE não abrir o 2T, os requests retornam 404 e o poller
     # pula silenciosamente. Quando abrir, começa a coletar sozinho — sem
-    # precisar de deploy nem mudança de config.
+    # precisar de deploy nem mudança de config. Deputado não tem 2T.
     + [AlvoColeta(2, 1, "BR")]                     # Presidente 2T nacional
     + [AlvoColeta(2, 1, uf) for uf in _UFS]        # Presidente 2T por UF
     + [AlvoColeta(2, 3, uf) for uf in _UFS]        # Governador 2T de cada UF
