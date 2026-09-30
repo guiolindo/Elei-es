@@ -18,7 +18,7 @@ from app.config import get_settings
 from app.ws import broadcaster
 from poller.service import loop as poller_loop
 from poller.candidatos_tse import sincronizar_candidatos
-from poller.descoberta import descobrir_cod_eleicao_atual
+from poller.descoberta import descobrir_cods_eleicao
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -30,22 +30,20 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 async def _descobrir_cod_loop():
     """A cada 5 min tenta descobrir os códigos reais da Eleição Geral 2026
-    no TSE. Enquanto ainda for ciclo 2024, mantém o fallback do simulado (21270).
-    Quando TSE publicar o 2026, o config em memória se atualiza sozinho
-    e o poller começa a puxar os arquivos certos no próximo ciclo.
+    no TSE. Descobre os 4 códigos (presidencial + estadual, 1T + 2T).
+    Quando TSE publica um novo/atualiza um existente, o config em memória
+    se atualiza sozinho e o poller começa a puxar os arquivos certos no
+    próximo ciclo.
     """
     settings = get_settings()
     while True:
         try:
-            res = await descobrir_cod_eleicao_atual()
-            if res:
-                cd_1t, cd_2t = res
-                if cd_1t != settings.eleicao_cod_1t:
-                    object.__setattr__(settings, "eleicao_cod_1t", cd_1t)
-                    log.info("cod_eleicao 1T atualizado para %s", cd_1t)
-                if cd_2t != settings.eleicao_cod_2t:
-                    object.__setattr__(settings, "eleicao_cod_2t", cd_2t)
-                    log.info("cod_eleicao 2T atualizado para %s", cd_2t)
+            achados = await descobrir_cods_eleicao()
+            for chave, valor in achados.items():
+                atual = getattr(settings, chave, None)
+                if atual != valor:
+                    object.__setattr__(settings, chave, valor)
+                    log.info("%s atualizado para %s (era %s)", chave, valor, atual)
         except Exception:
             log.exception("descoberta cod falhou")
         await asyncio.sleep(300)

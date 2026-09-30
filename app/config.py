@@ -30,14 +30,16 @@ class Settings(BaseSettings):
     tse_cdn_base: str = "https://resultados.tse.jus.br/oficial/ele2026"
     tse_fotos_base: str = "https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img"
     eleicao_ano: int = 2026
-    # Código da eleição no TSE resultados. Confirmado em 30/09/2026 via
-    # URL oficial: resultados.tse.jus.br/oficial/app/index.html#/eleicao/6257
-    # JSON confirmado: /oficial/ele2026/6257/dados/br/br-c0001-e006257-u.json
-    # O código anterior (21270) era do sistema simulado — TSE trocou.
-    # O 2T ainda não foi publicado (retorna NoSuchKey no S3), 6258 é o
-    # próximo natural — descoberta.py atualiza se o TSE usar outro.
-    eleicao_cod_1t: int = 6257
-    eleicao_cod_2t: int = 6258
+    # Códigos de eleição no TSE 2026 — DOIS códigos separados:
+    #  - PRESIDENCIAL (cargo 1): 6257 (1T), presume 6258 (2T)
+    #  - ESTADUAL (cargos 3, 5, 6, 7): 6259 (1T), presume 6260 (2T)
+    # Confirmado em 30/09/2026 testando os endpoints do S3 diretamente.
+    # 2T ainda não foi publicado — próximos códigos naturais na sequência.
+    # descoberta.py ajusta automaticamente se o TSE usar outro número.
+    eleicao_cod_1t: int = 6257           # Presidente 1T
+    eleicao_cod_2t: int = 6258           # Presidente 2T
+    eleicao_cod_1t_estadual: int = 6259  # Governador/Senador/Deputados 1T
+    eleicao_cod_2t_estadual: int = 6260  # Governador 2T
     # Código da eleição no divulgacandcontas (usado para candidatos e fotos)
     eleicao_cod_divulga: int = 20322002026
     poll_interval_seconds: int = 20

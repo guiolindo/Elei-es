@@ -37,7 +37,21 @@ class AlvoColeta:
 
     @property
     def cod_eleicao_key(self) -> str:
-        return "eleicao_cod_1t" if self.turno == 1 else "eleicao_cod_2t"
+        """Chave da setting que tem o cod_eleicao pra este alvo.
+
+        TSE separa em 2 eleições distintas (2 códigos separados):
+        - Presidente (cargo 1): eleição PRESIDENCIAL (ex.: 6257 em 2026)
+        - Governador/Senador/Deputado (3, 5, 6, 7): eleição ESTADUAL
+          (ex.: 6259 em 2026)
+
+        Cada eleição tem seus próprios arquivos no S3 sob paths
+        /oficial/ele2026/{cod}/dados/. Antes esse método presumia um
+        cod único pra todos os cargos; corrigido agora.
+        """
+        if self.cod_cargo == 1:
+            return "eleicao_cod_1t" if self.turno == 1 else "eleicao_cod_2t"
+        # Estaduais (3, 5, 6, 7)
+        return "eleicao_cod_1t_estadual" if self.turno == 1 else "eleicao_cod_2t_estadual"
 
 
 _UFS = [
