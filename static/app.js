@@ -1073,7 +1073,14 @@ function statusProporcionalDe(sq) {
 }
 
 function conectarWS() {
-  if (state.ws) { try { state.ws.close(); } catch(e){} }
+  if (state.ws) {
+    // Marca como "fechado intencional" pro handler onclose ignorar e
+    // NÃO agendar reconnect. Senão fica agendando reconexão do WS
+    // antigo enquanto o novo já está sendo criado — cria duas cadeias
+    // paralelas e o backoff (wsRetry) acumula.
+    state.ws.__intencional = true;
+    try { state.ws.close(); } catch(e){}
+  }
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${proto}//${location.host}/ws/apuracao?cargo=${state.cargo}&abrangencia=${state.abrangencia}`);
   ws.onopen = () => {
@@ -1084,6 +1091,9 @@ function conectarWS() {
     refreshApuracao().catch(() => {});
   };
   const reconectar = () => {
+    // Se o WS foi fechado intencionalmente (troca de cargo/UF),
+    // NÃO reconecta — outro conectarWS já está em andamento.
+    if (ws.__intencional) return;
     $("conexao").querySelector(".dot").classList.remove("on");
     $("conexao-label").textContent = "reconectando…";
     // Backoff exponencial com jitter: 1s, 2s, 4s, 8s, 15s teto

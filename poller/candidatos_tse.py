@@ -81,16 +81,25 @@ def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoT
             "sigla": payload.get("sgPartido"),
             "nome": payload.get("nomePartido") or "",
         }
-    # Em 2026 o partido.numero vem 0 no JSON — derivamos do número do candidato:
-    #  - Majoritário (1,3,5): número do candidato = número do partido (dois dígitos)
-    #  - Proporcional (6,7): dois primeiros dígitos do número (ex.: 13xxx = PT)
+    # Em 2026 o partido.numero às vezes vem 0 no JSON — derivamos do
+    # número do candidato conforme padrão do TSE:
+    #  - Presidente (1) e Governador (3): 2 dígitos = número do partido
+    #    (ex.: 13 = PT, 22 = PL, 12 = PDT)
+    #  - Senador (5): 3 dígitos, os 2 primeiros = partido, 3º = sequencial
+    #    (ex.: 130 e 131 são PT, 220 e 221 são PL)
+    #  - Deputado Federal (6): 4 dígitos, 2 primeiros = partido
+    #  - Deputado Estadual (7): 5 dígitos, 2 primeiros = partido
+    # Bug histórico: senador estava sendo tratado como presidente/gov
+    # (partido_num = num_cand), então virava 130/131/etc — que não
+    # existe como partido → candidatos ficavam sem logo.
     partido_num = _to_int(_pick(partido, "numero", "numeroPartido", "nr_partido"))
     num_cand = _to_int(_pick(payload, "numero", "numeroCandidato", "nr_candidato"))
     if not partido_num and num_cand:
-        if cod_cargo in (1, 3, 5):
+        if cod_cargo in (1, 3):
+            # 2 dígitos exatos = número do partido
             partido_num = num_cand
-        elif cod_cargo in (6, 7):
-            # Pega os dois primeiros dígitos (10..99) do número da urna
+        elif cod_cargo in (5, 6, 7):
+            # 2 primeiros dígitos = partido (senador 3d, dep 4/5d)
             s = str(num_cand)
             partido_num = int(s[:2]) if len(s) >= 2 else 0
     coligacao = _pick(payload, "nomeColigacao", "nm_coligacao", "coligacao")

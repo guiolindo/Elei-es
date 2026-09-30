@@ -659,6 +659,40 @@ async def atualizar_detalhe(
     return {"ok": True, "sq": sq}
 
 
+@router.post("/admin/corrigir-partidos", dependencies=[Depends(_exigir_admin)])
+async def corrigir_partidos(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Repara candidatos cujo partido_numero foi derivado errado (bug
+    histórico: Senador tinha `partido_numero = numero_candidato`, mas
+    o número do senador tem 3 dígitos e só os 2 primeiros são o partido).
+
+    Aplica a regra correta pra cargos 5/6/7:
+      partido_numero = int(str(numero_candidato)[:2])
+
+    Idempotente — só toca em candidatos cujo `partido_numero` atual
+    não existe na tabela `partidos`.
+    """
+    from sqlalchemy import update
+    from app.models import Partido
+    # Partidos registrados (números conhecidos)
+    partidos_ok = {n for (n,) in (await sess.execute(select(Partido.numero))).all()}
+    r = await sess.execute(
+        select(Candidato).where(Candidato.cod_cargo.in_([5, 6, 7]))
+    )
+    corrigidos = 0
+    for c in r.scalars():
+        if c.partido_numero in partidos_ok and c.partido_numero != 0:
+            continue  # já está OK
+        num = str(c.numero or "")
+        if len(num) < 2:
+            continue
+        novo = int(num[:2])
+        if novo in partidos_ok and novo != c.partido_numero:
+            c.partido_numero = novo
+            corrigidos += 1
+    await sess.commit()
+    return {"ok": True, "corrigidos": corrigidos}
+
+
 @router.get("/admin/diagnostico-ids", dependencies=[Depends(_exigir_admin)])
 async def diagnostico_ids(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Verifica se os IDs de candidatos batem entre divulga (importado) e
