@@ -850,6 +850,100 @@ async def admin_sync_candidatos(
     return {"atualizados": n}
 
 
+# ============ Municipal on-demand (mapa) ============
+# Cache TTL curto em memória pra puxar município/zona só quando alguém
+# abre o mapa. Não persiste no banco — some do cache em 45s.
+# Se 200 pessoas olham SP ao mesmo tempo, só 1 request sai pro TSE.
+_CACHE_MUN: dict[str, tuple[float, dict]] = {}
+_CACHE_MUN_TTL = 45.0
+
+
+async def _fetch_tse_json(url: str) -> dict | None:
+    from poller.tse_client import cliente_tse, BROWSER_HEADERS
+    try:
+        async with await cliente_tse() as c:
+            r = await c.get(url, headers=BROWSER_HEADERS, timeout=8.0)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except Exception:
+        return None
+
+
+@router.get("/apuracao/municipio")
+async def apuracao_municipio(
+    uf: str = Query(..., min_length=2, max_length=2),
+    municipio: str = Query(..., min_length=1, max_length=6),
+    cargo: int = Query(...),
+    turno: int = Query(1, ge=1, le=2),
+) -> dict[str, Any]:
+    """Puxa apuração de um município específico direto do TSE, sem
+    persistir no banco. Usado pelo mapa (drill-down "quem ganhou aqui").
+
+    Cache em memória de 45s: se muita gente clica no mesmo município,
+    só 1 request sai pro TSE. Nada é gravado — some quando expira.
+    """
+    from app.config import get_settings
+    from time import monotonic
+    uf = uf.lower()
+    mu = str(int(municipio))  # normaliza (strip zeros à esquerda)
+    settings = get_settings()
+    if cargo == 1:
+        cod = settings.eleicao_cod_1t if turno == 1 else settings.eleicao_cod_2t
+    else:
+        cod = settings.eleicao_cod_1t_estadual if turno == 1 else settings.eleicao_cod_2t_estadual
+    chave = f"{uf}:{mu}:{cargo}:{cod}"
+    agora = monotonic()
+    hit = _CACHE_MUN.get(chave)
+    if hit and (agora - hit[0]) < _CACHE_MUN_TTL:
+        return {"cache_hit": True, **hit[1]}
+    base = settings.tse_cdn_base.rstrip("/").rsplit("/", 1)[0]  # sem /ele2026
+    # Padrão do TSE: /{cod}/dados/{uf}/{uf}{municipio}-c{cargo:04d}-e{cod:06d}-u.json
+    # onde municipio pode ter 5 dígitos (código IBGE truncado do TSE)
+    mu_pad = mu.zfill(5)
+    url = f"{base}/{cod}/dados/{uf}/{uf}{mu_pad}-c{cargo:04d}-e{cod:06d}-u.json"
+    j = await _fetch_tse_json(url)
+    if not j:
+        return {"disponivel": False, "url_tentada": url}
+    # Parse enxuto: só o mínimo pro mapa (líder + % apurado)
+    from poller.parser import parse_snapshot
+    try:
+        parsed = parse_snapshot(j)
+    except Exception:
+        return {"disponivel": False, "erro": "parse"}
+    if not parsed:
+        return {"disponivel": False}
+    tot = parsed.totais
+    lider = parsed.candidatos[0] if parsed.candidatos else None
+    body = {
+        "disponivel": True,
+        "uf": uf.upper(),
+        "municipio": mu,
+        "cargo": cargo,
+        "pct_apurado": (tot.qt_secoes_totalizadas / tot.qt_secoes_total * 100)
+                        if tot.qt_secoes_total else 0,
+        "secoes_total": tot.qt_secoes_total,
+        "secoes_totalizadas": tot.qt_secoes_totalizadas,
+        "lider": {
+            "sq_candidato": lider.sq_candidato,
+            "votos": lider.votos,
+            "pct_validos": float(lider.pct_validos),
+        } if lider else None,
+        "candidatos": [
+            {"sq_candidato": c.sq_candidato, "votos": c.votos,
+             "pct_validos": float(c.pct_validos)}
+            for c in parsed.candidatos[:20]  # top 20 basta pro mapa
+        ],
+    }
+    _CACHE_MUN[chave] = (agora, body)
+    # Limpa entradas expiradas (barato: só faz se cresceu demais)
+    if len(_CACHE_MUN) > 5000:
+        cutoff = agora - _CACHE_MUN_TTL
+        for k in [k for k, (t, _) in _CACHE_MUN.items() if t < cutoff]:
+            _CACHE_MUN.pop(k, None)
+    return body
+
+
 ws_router = APIRouter()
 
 

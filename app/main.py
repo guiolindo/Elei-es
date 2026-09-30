@@ -51,6 +51,72 @@ async def _descobrir_cod_loop():
         await asyncio.sleep(300)
 
 
+async def _cleanup_snapshots_loop():
+    """Retenção enxuta de snapshots: mantém os N=200 mais recentes por
+    (cargo, abrangencia, turno) e apaga o resto.
+
+    200 snapshots × ~1min entre updates = ~3h de granularidade fina no
+    gráfico temporal, mais que suficiente pra visualizar a curva do
+    dia D. Delta com o anterior continua exato (só precisa dos 2
+    últimos). Auditoria do SHA-256 continua no mais recente.
+
+    Roda a cada 1h. No dia D pode ser preciso rodar mais frequente —
+    fica de knob.
+    """
+    from sqlalchemy import select, delete, func
+    from app.db import SessionLocal
+    from app.models import Snapshot, SnapshotTotais, SnapshotCandidato, SnapshotMunicipio
+    N = 200
+    await asyncio.sleep(120)  # warmup mais longo, não urgente
+    while True:
+        try:
+            async with SessionLocal() as sess:
+                # Descobre todas as chaves (cargo, abrangencia, turno) com snapshots
+                chaves = (await sess.execute(
+                    select(Snapshot.cod_cargo, Snapshot.abrangencia, Snapshot.turno)
+                    .group_by(Snapshot.cod_cargo, Snapshot.abrangencia, Snapshot.turno)
+                )).all()
+                total_apagado = 0
+                for cargo, abr, turno in chaves:
+                    # Pega o N-ésimo snapshot mais recente dessa chave
+                    corte = (await sess.execute(
+                        select(Snapshot.coletado_em)
+                        .where(Snapshot.cod_cargo == cargo,
+                               Snapshot.abrangencia == abr,
+                               Snapshot.turno == turno)
+                        .order_by(Snapshot.coletado_em.desc())
+                        .offset(N).limit(1)
+                    )).scalar_one_or_none()
+                    if not corte:
+                        continue
+                    # IDs dos snapshots antigos dessa chave
+                    ids_antigos = [r[0] for r in (await sess.execute(
+                        select(Snapshot.id)
+                        .where(Snapshot.cod_cargo == cargo,
+                               Snapshot.abrangencia == abr,
+                               Snapshot.turno == turno,
+                               Snapshot.coletado_em < corte)
+                    )).all()]
+                    if not ids_antigos:
+                        continue
+                    # Apaga filhos primeiro (FK)
+                    for tabela in (SnapshotCandidato, SnapshotMunicipio, SnapshotTotais):
+                        await sess.execute(
+                            delete(tabela).where(tabela.snapshot_id.in_(ids_antigos))
+                        )
+                    await sess.execute(
+                        delete(Snapshot).where(Snapshot.id.in_(ids_antigos))
+                    )
+                    total_apagado += len(ids_antigos)
+                if total_apagado:
+                    await sess.commit()
+                    log.info("cleanup snapshots: %d apagados (mantendo %d por chave)",
+                             total_apagado, N)
+        except Exception:
+            log.exception("cleanup snapshots falhou")
+        await asyncio.sleep(3600)
+
+
 async def _sync_candidatos_loop():
     """Sincroniza candidatos oficiais do TSE.
 
@@ -86,7 +152,8 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(_descobrir_cod_loop()))
         tasks.append(asyncio.create_task(poller_loop(broadcaster=broadcaster)))
         tasks.append(asyncio.create_task(_sync_candidatos_loop()))
-        log.info("poller + descoberta + sync candidatos iniciados (intervalo=%ss)",
+        tasks.append(asyncio.create_task(_cleanup_snapshots_loop()))
+        log.info("poller + descoberta + sync + cleanup iniciados (intervalo=%ss)",
                  settings.poll_interval_seconds)
     # Bot do Telegram: só sobe se TELEGRAM_BOT_TOKEN estiver setado.
     if (settings.telegram_bot_token or "").strip():
