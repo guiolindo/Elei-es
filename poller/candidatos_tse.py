@@ -256,6 +256,45 @@ async def _baixar_fotos(
                 continue
 
 
+async def corrigir_partidos_orfaos(sess: AsyncSession | None = None) -> int:
+    """Self-heal do partido_numero em candidatos de cargos 5/6/7.
+
+    Roda no startup pra corrigir dados históricos importados antes do
+    fix (Senador tem 3 dígitos: os 2 primeiros são o partido; deputados
+    idem com 4-5 dígitos). Idempotente e barato — só toca em linhas
+    cujo partido_numero atual não existe na tabela partidos.
+    """
+    from app.models import Partido as _P
+    close_sess = False
+    if sess is None:
+        sess = SessionLocal()
+        close_sess = True
+    try:
+        partidos_ok = {n for (n,) in (await sess.execute(select(_P.numero))).all()}
+        if not partidos_ok:
+            return 0
+        r = await sess.execute(
+            select(Candidato).where(Candidato.cod_cargo.in_([5, 6, 7]))
+        )
+        corrigidos = 0
+        for c in r.scalars():
+            if c.partido_numero in partidos_ok and c.partido_numero != 0:
+                continue
+            num = str(c.numero or "")
+            if len(num) < 2:
+                continue
+            novo = int(num[:2])
+            if novo in partidos_ok and novo != c.partido_numero:
+                c.partido_numero = novo
+                corrigidos += 1
+        if corrigidos:
+            await sess.commit()
+        return corrigidos
+    finally:
+        if close_sess:
+            await sess.close()
+
+
 async def sincronizar_candidatos(
     ufs: list[str] | None = None,
     cargos: list[int] | None = None,

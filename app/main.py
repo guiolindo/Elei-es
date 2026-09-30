@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -17,7 +19,7 @@ from app.api import router, ws_router
 from app.config import get_settings
 from app.ws import broadcaster
 from poller.service import loop as poller_loop
-from poller.candidatos_tse import sincronizar_candidatos
+from poller.candidatos_tse import sincronizar_candidatos, corrigir_partidos_orfaos
 from poller.descoberta import descobrir_cods_eleicao
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -58,6 +60,14 @@ async def _sync_candidatos_loop():
     a apuração começar, as mudanças são raras.
     """
     await asyncio.sleep(30)  # warmup
+    # Self-heal: corrige partido_numero de candidatos importados antes do
+    # fix do bug do Senador (numero 3 dígitos, partido = 2 primeiros).
+    try:
+        n = await corrigir_partidos_orfaos()
+        if n:
+            log.info("self-heal: %d candidatos com partido_numero corrigido", n)
+    except Exception:
+        log.exception("self-heal partidos falhou")
     while True:
         try:
             log.info("sync_candidatos: iniciando ciclo")
@@ -143,30 +153,53 @@ def create_app() -> FastAPI:
             from starlette.responses import JSONResponse
             return JSONResponse({"ok": False, "erro": str(e)[:200]}, status_code=503)
 
+    def _servir_html_com_versao(caminho: str) -> HTMLResponse:
+        """Serve HTML injetando `?v=<mtime>` em referências pra app.js e
+        app.css. Sem isso o browser cacheia agressivamente as versões
+        antigas e fixes de frontend não chegam ao usuário sem hard reload.
+        """
+        try:
+            with open(caminho, "r", encoding="utf-8") as f:
+                html = f.read()
+            versoes = {}
+            for arq in ("app.js", "app.css", "partidos.js"):
+                p = os.path.join("static", arq)
+                if os.path.exists(p):
+                    versoes[arq] = int(os.path.getmtime(p))
+            for arq, v in versoes.items():
+                html = re.sub(
+                    rf'(/static/{re.escape(arq)})(?!\?)',
+                    rf'\1?v={v}',
+                    html,
+                )
+            return HTMLResponse(html)
+        except OSError:
+            return FileResponse(caminho)
+
     @app.get("/")
     async def index():
-        return FileResponse("static/index.html")
+        return _servir_html_com_versao("static/index.html")
 
     @app.get("/importar")
     async def importar_page():
-        return FileResponse("static/importar.html")
+        return _servir_html_com_versao("static/importar.html")
 
     @app.get("/sobre")
     async def sobre_page():
-        return FileResponse("static/sobre.html")
+        return _servir_html_com_versao("static/sobre.html")
 
     @app.get("/faq")
     async def faq_page():
         # /faq é apelido pra /sobre#faq
-        return FileResponse("static/sobre.html")
+        return _servir_html_com_versao("static/sobre.html")
 
     @app.get("/termos")
     async def termos_page():
-        return FileResponse("static/sobre.html")
+        return _servir_html_com_versao("static/sobre.html")
 
     @app.get("/privacidade")
     async def privacidade_page():
-        return FileResponse("static/sobre.html")
+        return _servir_html_com_versao("static/sobre.html")
 
     return app
 
