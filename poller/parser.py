@@ -80,29 +80,45 @@ def _parse_dt(raw: str | None) -> datetime | None:
 def parse_snapshot(payload: dict) -> ParsedSnapshot:
     """Converte payload JSON do TSE em objetos tipados.
 
-    Suporta tanto o schema oficial da CDN (chaves como `st`, `s`, `pst`,
-    `cand`) quanto uma versão espelho normalizada (chaves em snake_case),
-    usada em fixtures e no modo simulação.
+    Schema oficial 2026 (confirmado em 30/09/2026):
+      raiz.s = {ts: total_secoes, st: totalizadas, sa: aptas, sni: não iniciadas}
+      raiz.e = {te: total_eleitorado, est: eleitorado_totalizado, c: comparecimento,
+                a: abstencoes}
+      raiz.v = {vv: votos_validos, vb: brancos, vn: nulos, vnom: nominais}
+      raiz.carg[0].agr[N] = agrupamentos (partido/federacao):
+        .par[M] = partidos:
+          .cand[K] = candidatos com sqcand, n, nm, nmu, vap, pvap
+      raiz.abr[] = breakdown por UF (opcional, quando abrangência BR)
+                   ou raiz.mu[] pra municípios (quando abrangência UF)
+
+    Também aceita chaves em snake_case (fixtures/modo simulação legado).
+
+    Bug histórico: parser anterior lia `raiz.s` como inteiro direto — mas
+    é um DICT. Resultado: qt_secoes_total sempre 0 em prod.
     """
-    # aceita variantes: cargos > [ { agr > [ { cand } ] } ] ou direto
-    if "carg" in payload and isinstance(payload["carg"], list) and payload["carg"]:
-        raiz = payload["carg"][0]
-    else:
-        raiz = payload
+    # Totais moram no PAYLOAD ROOT, não em carg[0]. carg[0] tem só a
+    # estrutura de candidatos (agr → par → cand).
+    root = payload
+
+    s = root.get("s") if isinstance(root.get("s"), dict) else {}
+    e = root.get("e") if isinstance(root.get("e"), dict) else {}
+    v = root.get("v") if isinstance(root.get("v"), dict) else {}
 
     tot = ParsedTotais(
-        qt_secoes_total=_to_int(raiz.get("s") or raiz.get("qt_secoes_total")),
-        qt_secoes_totalizadas=_to_int(raiz.get("st") or raiz.get("qt_secoes_totalizadas")),
-        qt_eleitorado_apto=_to_int(raiz.get("e") or raiz.get("qt_eleitorado_apto")),
+        # Total de seções da abrangência (ex.: 499.248 no BR).
+        # Fallback pra chave legada `s` direto (fixtures antigas).
+        qt_secoes_total=_to_int(s.get("ts") or root.get("qt_secoes_total")),
+        qt_secoes_totalizadas=_to_int(s.get("st") or root.get("qt_secoes_totalizadas")),
+        qt_eleitorado_apto=_to_int(e.get("te") or root.get("qt_eleitorado_apto")),
         qt_eleitorado_apto_totalizadas=_to_int(
-            raiz.get("eA") or raiz.get("qt_eleitorado_apto_totalizadas")
+            e.get("est") or root.get("qt_eleitorado_apto_totalizadas")
         ),
-        qt_comparecimento=_to_int(raiz.get("c") or raiz.get("qt_comparecimento")),
-        qt_abstencoes=_to_int(raiz.get("a") or raiz.get("qt_abstencoes")),
-        qt_votos_validos=_to_int(raiz.get("vv") or raiz.get("qt_votos_validos")),
-        qt_votos_brancos=_to_int(raiz.get("vb") or raiz.get("qt_votos_brancos")),
-        qt_votos_nulos=_to_int(raiz.get("vn") or raiz.get("qt_votos_nulos")),
-        gerado_em=_parse_dt(payload.get("dg") or payload.get("gerado_em")),
+        qt_comparecimento=_to_int(e.get("c") or root.get("qt_comparecimento")),
+        qt_abstencoes=_to_int(e.get("a") or root.get("qt_abstencoes")),
+        qt_votos_validos=_to_int(v.get("vv") or root.get("qt_votos_validos")),
+        qt_votos_brancos=_to_int(v.get("vb") or root.get("qt_votos_brancos")),
+        qt_votos_nulos=_to_int(v.get("vn") or root.get("qt_votos_nulos")),
+        gerado_em=_parse_dt(root.get("dg") or root.get("gerado_em")),
     )
 
     def _parse_cand_list(raw_list) -> list[ParsedCandidato]:
@@ -116,34 +132,52 @@ def parse_snapshot(payload: dict) -> ParsedSnapshot:
             out.append(ParsedCandidato(
                 sq_candidato=str(sq),
                 numero=_to_int(c.get("n") or c.get("numero") or c.get("nr")),
-                nome_urna=(c.get("nm") or c.get("nome_urna") or "").strip(),
+                # nmu = nome_urna, nm = nome completo — preferir nmu (mais curto)
+                nome_urna=(c.get("nmu") or c.get("nm") or c.get("nome_urna") or "").strip(),
                 votos=_to_int(c.get("vap") or c.get("votos") or c.get("vv")),
                 pct_validos=_to_float(c.get("pvap") or c.get("pct_validos") or c.get("pvv")),
             ))
         return out
 
-    candidatos = _parse_cand_list(raiz.get("cand") or raiz.get("candidatos"))
+    # Achata carg[0].agr[].par[].cand[] pra lista única de candidatos.
+    # `agr` são AGRUPAMENTOS (federação ou partido isolado); dentro tem
+    # par[] (partidos membros) e cada partido tem cand[].
+    candidatos: list[ParsedCandidato] = []
+    if "carg" in root and isinstance(root["carg"], list) and root["carg"]:
+        for cargo in root["carg"]:
+            for agr in cargo.get("agr", []) or []:
+                for par in agr.get("par", []) or []:
+                    candidatos.extend(_parse_cand_list(par.get("cand")))
+    # Fallback pra fixtures antigas com cand[] direto no root ou carg[0]
+    if not candidatos:
+        raiz_alt = root["carg"][0] if root.get("carg") else root
+        candidatos = _parse_cand_list(raiz_alt.get("cand") or raiz_alt.get("candidatos"))
 
-    # Breakdown por município. TSE historicamente usa `abr[].mu[]` ou `mu[]`.
-    # Cada município tem cand[] próprio. Se o TSE mudar o formato, esta parte
-    # simplesmente devolve [] e não quebra nada.
+    # Breakdown por município. TSE 2026: raiz.mu[] (quando abrangencia=UF)
+    # ou raiz.abr[].mu[] (quando abrangencia=BR). Cada município tem sua
+    # própria estrutura de agr[].par[].cand[].
     municipios: list[ParsedMunicipio] = []
     fontes_mun = []
-    for chave in ("abr", "mu", "municipios"):
-        val = raiz.get(chave)
+    for chave in ("mu", "municipios"):
+        val = root.get(chave)
         if isinstance(val, list):
-            for item in val:
-                if isinstance(item, dict) and item.get("mu"):
-                    fontes_mun.extend(item["mu"])
-                elif isinstance(item, dict):
-                    fontes_mun.append(item)
+            fontes_mun.extend(val)
+    for item in root.get("abr", []) or []:
+        if isinstance(item, dict) and item.get("mu"):
+            fontes_mun.extend(item["mu"])
     for m in fontes_mun:
         if not isinstance(m, dict):
             continue
         cod_ibge = str(m.get("cdi") or m.get("cod_ibge") or m.get("codIbge") or "")
         if not cod_ibge:
             continue
-        cands_m = _parse_cand_list(m.get("cand") or m.get("candidatos"))
+        # Achata cand do município (mesmo padrão do raiz)
+        cands_m: list[ParsedCandidato] = []
+        for agr in m.get("agr", []) or []:
+            for par in agr.get("par", []) or []:
+                cands_m.extend(_parse_cand_list(par.get("cand")))
+        if not cands_m:
+            cands_m = _parse_cand_list(m.get("cand") or m.get("candidatos"))
         if cands_m:
             municipios.append(ParsedMunicipio(
                 cod_ibge=cod_ibge,

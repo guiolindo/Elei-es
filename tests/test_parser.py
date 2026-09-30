@@ -1,28 +1,57 @@
 from poller.parser import parse_snapshot
 
 
-def test_parse_schema_tse_abreviado():
+def test_parse_schema_tse_2026_real():
+    """Schema oficial confirmado em 30/09/2026 via
+    resultados.tse.jus.br/oficial/ele2026/6257/dados/br/br-c0001-e006257-u.json.
+
+    Totais estão no ROOT em s/e/v como DICTS (não escalares como o
+    parser antigo assumia). Candidatos estão aninhados em
+    carg[0].agr[N].par[N].cand[N]."""
     payload = {
         "dg": "05/10/2026 20:35:12",
+        "s": {"ts": "500", "st": "300"},
+        "e": {"te": "2000000", "est": "1200000", "c": "1000000", "a": "200000"},
+        "v": {"vv": "900000", "vb": "50000", "vn": "50000"},
         "carg": [{
-            "s": "500", "st": "300",
-            "e": "2000000", "eA": "1200000",
-            "c": "1000000", "a": "200000",
-            "vv": "900000", "vb": "50000", "vn": "50000",
-            "cand": [
-                {"sqcand": "A1", "n": "13", "nm": "FULANO", "vap": "500000", "pvap": "55,55"},
-                {"sqcand": "A2", "n": "22", "nm": "CICLANO", "vap": "300000", "pvap": "33,33"},
-            ],
+            "cd": "1",
+            "agr": [{
+                "n": "1",
+                "par": [{
+                    "n": "13", "sg": "PT",
+                    "cand": [
+                        {"sqcand": "A1", "n": "13", "nmu": "FULANO",
+                         "vap": "500000", "pvap": "55,55"},
+                    ],
+                }],
+            }, {
+                "n": "2",
+                "par": [{
+                    "n": "22", "sg": "PL",
+                    "cand": [
+                        {"sqcand": "A2", "n": "22", "nmu": "CICLANO",
+                         "vap": "300000", "pvap": "33,33"},
+                    ],
+                }],
+            }],
         }],
     }
     p = parse_snapshot(payload)
     assert p.totais.qt_secoes_total == 500
     assert p.totais.qt_secoes_totalizadas == 300
+    assert p.totais.qt_eleitorado_apto == 2000000
+    assert p.totais.qt_comparecimento == 1000000
+    assert p.totais.qt_abstencoes == 200000
     assert p.totais.qt_votos_validos == 900000
+    assert p.totais.qt_votos_brancos == 50000
+    assert p.totais.qt_votos_nulos == 50000
     assert len(p.candidatos) == 2
-    assert p.candidatos[0].sq_candidato == "A1"
-    assert p.candidatos[0].votos == 500000
-    assert abs(p.candidatos[0].pct_validos - 55.55) < 0.01
+    sqs = {c.sq_candidato for c in p.candidatos}
+    assert sqs == {"A1", "A2"}
+    a1 = next(c for c in p.candidatos if c.sq_candidato == "A1")
+    assert a1.votos == 500000
+    assert a1.nome_urna == "FULANO"
+    assert abs(a1.pct_validos - 55.55) < 0.01
 
 
 def test_parse_schema_normalizado():
