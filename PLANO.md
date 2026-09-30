@@ -41,13 +41,30 @@ Estimativa: 2h. Rodar `locust` ou script `asyncio` no scratchpad.
 
 Estimativa: 1h. Preferir env vars sobre hardcode.
 
-## P1 — nice-to-have pré-eleição
+### 4. Timestamp de "gerado_em_tse" visível na UI
+- Info já vem na API (`gerado_em_tse`, `coletado_em`) — só falta subir pra tela
+- Ajuda o usuário entender divergências entre níveis (BR × UF × município) que são naturais no dia D (TSE gera cada arquivo em momentos diferentes)
+- Estimativa: 15 min. Discricionário do designer.
 
-### 4. Página `/urna` — verificação de BU
-- Usuário informa UF + município + zona + seção → mostra o boletim de urna
-- Requer parser de BU do TSE (formato próprio, JSON assinado)
-- Validar assinatura digital do TSE (ICP-Brasil)
-- Estimativa: 8-12h. Feature isolada, não bloqueia outros trabalhos.
+### 5. Página `/urna` — verificação de boletim de urna
+Dá pra desenvolver antes da eleição usando BUs de 2024 como ground truth.
+BUs de eleições passadas continuam online no S3 do TSE, então testes
+automatizados funcionam hoje.
+
+- [ ] Endpoint `/api/apuracao/bu?uf=SP&mun=71099&zn=130&se=1` com cache 60s
+- [ ] Parser do JSON assinado do TSE (estrutura: seção → candidato → votos + hash)
+- [ ] Página `/urna` com formulário (UF/mun/zona/seção) + card estilo boletim físico
+- [ ] Validação da assinatura ICP-Brasil (offline, cadeia pública do TSE)
+- [ ] Testes contra BUs reais de 2024 (`ele2024/545/dados/sp/...`)
+
+Riscos que só se confirmam depois de 04/10:
+  - TSE ajustar campos do JSON entre eleições (mitigar com parser tolerante `_pick`)
+  - AC do TSE renovar certificados (5 linhas de config no dia D)
+  - Rate limit agressivo do `dados_bu_imgbu` no dia D (aumentar cache pra 5min)
+
+Estimativa: 8h. Feature isolada, não bloqueia outros trabalhos.
+
+## P1 — nice-to-have pré-eleição
 
 ### 5. Notificações push do resultado final
 - Já tem infra VAPID + `PushSubscription` no banco
