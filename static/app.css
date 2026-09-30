@@ -40,11 +40,12 @@
   --danger: #ef4444;
   --info: #38bdf8;
 
-  /* Gradientes */
+  /* Gradientes — sóbrios, só amarelo/dourado institucional (TSE).
+     Removido o roxo (rgba(124,92,255,...)) que puxava pro "app genérico
+     de startup" e não tem lastro institucional. */
   --grad-a: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
-  --grad-b: linear-gradient(135deg, #3b82f6 0%, #7c5cff 100%);
-  --grad-hero: radial-gradient(1200px 600px at 10% -10%, rgba(240,180,41,.10), transparent 60%),
-               radial-gradient(1000px 500px at 90% -20%, rgba(124,92,255,.12), transparent 60%),
+  --grad-b: linear-gradient(135deg, #f0b429 0%, #f59e0b 100%);
+  --grad-hero: radial-gradient(1200px 600px at 10% -10%, rgba(240,180,41,.08), transparent 60%),
                linear-gradient(180deg, var(--surface-1) 0%, var(--surface-0) 100%);
 
   /* Anéis de foco (acessibilidade) — visível mas não intrusivo */
@@ -137,8 +138,8 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 }
 .brand { display: flex; align-items: center; gap: 14px; }
 .logo {
-  width: 44px; height: 44px; display: block;
-  filter: drop-shadow(0 4px 12px rgba(240,180,41,.35));
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  color: var(--brand);
 }
 .brand-title { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
 .brand-title span {
@@ -212,7 +213,7 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
 /* Stat hero (Apurado): número gigante, barra proeminente */
 .stat-hero {
-  background: linear-gradient(160deg, rgba(240,180,41,.14), rgba(124,92,255,.10));
+  background: linear-gradient(160deg, rgba(240,180,41,.14), rgba(240,180,41,.04));
   border-color: rgba(240,180,41,.25);
   padding: 20px 24px;
   display: flex; flex-direction: column; justify-content: center;
@@ -435,7 +436,7 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .candidato.selecionado .cand-comparar {
   background: rgba(240,180,41,.15); color: var(--brand); border-color: var(--brand);
 }
-.cand-ver:hover { background: rgba(124,92,255,.10); border-color: var(--accent); color: #cfc4ff; }
+.cand-ver:hover { background: rgba(240,180,41,.10); border-color: var(--brand); color: var(--brand); }
 /* .cand-foto regras principais estão no bloco de redesign acima
    (60×78 no card, com hover scale). Fallback + tamanhos maiores
    pra modal e comparação continuam abaixo. */
@@ -657,7 +658,9 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
   padding: 3px 8px; border-radius: 4px; font-weight: 700;
   background: var(--a); color: #000; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
 }
+.timeline .ev-tipo svg { stroke-width: 2.4; }
 .timeline .ev-tipo.warn { background: var(--warn); color: #1a0f00; }
 .timeline .ev-tipo.ok { background: var(--ok); color: #001a0a; }
 .timeline .ev-tipo.danger { background: var(--danger); color: #fff; }
@@ -917,7 +920,12 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   animation: banner-in 0.5s cubic-bezier(.2,1.5,.4,1);
 }
 .banner-eleito.saindo { animation: banner-out 0.6s ease-in forwards; }
-.be-emoji { font-size: 56px; }
+.be-ico {
+  width: 64px; height: 64px; margin: 0 auto 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--brand);
+}
+.be-ico svg { width: 48px; height: 48px; stroke-width: 1.6; }
 .be-nome { font-size: 32px; font-weight: 800; margin-top: 4px; letter-spacing: -0.5px; }
 .be-sub { font-size: 14px; font-weight: 600; margin-top: 4px; opacity: 0.7;
   text-transform: uppercase; letter-spacing: 1px; }

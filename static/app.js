@@ -990,12 +990,14 @@ function renderLegenda(leg, dados, texto) {
 }
 
 // ============ eventos ============
+// Ícones referenciam o sprite SVG em index.html (#i-trophy, #i-bolt, etc).
+// Nada de emoji — cor + tipografia carregam a hierarquia.
 const TIPOS_EVENTO = {
-  ELEITO_1T:                 { label: "Eleito 1T", classe: "ok",     emoji: "🎉" },
-  ELEITO_MAJORITARIO:        { label: "Eleito",    classe: "ok",     emoji: "🎉" },
-  SEGUNDO_TURNO_DEFINIDO:    { label: "2º Turno",  classe: "warn",   emoji: "⚡" },
-  VIRADA:                    { label: "Virada",    classe: "warn",   emoji: "🔄" },
-  MATEMATICAMENTE_ELIMINADO: { label: "Eliminado", classe: "danger", emoji: "❌" },
+  ELEITO_1T:                 { label: "Eleito 1T", classe: "ok",     ico: "trophy" },
+  ELEITO_MAJORITARIO:        { label: "Eleito",    classe: "ok",     ico: "trophy" },
+  SEGUNDO_TURNO_DEFINIDO:    { label: "2º Turno",  classe: "warn",   ico: "bolt" },
+  VIRADA:                    { label: "Virada",    classe: "warn",   ico: "arrow-up" },
+  MATEMATICAMENTE_ELIMINADO: { label: "Eliminado", classe: "danger", ico: "x" },
 };
 
 async function carregarEventos() {
@@ -1009,7 +1011,7 @@ async function carregarEventos() {
   ul.innerHTML = "";
   for (const ev of evs.slice().reverse()) {
     const nome = state.ficha[ev.sq_candidato_a]?.nome_urna || ev.sq_candidato_a;
-    const meta = TIPOS_EVENTO[ev.tipo] || { label: ev.tipo, classe: "", emoji: "•" };
+    const meta = TIPOS_EVENTO[ev.tipo] || { label: ev.tipo, classe: "", ico: null };
     let texto = "";
     if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
       const b = state.ficha[ev.sq_candidato_b]?.nome_urna || ev.sq_candidato_b;
@@ -1027,7 +1029,7 @@ async function carregarEventos() {
     const li = document.createElement("li");
     li.innerHTML = `
       <time>${fmtHora(ev.ocorrido_em)}</time>
-      <span class="ev-tipo ${meta.classe}">${meta.emoji} ${meta.label}</span>
+      <span class="ev-tipo ${meta.classe}">${meta.ico ? `<svg width="12" height="12" aria-hidden="true"><use href="#i-${meta.ico}"/></svg>` : ""} ${meta.label}</span>
       <span class="ev-texto">${texto}</span>`;
     ul.appendChild(li);
   }
@@ -1131,9 +1133,9 @@ function conectarWS() {
         const cor = num ? corDoPartido(num) : "#f0b429";
         if (ev.tipo === "ELEITO_1T" || ev.tipo === "ELEITO_MAJORITARIO") {
           comemorar(nome, cor);
-          toast(`🎉 ${nome} eleito(a)!`, "ok");
+          toast(`${nome} eleito(a)!`, "ok");
         } else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
-          toast(`⚡ 2º turno matematicamente definido`, "ok");
+          toast(`2º turno matematicamente definido`, "ok");
         } else {
           toast(`✓ ${nome} eleito(a)`, "ok");
         }
@@ -1258,7 +1260,7 @@ function comemorar(nome, cor = "#f0b429") {
   // Banner grande com o nome
   const banner = document.createElement("div");
   banner.className = "banner-eleito";
-  banner.innerHTML = `<div class="be-emoji">🎉</div><div class="be-nome">${nome}</div><div class="be-sub">Matematicamente eleito(a)</div>`;
+  banner.innerHTML = `<div class="be-ico" aria-hidden="true"><svg width="32" height="32"><use href="#i-trophy"/></svg></div><div class="be-nome">${nome}</div><div class="be-sub">Matematicamente eleito(a)</div>`;
   document.body.appendChild(banner);
   setTimeout(() => banner.classList.add("saindo"), 3500);
   setTimeout(() => banner.remove(), 4200);
