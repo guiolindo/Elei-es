@@ -944,6 +944,76 @@ async def apuracao_municipio(
     return body
 
 
+@router.get("/apuracao/zona")
+async def apuracao_zona(
+    uf: str = Query(..., min_length=2, max_length=2),
+    municipio: str = Query(..., min_length=1, max_length=6),
+    zona: str = Query(..., min_length=1, max_length=5),
+    cargo: int = Query(...),
+    turno: int = Query(1, ge=1, le=2),
+) -> dict[str, Any]:
+    """Apuração de uma zona eleitoral específica. Mesmo padrão do
+    endpoint de município: on-demand, cache 45s, sem persistência.
+
+    Zona é a subdivisão dentro do município (ex.: SP tem ~500 zonas).
+    Útil pra drill-down: usuário abre SP-SP no mapa → escolhe a zona
+    do bairro dele → vê onde cada candidato ganhou lá.
+    """
+    from app.config import get_settings
+    from time import monotonic
+    uf = uf.lower()
+    mu = str(int(municipio)).zfill(5)
+    zn = str(int(zona)).zfill(4)
+    settings = get_settings()
+    if cargo == 1:
+        cod = settings.eleicao_cod_1t if turno == 1 else settings.eleicao_cod_2t
+    else:
+        cod = settings.eleicao_cod_1t_estadual if turno == 1 else settings.eleicao_cod_2t_estadual
+    chave = f"z:{uf}:{mu}:{zn}:{cargo}:{cod}"
+    agora = monotonic()
+    hit = _CACHE_MUN.get(chave)  # reusa o mesmo cache
+    if hit and (agora - hit[0]) < _CACHE_MUN_TTL:
+        return {"cache_hit": True, **hit[1]}
+    base = settings.tse_cdn_base.rstrip("/").rsplit("/", 1)[0]
+    # Padrão TSE zona: /{cod}/dados/{uf}/{uf}{mun}z{zn}-c{cargo:04d}-e{cod:06d}-u.json
+    url = f"{base}/{cod}/dados/{uf}/{uf}{mu}z{zn}-c{cargo:04d}-e{cod:06d}-u.json"
+    j = await _fetch_tse_json(url)
+    if not j:
+        return {"disponivel": False, "url_tentada": url}
+    from poller.parser import parse_snapshot
+    try:
+        parsed = parse_snapshot(j)
+    except Exception:
+        return {"disponivel": False, "erro": "parse"}
+    if not parsed:
+        return {"disponivel": False}
+    tot = parsed.totais
+    lider = parsed.candidatos[0] if parsed.candidatos else None
+    body = {
+        "disponivel": True,
+        "uf": uf.upper(),
+        "municipio": mu.lstrip("0") or "0",
+        "zona": zn.lstrip("0") or "0",
+        "cargo": cargo,
+        "pct_apurado": (tot.qt_secoes_totalizadas / tot.qt_secoes_total * 100)
+                        if tot.qt_secoes_total else 0,
+        "secoes_total": tot.qt_secoes_total,
+        "secoes_totalizadas": tot.qt_secoes_totalizadas,
+        "lider": {
+            "sq_candidato": lider.sq_candidato,
+            "votos": lider.votos,
+            "pct_validos": float(lider.pct_validos),
+        } if lider else None,
+        "candidatos": [
+            {"sq_candidato": c.sq_candidato, "votos": c.votos,
+             "pct_validos": float(c.pct_validos)}
+            for c in parsed.candidatos[:20]
+        ],
+    }
+    _CACHE_MUN[chave] = (agora, body)
+    return body
+
+
 ws_router = APIRouter()
 
 
