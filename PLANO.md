@@ -1,0 +1,103 @@
+# PLANO — próximas rodadas
+
+Documento vivo com o backlog priorizado. Atualiza a cada sessão. Foco:
+o que ainda falta pro dia D (04/10/2026) e o que pode esperar.
+
+## Status atual (30/09/2026)
+
+Backend maduro:
+- Poller multi-cargo (Presidente + Governador + Senador + Dep. Federal + Dep. Estadual) rodando com 2 códigos TSE distintos (6257 federal / 6259 estadual), descoberta automática.
+- Parser tolerante lendo `s/e/v` como dicts (bug crítico corrigido).
+- Endpoints on-demand: `/api/apuracao/municipio` e `/api/apuracao/zona` com cache 45s em memória (mapa não pesa no banco).
+- Retenção enxuta: cleanup a cada 1h mantém 200 snapshots por chave (~50 MB total previstos).
+- Self-heal de `partido_numero` no startup (fix histórico do senador sem logo).
+- Cache-busting em `app.js`/`app.css` via `?v=<mtime>` — fixes de frontend chegam sem hard-reload.
+- Motor matemático completo: presidente/governador unificados (art. 77 CF), 2º turno com desempate por idade (art. 110 CE), sobras em 3 fases (QP → 80/20 → residual STF).
+- 55 testes passando em 0.15s.
+- Documentação: README, ARCHITECTURE, AGENTS, CHANGELOG, docs/metodologia, docs/security, docs/operations, docs/api-reference, docs/faq.
+
+## P0 — antes do dia D (04/10)
+
+### 1. Frontend do mapa consumindo os endpoints novos
+- [ ] `bootMapa()` em `app/static/app.js`: renderizar mapa SVG do Brasil por UF (fill = cor do partido líder na UF)
+- [ ] Ao clicar UF → carrega municípios via `/api/apuracao/municipio` em batch (max 20 paralelos, com `Promise.all` limitado)
+- [ ] Ao clicar município → carrega zonas via `/api/apuracao/zona`
+- [ ] Loading skeleton por camada
+- [ ] Legenda com cor de cada líder possível
+
+Estimativa: 4-6h. Bloqueador: SVG do Brasil (usar `simplemaps` ou similar, ~30 KB).
+
+### 2. Teste do dia D — carga sintética
+- [ ] Simular 500 conexões WS simultâneas + 100 req/s no `/api/apuracao/atual`
+- [ ] Verificar rate limit (100/min por IP — pode precisar afrouxar pra 300/min)
+- [ ] Confirmar autovacuum tuning da migration 0005 tá segurando
+
+Estimativa: 2h. Rodar `locust` ou script `asyncio` no scratchpad.
+
+### 3. Ajuste de cadência no dia D
+- [ ] `_cleanup_snapshots_loop`: no dia D reduzir de 1h pra 15min (mais fluxo)
+- [ ] `poll_interval_seconds`: manter 20s até 17h de domingo, subir pra 10s durante apuração
+- [ ] Considerar `POLL_INTERVAL_APURACAO=10` como env var separada
+
+Estimativa: 1h. Preferir env vars sobre hardcode.
+
+## P1 — nice-to-have pré-eleição
+
+### 4. Página `/urna` — verificação de BU
+- Usuário informa UF + município + zona + seção → mostra o boletim de urna
+- Requer parser de BU do TSE (formato próprio, JSON assinado)
+- Validar assinatura digital do TSE (ICP-Brasil)
+- Estimativa: 8-12h. Feature isolada, não bloqueia outros trabalhos.
+
+### 5. Notificações push do resultado final
+- Já tem infra VAPID + `PushSubscription` no banco
+- Falta o gatilho quando `pct_apurado >= 99.5` E vencedor definido
+- Copy da notificação: "Fulano eleito Presidente com X% dos votos"
+- Estimativa: 3h.
+
+### 6. Bot do Telegram — comando `/mapa <UF>`
+- Retorna o líder de cada município como texto (top 5 municípios)
+- Reusa endpoint on-demand
+- Estimativa: 2h.
+
+## P2 — pós-eleição
+
+### 7. Análise histórica
+- Página `/historico` comparando 2022 vs 2026 (se tivermos dados de 2022 importados)
+- Requer sincronizar candidatos de 2022 no divulga
+- Estimativa: 6h.
+
+### 8. Export CSV/JSON dos resultados
+- Endpoint `/api/apuracao/export?cargo=X&formato=csv`
+- Para pesquisadores, jornalistas
+- Estimativa: 2h.
+
+### 9. Rate limit por API key (não só IP)
+- Se abrir a API pra terceiros, precisa key
+- Estimativa: 3h.
+
+## Débitos técnicos identificados
+
+- `poller/service.py` tem lógica de retry acoplada ao loop principal — poderia virar decorator.
+- `notif/telegram_bot.py` está com ~750 linhas em um arquivo só — funciona, mas revisitável.
+- Tests não cobrem os endpoints on-demand novos (`/municipio`, `/zona`) — mockar TSE e adicionar.
+- `alembic/versions` tem 5 migrations — se ficar muitas mais, considerar squash pré-produção.
+
+## Contas de capacidade (referência rápida)
+
+Railway Postgres Hobby = 8 GB.
+
+Volume real esperado com retenção enxuta:
+- Snapshots: ~200/chave × ~110 chaves (1 presidente + 27 UFs × 4 cargos) × ~30 KB = **~660 MB**
+- Candidatos: ~30 mil × 3 KB = **~90 MB**
+- Eventos + comparações + subscriptions: **~50 MB**
+- Total: **~800 MB** — folga confortável de 7 GB.
+
+Sem cleanup, seria ~30 GB só nos snapshots do dia D.
+
+## Contatos e recursos
+
+- Fontes primárias: `resultados.tse.jus.br/oficial/ele2026/` e `divulgacandcontas.tse.jus.br`
+- Doc jurídica: `docs/metodologia.md` (links pra CF/CE/STF)
+- Import manual do Termux quando divulgacandcontas bloqueia Railway: `scripts/importar_termux.py`
+- Session Claude atual: https://claude.ai/code/session_019SvYDZmwHD39tVfjSPYDWk
