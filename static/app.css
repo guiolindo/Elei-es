@@ -407,6 +407,55 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   white-space: nowrap;
 }
 
+/* ============ Tarja de status matemático ============
+   Marca visual quando o candidato:
+   - Foi matematicamente eleito → tarja verde com troféu
+   - Foi matematicamente eliminado → tarja vermelha + foto grayscale
+   Copy é sóbria — "sem chance matemática", não "PERDEU" em capslock.
+   Resultado eleitoral merece dignidade mesmo pra quem perdeu.
+*/
+.cand-tarja {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px;
+  margin-top: 8px;
+}
+.cand-tarja svg { flex: 0 0 auto; stroke-width: 2.4; }
+.cand-tarja span { line-height: 1.2; }
+.tarja-eleito {
+  background: color-mix(in srgb, var(--ok) 15%, transparent);
+  color: var(--ok);
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
+}
+.tarja-eliminado {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: color-mix(in srgb, var(--danger) 85%, #fff 15%);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+}
+/* Foto do eliminado em preto-e-branco + opacidade reduzida.
+   Aplicado só na foto — o resto do card continua legível pra que a
+   pessoa consiga ler os votos e o status. */
+.candidato.eliminado .cand-foto {
+  filter: grayscale(1) brightness(.7);
+  opacity: .55;
+  transition: filter .3s ease, opacity .3s ease;
+}
+.candidato.eliminado .cand-nome {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--danger) 60%, transparent);
+}
+.candidato.eliminado .cand-votos {
+  opacity: .75;
+}
+/* Card do eleito tem um sutil brilho verde no border pra destacar sem
+   ser espalhafatoso — a tarja verde já carrega a mensagem. */
+.candidato.eleito {
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--line-2));
+}
+
 /* Bloco 3: rodapé (dois botões explícitos, sem posicionamento absoluto) */
 .cand-rodape {
   display: flex; gap: 8px; justify-content: space-between;

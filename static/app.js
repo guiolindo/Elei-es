@@ -20,6 +20,12 @@ const state = {
   ws: null,
   filtro: { texto: "", partido: "", ordenar: "votos" },
   proporcional: null,
+  // Candidatos matematicamente eliminados — sem chance aritmética de
+  // vencer/ir ao 2º turno mesmo somando todos os votos restantes. Poputa
+  // via /api/eventos + eventos que chegam pelo WS.
+  eliminados: new Set(),
+  // Candidatos eleitos matematicamente (majoritário ou proporcional).
+  eleitos: new Set(),
 };
 
 // ============ persistência de preferências ============
@@ -363,7 +369,12 @@ function renderLista() {
   for (const c of filtrados) {
     const sel = state.selecionados.indexOf(c.sq_candidato);
     const div = document.createElement("div");
-    div.className = "candidato" + (sel >= 0 ? " selecionado" : "");
+    const eliminado = state.eliminados.has(c.sq_candidato);
+    const eleito = state.eleitos.has(c.sq_candidato);
+    div.className = "candidato"
+      + (sel >= 0 ? " selecionado" : "")
+      + (eliminado ? " eliminado" : "")
+      + (eleito ? " eleito" : "");
     div.dataset.sqCard = c.sq_candidato;
     div.style.setProperty("--sel-cor", sel >= 0 ? PALETA[sel] : "");
     if (sel >= 0) {
@@ -389,6 +400,27 @@ function renderLista() {
       badgeProp = `<div class="badge-prop ${cls}" title="${prop.status}">${label}${fed}</div>`;
     }
     const pillPart = badgePartidoHtml(c.partido);
+    // Tarja de status matemático (eleito/eliminado). Cargo majoritário
+    // (presidente/governador): "Sem chance de ir ao 2º turno" pega bem.
+    // Proporcional (senador/dep): "Sem chance de eleição" é claro sem
+    // ser cruel. O aviso é sobrio — dignidade importa em resultado
+    // eleitoral, mesmo pra quem perdeu.
+    const cargoMaj = [1, 3].includes(state.cargo);
+    let tarja = "";
+    if (eleito) {
+      tarja = `<div class="cand-tarja tarja-eleito">
+        <svg width="14" height="14" aria-hidden="true"><use href="#i-trophy"/></svg>
+        <span>Eleito(a) matematicamente</span>
+      </div>`;
+    } else if (eliminado) {
+      const frase = cargoMaj
+        ? "Sem chance matemática de ir ao 2º turno"
+        : "Sem chance matemática de eleição";
+      tarja = `<div class="cand-tarja tarja-eliminado">
+        <svg width="14" height="14" aria-hidden="true"><use href="#i-x"/></svg>
+        <span>${frase}</span>
+      </div>`;
+    }
     // Layout redesenhado: header (foto + nome/partido) → métricas
     // (votos + %/delta + barra) → footer (botão "ver ficha" integrado).
     // Zero position:absolute nos elementos principais.
@@ -414,6 +446,7 @@ function renderLista() {
         </div>
         <div class="cand-barra"><div data-sq-barra="${c.sq_candidato}" style="width:0%"></div></div>
       </div>
+      ${tarja}
       <div class="cand-rodape">
         <button class="cand-acao cand-comparar" data-comparar="${c.sq_candidato}" aria-label="Selecionar para comparar">
           ${sel >= 0 ? '<svg width="14" height="14"><use href="#i-x"/></svg> remover' : '＋ comparar'}
@@ -1000,9 +1033,25 @@ const TIPOS_EVENTO = {
   MATEMATICAMENTE_ELIMINADO: { label: "Eliminado", classe: "danger", ico: "x" },
 };
 
+function _absorverEventoNoState(ev) {
+  // Popula state.eliminados / state.eleitos a partir de um evento.
+  // Chamado no carregamento inicial e em cada evento novo via WS —
+  // fonte única de verdade pro visual dos cards.
+  if (ev.tipo === "MATEMATICAMENTE_ELIMINADO" && ev.sq_candidato_a) {
+    state.eliminados.add(ev.sq_candidato_a);
+  } else if ((ev.tipo === "ELEITO_1T" || ev.tipo === "ELEITO_MAJORITARIO")
+             && ev.sq_candidato_a) {
+    state.eleitos.add(ev.sq_candidato_a);
+  }
+}
+
 async function carregarEventos() {
   let evs = [];
   try { evs = await get(`/api/eventos?cargo=${state.cargo}&abrangencia=${state.abrangencia}`); } catch (e) {}
+  // Reseta os sets — cargo/UF podem ter mudado e temos que zerar
+  state.eliminados.clear();
+  state.eleitos.clear();
+  evs.forEach(_absorverEventoNoState);
   const ul = $("lista-eventos");
   if (evs.length === 0) {
     ul.innerHTML = `<li class="vazio">Nenhum evento ainda. Aguardando apuração começar.</li>`;
@@ -1128,6 +1177,7 @@ function conectarWS() {
       await refreshApuracao();
       if (state.selecionados.length >= 2) await inicializarGraficos();
       for (const ev of msg.eventos || []) {
+        _absorverEventoNoState(ev);
         const nome = state.ficha[ev.sq_candidato_a]?.nome_urna || ev.sq_candidato_a;
         const num = state.ficha[ev.sq_candidato_a]?.partido;
         const cor = num ? corDoPartido(num) : "#f0b429";
