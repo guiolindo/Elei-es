@@ -65,12 +65,45 @@ async def _cleanup_snapshots_loop():
     """
     from sqlalchemy import select, delete, func
     from app.db import SessionLocal
-    from app.models import Snapshot, SnapshotTotais, SnapshotCandidato, SnapshotMunicipio
+    from app.models import Snapshot, SnapshotTotais, SnapshotCandidato, SnapshotMunicipio, Evento
     N = 200
     await asyncio.sleep(120)  # warmup mais longo, não urgente
     while True:
         try:
             async with SessionLocal() as sess:
+                # Primeiro: apaga snapshots com 0 votos, mantendo só o
+                # mais recente por chave (pré-apuração não precisa de
+                # histórico, só de 1 testemunho).
+                zero = (await sess.execute(
+                    select(Snapshot.id, Snapshot.cod_cargo, Snapshot.abrangencia,
+                           Snapshot.turno, Snapshot.coletado_em)
+                    .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
+                    .where(SnapshotTotais.qt_votos_validos == 0)
+                    .order_by(Snapshot.coletado_em.desc())
+                )).all()
+                if zero:
+                    mantidos: set[int] = set()
+                    vistos: set[tuple] = set()
+                    for row in zero:
+                        k = (row.cod_cargo, row.abrangencia, row.turno)
+                        if k not in vistos:
+                            vistos.add(k)
+                            mantidos.add(row.id)
+                    ids_zero = [r.id for r in zero if r.id not in mantidos]
+                    if ids_zero:
+                        for tabela in (Evento, SnapshotCandidato,
+                                       SnapshotMunicipio, SnapshotTotais):
+                            await sess.execute(
+                                delete(tabela)
+                                .where(tabela.snapshot_id.in_(ids_zero))
+                            )
+                        await sess.execute(
+                            delete(Snapshot).where(Snapshot.id.in_(ids_zero))
+                        )
+                        log.info("cleanup: %d snapshots com 0 votos apagados",
+                                 len(ids_zero))
+
+                # Depois: retenção N=200 das chaves normais
                 # Descobre todas as chaves (cargo, abrangencia, turno) com snapshots
                 chaves = (await sess.execute(
                     select(Snapshot.cod_cargo, Snapshot.abrangencia, Snapshot.turno)
@@ -134,27 +167,65 @@ async def _sync_candidatos_loop():
             log.info("self-heal: %d candidatos com partido_numero corrigido", n)
     except Exception:
         log.exception("self-heal partidos falhou")
-    # Self-heal: apaga eventos (VIRADA, ELEITO) emitidos em snapshots com
-    # 0 votos — fantasmas do bug corrigido em 01/10/2026. Idempotente.
+    # Self-heal: apaga snapshots com 0 votos (e seus eventos/totais/
+    # candidatos/municípios associados) — fantasmas do bug corrigido em
+    # 01/10/2026 que lotam o gráfico temporal com pontos "0% em
+    # 30/09/2026 16h" e deixam um platô vazio até o dia D. Mantém APENAS
+    # o snapshot mais recente de cada chave pra servir de "testemunho"
+    # de que estamos monitorando (eleitorado apto, nº de seções, etc).
+    # Idempotente.
     try:
-        from sqlalchemy import select, delete
+        from sqlalchemy import select, delete, func, and_ as sql_and
         from app.db import SessionLocal
-        from app.models import Snapshot, SnapshotTotais, Evento
+        from app.models import (
+            Snapshot, SnapshotTotais, SnapshotCandidato,
+            SnapshotMunicipio, Evento,
+        )
         async with SessionLocal() as sess:
-            snaps_zero = (await sess.execute(
-                select(Snapshot.id)
+            # IDs dos snapshots com 0 votos
+            zero = (await sess.execute(
+                select(Snapshot.id, Snapshot.cod_cargo, Snapshot.abrangencia,
+                       Snapshot.turno, Snapshot.coletado_em)
                 .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
                 .where(SnapshotTotais.qt_votos_validos == 0)
-            )).scalars().all()
-            if snaps_zero:
+                .order_by(Snapshot.coletado_em.desc())
+            )).all()
+            if zero:
+                # Mantém o mais recente por chave (cargo, abrangência, turno)
+                mantidos: set[int] = set()
+                vistos: set[tuple] = set()
+                for row in zero:
+                    chave = (row.cod_cargo, row.abrangencia, row.turno)
+                    if chave not in vistos:
+                        vistos.add(chave)
+                        mantidos.add(row.id)
+                ids_apagar = [r.id for r in zero if r.id not in mantidos]
+                if ids_apagar:
+                    # Apaga filhos (FK) na ordem segura
+                    for tabela in (Evento, SnapshotCandidato,
+                                   SnapshotMunicipio, SnapshotTotais):
+                        await sess.execute(
+                            delete(tabela)
+                            .where(tabela.snapshot_id.in_(ids_apagar))
+                        )
+                    await sess.execute(
+                        delete(Snapshot).where(Snapshot.id.in_(ids_apagar))
+                    )
+                    await sess.commit()
+                    log.info("self-heal: %d snapshots fantasma apagados "
+                             "(mantidos %d como testemunho)",
+                             len(ids_apagar), len(mantidos))
+                # Também apaga eventos presos nos snapshots-testemunho
+                # (não devem existir, mas idempotente)
                 r = await sess.execute(
-                    delete(Evento).where(Evento.snapshot_id.in_(snaps_zero))
+                    delete(Evento).where(Evento.snapshot_id.in_(mantidos))
                 )
-                await sess.commit()
                 if r.rowcount:
-                    log.info("self-heal: %d eventos fantasma apagados", r.rowcount)
+                    await sess.commit()
+                    log.info("self-heal: %d eventos fantasma no testemunho apagados",
+                             r.rowcount)
     except Exception:
-        log.exception("self-heal eventos falhou")
+        log.exception("self-heal snapshots fantasma falhou")
     while True:
         try:
             log.info("sync_candidatos: iniciando ciclo")

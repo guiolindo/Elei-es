@@ -244,6 +244,10 @@ async def historico(
             Snapshot.cod_cargo == cargo,
             Snapshot.abrangencia == abrangencia,
             Snapshot.suspeito.is_(False),
+            # Pré-apuração (0 votos) o gráfico desenha pontos "todos a 0%"
+            # com data de ontem/anteontem e deixa um platô vazio até o
+            # dia D. Exclui pra curva começar quando a apuração começa.
+            SnapshotTotais.qt_votos_validos > 0,
             SnapshotCandidato.sq_candidato.in_(sqs),
         ))
         .order_by(Snapshot.coletado_em)
