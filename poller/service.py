@@ -410,8 +410,17 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
             except Exception:
                 log.exception("erro processando %s", alvo)
 
+    ciclo = 0
+    # Heartbeat log a cada N ciclos pra confirmar que o loop está vivo
+    # mesmo quando nada muda nos snapshots (dedup por hash cala a boca
+    # do processar_alvo). Com poll a cada 20s, 60 ciclos = 20 min.
+    HEARTBEAT_A_CADA = 60
     while True:
         # Recria o cliente a cada ciclo pra permitir troca de proxy quando um cair
         async with await cliente_tse() as client:
             await asyncio.gather(*[_um(client, a) for a in alvos])
+        ciclo += 1
+        if ciclo % HEARTBEAT_A_CADA == 0:
+            log.info("poller vivo: %d ciclos completos (intervalo %ss, %d alvos)",
+                     ciclo, settings.poll_interval_seconds, len(alvos))
         await asyncio.sleep(settings.poll_interval_seconds)
