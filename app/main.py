@@ -134,6 +134,27 @@ async def _sync_candidatos_loop():
             log.info("self-heal: %d candidatos com partido_numero corrigido", n)
     except Exception:
         log.exception("self-heal partidos falhou")
+    # Self-heal: apaga eventos (VIRADA, ELEITO) emitidos em snapshots com
+    # 0 votos — fantasmas do bug corrigido em 01/10/2026. Idempotente.
+    try:
+        from sqlalchemy import select, delete
+        from app.db import SessionLocal
+        from app.models import Snapshot, SnapshotTotais, Evento
+        async with SessionLocal() as sess:
+            snaps_zero = (await sess.execute(
+                select(Snapshot.id)
+                .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
+                .where(SnapshotTotais.qt_votos_validos == 0)
+            )).scalars().all()
+            if snaps_zero:
+                r = await sess.execute(
+                    delete(Evento).where(Evento.snapshot_id.in_(snaps_zero))
+                )
+                await sess.commit()
+                if r.rowcount:
+                    log.info("self-heal: %d eventos fantasma apagados", r.rowcount)
+    except Exception:
+        log.exception("self-heal eventos falhou")
     while True:
         try:
             log.info("sync_candidatos: iniciando ciclo")
