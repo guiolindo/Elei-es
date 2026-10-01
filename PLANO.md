@@ -60,12 +60,25 @@ Estimativa: 2h. Rodar `locust` ou script `asyncio` no scratchpad.
 
 Estimativa: 1h. Preferir env vars sobre hardcode.
 
-### 4. Timestamp de "gerado_em_tse" visível na UI
+### 4. Voto do exterior (abrangência "ZZ")
+- Só vota presidente no exterior (CF art. 14 §1º c/c LC 44/82)
+- Eleitorado ~1 M em 2026 (consulados). Já ESTÁ incluído no total BR
+  — mas o TSE publica corte separado como UF virtual "ZZ":
+  `resultados.tse.jus.br/oficial/ele2026/6257/dados/zz/zz-c0001-e006257-u.json`
+- [ ] Poller: adicionar "ZZ" aos `ufs` quando cargo=1
+- [ ] API/`/apuracao/atual`: suportar `abrangencia=ZZ` (já funciona de
+  graça — tabela genérica)
+- [ ] Frontend: chip "Exterior" no seletor de UFs, visível só quando
+  cargo=presidente
+- Volume: 1 chave extra × 200 snapshots retidos = ~5 MB. Desprezível.
+- Estimativa: 15 min.
+
+### 5. Timestamp de "gerado_em_tse" visível na UI
 - Info já vem na API (`gerado_em_tse`, `coletado_em`) — só falta subir pra tela
 - Ajuda o usuário entender divergências entre níveis (BR × UF × município) que são naturais no dia D (TSE gera cada arquivo em momentos diferentes)
 - Estimativa: 15 min. Discricionário do designer.
 
-### 5. Página `/urna` — verificação de boletim de urna
+### 6. Página `/urna` — verificação de boletim de urna
 Dá pra desenvolver antes da eleição usando BUs de 2024 como ground truth.
 BUs de eleições passadas continuam online no S3 do TSE, então testes
 automatizados funcionam hoje.
