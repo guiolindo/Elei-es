@@ -33,6 +33,11 @@ from poller.tse_client import cliente_tse
 log = logging.getLogger(__name__)
 
 
+class _BloqueadoPorAkamai(Exception):
+    """Sinalização interna: divulgacandcontas bloqueou o IP (403 ou 429).
+    O sync aborta cedo em vez de queimar requests que vão todas falhar."""
+
+
 @dataclass
 class CandidatoTSE:
     sq_candidato: str
@@ -164,19 +169,24 @@ async def _fetch_lista(
         r = await client.get(url, timeout=20.0, headers=_TSE_HEADERS)
         if r.status_code == 404:
             return []
-        if r.status_code == 403:
+        if r.status_code in (403, 429):
             # Esperado quando o Railway (fora do BR) bate direto no TSE.
-            # Os candidatos são importados via Termux (scripts/importar_termux.py).
+            # 403 = Akamai bloqueou; 429 = rate limit do mesmo gateway.
+            # Candidatos são importados via Termux
+            # (scripts/importar_termux.py) ou /api/admin/importar-candidatos.
             # Debug em vez de warning pra não poluir o log.
-            log.debug("candidatos %s cargo=%s uf=%s: 403 Akamai (esperado)",
-                      ano, cargo, uf)
-            return []
+            log.debug("candidatos %s cargo=%s uf=%s: %d Akamai (esperado)",
+                      ano, cargo, uf, r.status_code)
+            # Sinaliza para o loop externo abortar
+            raise _BloqueadoPorAkamai()
         r.raise_for_status()
         j = r.json()
         cs = parse_lista(j, cargo, None if uf == "BR" else uf)
         if cs:
             log.info("candidatos %s cargo=%s uf=%s: %d encontrados", ano, cargo, uf, len(cs))
         return cs
+    except _BloqueadoPorAkamai:
+        raise
     except (httpx.HTTPError, ValueError) as e:
         log.warning("candidatos %s cargo=%s uf=%s falhou: %s", ano, cargo, uf, e)
         return []
@@ -315,12 +325,24 @@ async def sincronizar_candidatos(
     cod_eleicao = settings.eleicao_cod_divulga
 
     total = 0
+    bloqueado = False
     async with await cliente_tse() as client:
         for cargo in cargos:
+            if bloqueado:
+                break
             # Presidente é só uf=BR
             ufs_cargo = ["BR"] if cargo == 1 else [u for u in ufs if u != "BR"]
             for uf in ufs_cargo:
-                cands = await _fetch_lista(client, ano, uf, cod_eleicao, cargo)
+                try:
+                    cands = await _fetch_lista(client, ano, uf, cod_eleicao, cargo)
+                except _BloqueadoPorAkamai:
+                    log.info(
+                        "sync_candidatos: divulgacandcontas bloqueou (Akamai). "
+                        "Abortando ciclo. Use scripts/importar_termux.py do celular "
+                        "ou POST /api/admin/importar-candidatos."
+                    )
+                    bloqueado = True
+                    break
                 if not cands:
                     continue
                 async with SessionLocal() as sess:
