@@ -122,6 +122,34 @@ FEDERACOES_2026_DEFAULT = {
 }
 
 
+class _MediaKey:
+    """Chave de comparação pra max()/sort de médias D'Hondt sem float.
+
+    Compara `num_a/den_a` vs `num_b/den_b` por produto cruzado
+    (`num_a * den_b` vs `num_b * den_a`) — resultado exato em inteiros.
+    Em empate exato de média, desempata pela maior votação da unidade
+    (Res. TSE 23.677/2021, art. 108 §3º).
+    """
+    __slots__ = ("num", "den", "votos_unidade")
+
+    def __init__(self, num: int, den: int, votos_unidade: int):
+        self.num = num
+        self.den = den
+        self.votos_unidade = votos_unidade
+
+    def __lt__(self, other: "_MediaKey") -> bool:
+        a = self.num * other.den
+        b = other.num * self.den
+        if a != b:
+            return a < b
+        # Empate de média → maior votação ganha (desempate legal)
+        return self.votos_unidade < other.votos_unidade
+
+    def __eq__(self, other: "_MediaKey") -> bool:
+        return (self.num * other.den == other.num * self.den
+                and self.votos_unidade == other.votos_unidade)
+
+
 def _federacao_de(partido: int, federacoes: dict[str, set[int]]) -> str | None:
     for nome, membros in federacoes.items():
         if partido in membros:
@@ -174,8 +202,17 @@ def calcular_eleitos_proporcional(
         votos_por_unidade[u] = votos_por_unidade.get(u, 0) + votos
 
     # 2) QE e barreiras
+    # Regulação TSE: fração igual ou inferior a 0,5 é desprezada;
+    # somente fração estritamente superior a 0,5 arredonda para cima.
+    # Res. TSE 23.677/2021, art. 100 (consolidado p/ 2026 na Res. 23.748/2026).
+    # Implementação sem ponto flutuante — compara `2*r > vagas` que é
+    # exatamente "r/vagas > 0.5" sem imprecisão binária.
     votos_validos = sum(votos_por_unidade.values())
-    qe = votos_validos // vagas if vagas > 0 else 0
+    if vagas > 0:
+        q, r = divmod(votos_validos, vagas)
+        qe = q + (1 if 2 * r > vagas else 0)
+    else:
+        qe = 0
     barreira_qp = qe // 10              # 10% do QE — barreira nas vagas diretas do QP
     barreira_sobra_cand = int(qe * 0.20)  # 20% do QE — barreira do candidato nas sobras
     corte_80_qe = int(qe * 0.80)          # 80% do QE — barreira da unidade nas sobras (Fase 1)
@@ -216,9 +253,28 @@ def calcular_eleitos_proporcional(
     def total_sobras(u: str) -> int:
         return vagas_sobra_8020_por_unidade[u] + vagas_sobra_residual_por_unidade[u]
 
-    def media_dhondt(u: str) -> float:
+    def media_dhondt_tupla(u: str) -> tuple[int, int]:
+        """Média como par (numerador, denominador) pra comparação exata
+        por produto cruzado em vez de float. Evita arredondamento binário
+        que pode criar empate artificial ou inverter resultado em
+        votações grandes com médias próximas.
+        """
         total_atual = vagas_efetivas_por_unidade[u] + total_sobras(u)
-        return votos_por_unidade[u] / (total_atual + 1)
+        return (votos_por_unidade[u], total_atual + 1)
+
+    def media_cmp_key(u: str):
+        """Chave de ordenação determinística:
+          1. Maior média (produto cruzado em inteiros)
+          2. Em caso de empate exato, maior votação da unidade (desempate
+             legal — Res. 23.677 art. 108 §3º).
+        Python ordena tuplas lexicograficamente; invertemos sinal pra
+        max() natural.
+        """
+        num, den = media_dhondt_tupla(u)
+        # Pra max(): queremos maior média, maior votação.
+        # Como média é num/den, não dá pra usar sinal direto como int.
+        # Retorna um objeto que sabe comparar por produto cruzado:
+        return _MediaKey(num, den, votos_por_unidade[u])
 
     # ---- Fase 2 das sobras: Regra 80/20 (Lei 14.211/2021, art. 109 II) ----
     # Só concorrem partidos/federações com ≥ 80% do QE, cujos candidatos
@@ -235,7 +291,7 @@ def calcular_eleitos_proporcional(
                 elegiveis.append(u)
         if not elegiveis:
             break
-        vencedor = max(elegiveis, key=media_dhondt)
+        vencedor = max(elegiveis, key=media_cmp_key)
         vagas_sobra_8020_por_unidade[vencedor] += 1
         vagas_restantes -= 1
 
@@ -252,7 +308,7 @@ def calcular_eleitos_proporcional(
                 elegiveis.append(u)
         if not elegiveis:
             break
-        vencedor = max(elegiveis, key=media_dhondt)
+        vencedor = max(elegiveis, key=media_cmp_key)
         vagas_sobra_residual_por_unidade[vencedor] += 1
         vagas_restantes -= 1
 

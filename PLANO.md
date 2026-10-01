@@ -16,6 +16,25 @@ Backend maduro:
 - 55 testes passando em 0.15s.
 - Documentação: README, ARCHITECTURE, AGENTS, CHANGELOG, docs/metodologia, docs/security, docs/operations, docs/api-reference, docs/faq.
 
+## Auditoria externa de 30/09/2026 — veredictos
+
+Uma auditoria técnica foi feita por outra IA. Verifiquei cada bug
+contra o código real. Resumo:
+
+| Bug alegado | Veredicto | Status |
+|---|---|---|
+| BUG-01 (API ignora votos de legenda) | **Verdadeiro** | Pendente — fix no parser + API |
+| BUG-02 (federações desativadas) | **Falso** | Motor usa `FEDERACOES_2026_DEFAULT` quando API passa None; as 5 federações estão lá (BRASIL ESPERANCA, PSDB CIDADANIA, PSOL REDE, UNIÃO PROGRESSISTA, RENOVAÇÃO SOLIDÁRIA) |
+| BUG-03 (QE arredonda 0,5 pra cima) | **Verdadeiro** | ✅ **Corrigido** — divmod + `2*r > vagas` (sem float) |
+| BUG-04 (vaga QP vira eleição < 10%) | **Falso** | Código já faz `min(vagas_teoricas, passam_barreira)`; o que a auditoria chamou de "eleição abaixo de 10%" é a Fase 3 residual STF (ADI 7228/7263), legalmente correta |
+| BUG-05 (desempates proporcionais) | **Verdadeiro** | ✅ Parcialmente corrigido — desempate por maior votação da unidade (produto cruzado em `_MediaKey`). Desempate por idade entre candidatos ainda pendente |
+| BUG-06 (float em médias) | **Verdadeiro** | ✅ **Corrigido** — `_MediaKey` compara por produto cruzado em inteiros |
+| BUG-07 (senador empate idade) | **Verdadeiro** | Pendente — depende de ter `data_nascimento` no modelo |
+| BUG-08 (idade só em anos) | **Verdadeiro** | Pendente — mesma dependência de BUG-07 |
+
+Novos testes adicionados cobrindo QE em todas as franjas (0.5 exato,
+> 0.5, < 0.5, exato sem fração). Suíte: **59 testes passando**.
+
 ## P0 — antes do dia D (04/10)
 
 ### 1. Frontend do mapa consumindo os endpoints novos

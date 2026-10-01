@@ -132,3 +132,38 @@ def test_dhondt_sobras_multi_partidos():
     assert votos_por_p[13] == 2  # PT: 2 do QP
     assert votos_por_p[22] == 2  # PL: 1 QP + 1 sobra
     assert votos_por_p[45] == 1  # PSDB: 1 QP
+
+
+# ============ Testes de arredondamento do QE (TSE Res. 23.677 art. 100) ============
+# Regra: fração <= 0.5 descarta; fração > 0.5 arredonda pra cima.
+
+def test_qe_frac_exatamente_meio_descarta():
+    """1000/16 = 62.5 → fração 0.5 descarta → QE = 62."""
+    cands = [CandidatoProporcional(sq_candidato='X', nome_urna='X', numero=131,
+                                    partido_numero=13, votos=1000)]
+    r = calcular_eleitos_proporcional(cands, vagas=16)
+    assert r.qe == 62
+
+
+def test_qe_frac_acima_de_meio_arredonda():
+    """1001/16 = 62.5625 → fração > 0.5 arredonda → QE = 63."""
+    cands = [CandidatoProporcional(sq_candidato='X', nome_urna='X', numero=131,
+                                    partido_numero=13, votos=1001)]
+    r = calcular_eleitos_proporcional(cands, vagas=16)
+    assert r.qe == 63
+
+
+def test_qe_frac_abaixo_de_meio_descarta():
+    """999/16 = 62.4375 → fração < 0.5 descarta → QE = 62."""
+    cands = [CandidatoProporcional(sq_candidato='X', nome_urna='X', numero=131,
+                                    partido_numero=13, votos=999)]
+    r = calcular_eleitos_proporcional(cands, vagas=16)
+    assert r.qe == 62
+
+
+def test_qe_exato_sem_fracao():
+    """960/16 = 60 exato → QE = 60."""
+    cands = [CandidatoProporcional(sq_candidato='X', nome_urna='X', numero=131,
+                                    partido_numero=13, votos=960)]
+    r = calcular_eleitos_proporcional(cands, vagas=16)
+    assert r.qe == 60
