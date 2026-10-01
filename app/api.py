@@ -48,13 +48,29 @@ def _url_foto(sq_candidato: str, uf: str | None) -> str:
 
 @router.get("/config-publica")
 async def config_publica() -> dict[str, Any]:
-    """Config exposta ao frontend (não sensível). Usa pra montar o link
-    do bot do Telegram só quando ele estiver configurado."""
+    """Config pública (sem segredos). Expõe os códigos TSE que o
+    sistema usa pra auditoria externa, o ano da eleição e, quando o
+    bot do Telegram está habilitado, seu @username pra montar o link.
+
+    NUNCA inclui token, URL de proxy com credenciais, VAPID private
+    key, DB URL ou admin token.
+    """
     from app.config import get_settings
     s = get_settings()
     return {
-        "telegram_bot": (s.telegram_bot_username if s.telegram_bot_token else None),
         "eleicao_ano": s.eleicao_ano,
+        "codigos_tse": {
+            "presidente_1t": s.eleicao_cod_1t,
+            "presidente_2t": s.eleicao_cod_2t,
+            "estadual_1t": s.eleicao_cod_1t_estadual,
+            "estadual_2t": s.eleicao_cod_2t_estadual,
+            "divulga": s.eleicao_cod_divulga,
+        },
+        "fontes": {
+            "resultados": s.tse_cdn_base,
+            "candidatos": "https://divulgacandcontas.tse.jus.br",
+        },
+        "telegram_bot": (s.telegram_bot_username if s.telegram_bot_token else None),
     }
 
 

@@ -229,7 +229,7 @@ def create_app() -> FastAPI:
             with open(caminho, "r", encoding="utf-8") as f:
                 html = f.read()
             versoes = {}
-            for arq in ("app.js", "app.css", "partidos.js"):
+            for arq in ("app.js", "app.css", "partidos.js", "verificacao.js"):
                 p = os.path.join("static", arq)
                 if os.path.exists(p):
                     versoes[arq] = int(os.path.getmtime(p))

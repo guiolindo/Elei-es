@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Content-Security-Policy"
- content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;">
+ content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -65,6 +65,37 @@
     margin-bottom: 6px;
   }
   .verif-sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .verif-exec {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 10px; padding: 6px 12px;
+    background: transparent; border: 1px solid var(--line-2);
+    color: var(--fg-2); border-radius: 6px; font-size: 12px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .verif-exec:hover { border-color: var(--brand); color: var(--brand); }
+  .verif-exec:disabled { opacity: .5; cursor: wait; }
+  .verif-resp {
+    margin-top: 10px; padding: 12px 14px;
+    background: #0a0f1a; border: 1px solid var(--line-2);
+    border-radius: 6px; font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; line-height: 1.5; color: var(--fg);
+    max-height: 400px; overflow: auto;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .verif-resp.erro { color: var(--danger); }
+  .verif-resp-meta {
+    font-size: 11px; color: var(--muted); margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .verif-resp-meta .verif-status-ok { color: var(--ok); }
+  .verif-resp-meta .verif-status-err { color: var(--danger); }
+  /* syntax highlight simples (sem lib) */
+  .j-str { color: #86efac; }
+  .j-num { color: #fcd34d; }
+  .j-bool { color: #f0abfc; }
+  .j-null { color: #94a3b8; }
+  .j-key { color: #93c5fd; }
 </style>
 </head>
 <body>
@@ -277,16 +308,6 @@
       </div>
     </div>
 
-    <div class="verif-card">
-      <div class="verif-card-topo">
-        <span class="verif-metodo">GET</span>
-        <a class="verif-card-url" href="/importar" target="_blank" rel="noopener">/importar</a>
-      </div>
-      <div class="verif-card-desc">
-        Página de importação manual (precisa de token admin para efetivar
-        o upload — útil quando a Railway é bloqueada pelo divulgacandcontas).
-      </div>
-    </div>
   </div>
 
   <div class="verif-intro" style="margin-top: 40px;">
@@ -295,9 +316,12 @@
     reservadas (importar candidatos manualmente, limpar seed de teste,
     disparar sincronização). Eles exigem token (<code>X-Admin-Token</code>)
     e por isso <strong>não aparecem aqui</strong> — não há nada que
-    uma pessoa comum do público precise fazer com eles.
+    uma pessoa comum do público precise fazer com eles. A página
+    <a href="/importar">/importar</a> também cai nessa categoria: o
+    formulário existe mas só funciona com o token de admin.
   </div>
 </main>
 
+<script src="/static/verificacao.js"></script>
 </body>
 </html>
