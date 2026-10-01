@@ -78,7 +78,7 @@ async def _cleanup_snapshots_loop():
                     select(Snapshot.id, Snapshot.cod_cargo, Snapshot.abrangencia,
                            Snapshot.turno, Snapshot.coletado_em)
                     .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
-                    .where(SnapshotTotais.qt_votos_validos == 0)
+                    .where(SnapshotTotais.qt_secoes_totalizadas == 0)
                     .order_by(Snapshot.coletado_em.desc())
                 )).all()
                 if zero:
@@ -187,7 +187,7 @@ async def _sync_candidatos_loop():
                 select(Snapshot.id, Snapshot.cod_cargo, Snapshot.abrangencia,
                        Snapshot.turno, Snapshot.coletado_em)
                 .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
-                .where(SnapshotTotais.qt_votos_validos == 0)
+                .where(SnapshotTotais.qt_secoes_totalizadas == 0)
                 .order_by(Snapshot.coletado_em.desc())
             )).all()
             if zero:

@@ -244,10 +244,13 @@ async def historico(
             Snapshot.cod_cargo == cargo,
             Snapshot.abrangencia == abrangencia,
             Snapshot.suspeito.is_(False),
-            # Pré-apuração (0 votos) o gráfico desenha pontos "todos a 0%"
-            # com data de ontem/anteontem e deixa um platô vazio até o
-            # dia D. Exclui pra curva começar quando a apuração começa.
-            SnapshotTotais.qt_votos_validos > 0,
+            # Só inclui snapshots que já são apuração — critério é
+            # qt_secoes_totalizadas > 0 (não qt_votos_validos). Diferença
+            # importante no dia D: uma seção pode ter sido totalizada com
+            # TODOS os votos brancos/nulos, dando qt_votos_validos=0 mas
+            # qt_secoes_totalizadas=1 — isso é apuração real, deve
+            # aparecer no gráfico (improvável mas possível).
+            SnapshotTotais.qt_secoes_totalizadas > 0,
             SnapshotCandidato.sq_candidato.in_(sqs),
         ))
         .order_by(Snapshot.coletado_em)
@@ -299,7 +302,10 @@ async def apuracao_proporcional(
     tot = (await sess.execute(
         select(SnapshotTotais).where(SnapshotTotais.snapshot_id == snap.id)
     )).scalar_one_or_none()
-    if not tot or (tot.qt_votos_validos or 0) == 0:
+    # Gate correto é "nenhuma seção totalizada ainda", não "nenhum voto
+    # válido" — se já há seção apurada mas só com brancos/nulos, o
+    # motor pode rodar (QE=0 trivialmente, mas status fica correto).
+    if not tot or (tot.qt_secoes_totalizadas or 0) == 0:
         return {
             "disponivel": False,
             "vagas": vagas,
@@ -746,7 +752,7 @@ async def limpar_eventos_pre_apuracao(sess: AsyncSession = Depends(get_session))
     snaps_zero = (await sess.execute(
         select(Snapshot.id)
         .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
-        .where(SnapshotTotais.qt_votos_validos == 0)
+        .where(SnapshotTotais.qt_secoes_totalizadas == 0)
     )).scalars().all()
     if not snaps_zero:
         return {"ok": True, "removidos": 0}

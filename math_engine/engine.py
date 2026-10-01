@@ -296,6 +296,11 @@ def detectar_viradas(
     if (sum(c.votos for c in candidatos_atual) == 0
             or sum(c.votos for c in candidatos_anterior) == 0):
         return []
+    # Mapas de VOTOS por sq (não só posição) — pra ter critério objetivo
+    # de "A está à frente de B": A.votos > B.votos. Posição com empate é
+    # ambígua e varia conforme ordem de inserção.
+    votos_ant = {c.sq_candidato: c.votos for c in candidatos_anterior}
+    votos_now = {c.sq_candidato: c.votos for c in candidatos_atual}
     pos_anterior = {c.sq_candidato: i for i, c in
                     enumerate(sorted(candidatos_anterior, key=lambda x: x.votos, reverse=True))}
     pos_atual = {c.sq_candidato: i for i, c in
@@ -318,12 +323,21 @@ def detectar_viradas(
             for outro in candidatos_atual:
                 if outro.sq_candidato == sq:
                     continue
-                if (pos_anterior.get(outro.sq_candidato, LEN_A) < pos_anterior[sq] and
-                    pos_atual.get(outro.sq_candidato, LEN_B) > pos_atual[sq]):
+                outro_sq = outro.sq_candidato
+                # Validação ESTRITA por votos: só é virada legítima se
+                # ANTES o outro tinha mais votos E AGORA eu tenho mais.
+                # Empate (votos iguais) não é virada — proíbe ping-pong
+                # fantasma quando dois candidatos têm exatamente a mesma
+                # votação e a ordem oscila entre snapshots.
+                if not (votos_ant.get(outro_sq, 0) > votos_ant.get(sq, 0)
+                        and votos_now.get(sq, 0) > votos_now.get(outro_sq, 0)):
+                    continue
+                if (pos_anterior.get(outro_sq, LEN_A) < pos_anterior[sq] and
+                    pos_atual.get(outro_sq, LEN_B) > pos_atual[sq]):
                     eventos.append({
                         "tipo": "VIRADA",
                         "sq_candidato_a": sq,
-                        "sq_candidato_b": outro.sq_candidato,
+                        "sq_candidato_b": outro_sq,
                         "detalhes": {
                             "pos_nova": pos_atual[sq] + 1,
                             "pos_antiga": pos_anterior[sq] + 1,

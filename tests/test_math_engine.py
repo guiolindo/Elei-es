@@ -540,3 +540,22 @@ def test_detectar_viradas_com_votos_emite():
     evs = detectar_viradas(agora, antes)
     assert any(e["tipo"] == "VIRADA" and e["sq_candidato_a"] == "B"
                and e["sq_candidato_b"] == "A" for e in evs)
+
+
+def test_detectar_viradas_empate_nao_emite():
+    """Dois candidatos com MESMA votação não viram ping-pong fantasma.
+    A ordem do sort é indefinida com empate — não é virada."""
+    from math_engine.engine import detectar_viradas, CandidatoResumo
+    antes = [CandidatoResumo("A", 100), CandidatoResumo("B", 100), CandidatoResumo("C", 50)]
+    agora = [CandidatoResumo("B", 100), CandidatoResumo("A", 100), CandidatoResumo("C", 50)]
+    assert detectar_viradas(agora, antes) == []
+
+
+def test_detectar_viradas_candidato_zero_nao_cria_virada():
+    """Candidato com 0 votos no top-5 (improvável mas possível no início
+    da apuração) não deve gerar virada contra outro com 0 ou com votos."""
+    from math_engine.engine import detectar_viradas, CandidatoResumo
+    antes = [CandidatoResumo("A", 500), CandidatoResumo("B", 0), CandidatoResumo("C", 0)]
+    agora = [CandidatoResumo("A", 500), CandidatoResumo("C", 0), CandidatoResumo("B", 0)]
+    # B e C trocaram posição mas ambos com 0 — não é virada
+    assert detectar_viradas(agora, antes) == []
