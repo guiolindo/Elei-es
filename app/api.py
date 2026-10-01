@@ -286,7 +286,22 @@ async def apuracao_proporcional(
 
     snap = await _ultimo_snapshot(sess, cargo, uf.upper())
     if not snap:
-        return {"disponivel": False, "vagas": vagas}
+        return {"disponivel": False, "vagas": vagas, "motivo": "sem snapshot"}
+
+    # Pré-apuração (0 votos) o motor marcaria todo mundo como "eleito" ou
+    # "suplente" por ordem arbitrária — fariam PT eleger 45 candidatos
+    # com 0 votos, PSD ter 65 "partido_sem_vaga", etc. O status seria
+    # ficção. Só roda o cálculo quando há voto real.
+    tot = (await sess.execute(
+        select(SnapshotTotais).where(SnapshotTotais.snapshot_id == snap.id)
+    )).scalar_one_or_none()
+    if not tot or (tot.qt_votos_validos or 0) == 0:
+        return {
+            "disponivel": False,
+            "vagas": vagas,
+            "motivo": "apuracao nao iniciada",
+            "coletado_em": snap.coletado_em.isoformat(),
+        }
 
     cands_db = (await sess.execute(
         select(SnapshotCandidato, Candidato)
@@ -716,6 +731,26 @@ async def reparsear_snapshots(sess: AsyncSession = Depends(get_session)) -> dict
     await sess.commit()
     return {"ok": True, "snapshots_reparsed": atualizados,
             "total_snapshots": len(snaps)}
+
+
+@router.post("/admin/limpar-eventos-pre-apuracao", dependencies=[Depends(_exigir_admin)])
+async def limpar_eventos_pre_apuracao(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Apaga eventos (VIRADA, ELEITO, etc) emitidos em snapshots com 0
+    votos válidos — fantasma do bug fixado em 01/10/2026. Idempotente."""
+    from sqlalchemy import delete
+    # Snapshots sem apuração: votos_validos=0
+    snaps_zero = (await sess.execute(
+        select(Snapshot.id)
+        .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
+        .where(SnapshotTotais.qt_votos_validos == 0)
+    )).scalars().all()
+    if not snaps_zero:
+        return {"ok": True, "removidos": 0}
+    r = await sess.execute(
+        delete(Evento).where(Evento.snapshot_id.in_(snaps_zero))
+    )
+    await sess.commit()
+    return {"ok": True, "removidos": r.rowcount or 0, "snapshots_afetados": len(snaps_zero)}
 
 
 @router.post("/admin/corrigir-partidos", dependencies=[Depends(_exigir_admin)])

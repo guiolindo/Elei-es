@@ -520,3 +520,23 @@ def test_snapshot_com_totalizadas_maior_que_apto_nao_quebra():
     ]
     assert votos_restantes_max(t) == 0
     assert eleito_majoritario(cands, t) is True
+
+
+def test_detectar_viradas_sem_votos_nao_emite():
+    """Pré-apuração todos têm 0 votos — ordem é arbitrária, não deve
+    emitir virada fantasma."""
+    from math_engine.engine import detectar_viradas, CandidatoResumo
+    a = [CandidatoResumo("A", 0), CandidatoResumo("B", 0), CandidatoResumo("C", 0)]
+    b = [CandidatoResumo("B", 0), CandidatoResumo("A", 0), CandidatoResumo("C", 0)]
+    assert detectar_viradas(a, b) == []
+    assert detectar_viradas(b, a) == []
+
+
+def test_detectar_viradas_com_votos_emite():
+    """Com votos reais, virada legítima é emitida."""
+    from math_engine.engine import detectar_viradas, CandidatoResumo
+    antes = [CandidatoResumo("A", 100), CandidatoResumo("B", 50)]
+    agora = [CandidatoResumo("B", 150), CandidatoResumo("A", 100)]
+    evs = detectar_viradas(agora, antes)
+    assert any(e["tipo"] == "VIRADA" and e["sq_candidato_a"] == "B"
+               and e["sq_candidato_b"] == "A" for e in evs)

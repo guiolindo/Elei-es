@@ -289,6 +289,13 @@ def detectar_viradas(
     """
     if not candidatos_atual or not candidatos_anterior:
         return []
+    # Pré-apuração todos os candidatos têm 0 votos — a ordem fica arbitrária
+    # (vem do TSE conforme ele lista) e muda entre snapshots sem significado.
+    # Comparar essas ordens emitia "FULANO passou SICRANO" fantasma na timeline
+    # com 0% apurado. Só compara se há algum voto de verdade dos dois lados.
+    if (sum(c.votos for c in candidatos_atual) == 0
+            or sum(c.votos for c in candidatos_anterior) == 0):
+        return []
     pos_anterior = {c.sq_candidato: i for i, c in
                     enumerate(sorted(candidatos_anterior, key=lambda x: x.votos, reverse=True))}
     pos_atual = {c.sq_candidato: i for i, c in
