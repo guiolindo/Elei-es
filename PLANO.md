@@ -60,7 +60,28 @@ Estimativa: 2h. Rodar `locust` ou script `asyncio` no scratchpad.
 
 Estimativa: 1h. Preferir env vars sobre hardcode.
 
-### 4. Voto do exterior (abrangência "ZZ")
+### 4. Tarja de proporcional mentindo pré-apuração
+Reportado 01/10/2026 via screenshot. Antes da apuração começar, cards
+de Dep. Estadual GO mostram:
+- Ana Carolina (Republicanos) → "PARTIDO S/ VAGA"
+- Ana Carol (PT) → "SUPLENTE · FED."
+- Carol do Amiltinho (MDB) → "PARTIDO S/ VAGA"
+
+Todas com 0 votos. Os status vêm do motor rodando com votos_validos=0:
+QE=0, barreira=0, ninguém ganha vaga real, mas candidatos de federação
+são marcados "suplente · fed" porque entram na lista federativa unificada
+e os de partido isolado viram "partido_sem_vaga". **A tarja mente**:
+sugere que a candidata do PT está em posição diferente da do Republicanos,
+quando na verdade ninguém tem voto.
+
+Fix: `apuracao_proporcional` retorna `disponivel: false` quando
+`votos_validos = 0` (ou `pct_apurado = 0`). Frontend então não desenha
+badge. Mesma lógica do título da aba — nada de status até haver apuração
+real.
+
+Estimativa: 15 min.
+
+### 5. Voto do exterior (abrangência "ZZ")
 - Só vota presidente no exterior (CF art. 14 §1º c/c LC 44/82)
 - Eleitorado ~1 M em 2026 (consulados). Já ESTÁ incluído no total BR
   — mas o TSE publica corte separado como UF virtual "ZZ":
@@ -73,12 +94,12 @@ Estimativa: 1h. Preferir env vars sobre hardcode.
 - Volume: 1 chave extra × 200 snapshots retidos = ~5 MB. Desprezível.
 - Estimativa: 15 min.
 
-### 5. Timestamp de "gerado_em_tse" visível na UI
+### 6. Timestamp de "gerado_em_tse" visível na UI
 - Info já vem na API (`gerado_em_tse`, `coletado_em`) — só falta subir pra tela
 - Ajuda o usuário entender divergências entre níveis (BR × UF × município) que são naturais no dia D (TSE gera cada arquivo em momentos diferentes)
 - Estimativa: 15 min. Discricionário do designer.
 
-### 6. Página `/urna` — verificação de boletim de urna
+### 7. Página `/urna` — verificação de boletim de urna
 Dá pra desenvolver antes da eleição usando BUs de 2024 como ground truth.
 BUs de eleições passadas continuam online no S3 do TSE, então testes
 automatizados funcionam hoje.
