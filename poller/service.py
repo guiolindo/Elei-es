@@ -172,19 +172,52 @@ async def processar_alvo(
                 )
             )
             faltando = sqs_snapshot - {row[0] for row in existentes.all()}
-            for c in ordenados:
-                if c.sq_candidato not in faltando:
-                    continue
-                sess.add(Candidato(
-                    sq_candidato=c.sq_candidato,
-                    nome=c.nome_urna or f"Cand {c.numero}",
-                    nome_urna=c.nome_urna or f"Cand {c.numero}",
-                    numero=c.numero,
-                    cod_cargo=alvo.cod_cargo,
-                    uf=None if alvo.abrangencia == "BR" else alvo.abrangencia,
-                    partido_numero=0,
-                ))
             if faltando:
+                # Deriva partido pelo número do candidato (fallback — melhor
+                # que partido_numero=0 que quebra FK). Padrão TSE:
+                #   cargo 1/3 (president/gov): 2 dígitos = partido
+                #   cargo 5/6/7: 2 primeiros dígitos = partido
+                def _derivar_partido(numero: int, cargo: int) -> int:
+                    if not numero:
+                        return 0
+                    s = str(numero)
+                    if cargo in (1, 3):
+                        return int(s[:2]) if len(s) >= 2 else int(s)
+                    return int(s[:2]) if len(s) >= 2 else 0
+
+                # Garante que todos os partidos derivados existem (upsert
+                # idempotente de "N/D" quando o número não bate com nenhum
+                # partido real). Evita FK violation.
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+                from app.models import Partido as _P
+                partidos_necessarios: set[int] = {0}
+                for c in ordenados:
+                    if c.sq_candidato in faltando:
+                        partidos_necessarios.add(_derivar_partido(c.numero, alvo.cod_cargo))
+                existentes_part = {
+                    n for (n,) in (await sess.execute(
+                        select(_P.numero).where(_P.numero.in_(partidos_necessarios))
+                    )).all()
+                }
+                for n in partidos_necessarios - existentes_part:
+                    stmt = pg_insert(_P).values(
+                        numero=n, sigla=f"P{n}" if n else "N/D",
+                        nome="Partido não identificado" if not n else f"P{n}",
+                    )
+                    stmt = stmt.on_conflict_do_nothing(index_elements=["numero"])
+                    await sess.execute(stmt)
+                for c in ordenados:
+                    if c.sq_candidato not in faltando:
+                        continue
+                    sess.add(Candidato(
+                        sq_candidato=c.sq_candidato,
+                        nome=c.nome_urna or f"Cand {c.numero}",
+                        nome_urna=c.nome_urna or f"Cand {c.numero}",
+                        numero=c.numero,
+                        cod_cargo=alvo.cod_cargo,
+                        uf=None if alvo.abrangencia == "BR" else alvo.abrangencia,
+                        partido_numero=_derivar_partido(c.numero, alvo.cod_cargo),
+                    ))
                 await sess.flush()
                 log.info("stub criado para %d candidatos que faltavam", len(faltando))
 
