@@ -60,7 +60,34 @@ Estimativa: 2h. Rodar `locust` ou script `asyncio` no scratchpad.
 
 Estimativa: 1h. Preferir env vars sobre hardcode.
 
-### 4. Tarja de proporcional mentindo pré-apuração
+### 4. Candidatos que desistiram / foram cassados aparecem como normais
+Pergunta do usuário: Leonardo Avalanche (número 28, cargo 1) desistiu
+da candidatura. O que o sistema faz? Hoje:
+- Parser só filtra `descricaoSituacao=indeferido` sem recurso
+- `renunciou`, `cancelado`, `cassado` passam direto como candidato ativo
+- Se receber votos no dia D (vai receber — eleitor pode não saber),
+  aparece no ranking, pode até ser marcado "eleito" se tiver muito voto
+- Nenhuma tag visual indica que ele saiu da disputa
+
+Impacto jurídico: Lei 9.504/97 art. 175 §3º — votos em candidato com
+registro cancelado após convenção são considerados **nulos** na
+apuração oficial. O sistema não implementa isso.
+
+Fix necessário (maior, ~3h):
+- [ ] Migration: coluna `situacao` em `candidatos` (`ativo | renunciou |
+  cancelado | indeferido_sem_recurso | cassado`)
+- [ ] `parse_candidato`: lê `descricaoSituacao` do divulga e popula
+- [ ] `sincronizar_candidatos`: também atualiza situacao em candidatos
+  já existentes (TSE pode mudar depois de registrado)
+- [ ] Motor (`avaliar_apuracao`): exclui candidatos com situacao não
+  ativa do cálculo de "eleito" e "2º turno". Votos aparecem no total
+  mas candidato não ganha nada.
+- [ ] UI: badge vermelha "CANDIDATURA RETIRADA" + foto grayscale,
+  distinta da tarja "matematicamente eliminado". Linha explicando
+  que os votos nele são nulos por lei.
+- [ ] Testes: cenário "candidato retirado com 60% dos votos não é eleito"
+
+### 5. Tarja de proporcional mentindo pré-apuração
 Reportado 01/10/2026 via screenshot. Antes da apuração começar, cards
 de Dep. Estadual GO mostram:
 - Ana Carolina (Republicanos) → "PARTIDO S/ VAGA"
@@ -81,7 +108,7 @@ real.
 
 Estimativa: 15 min.
 
-### 5. Voto do exterior (abrangência "ZZ")
+### 6. Voto do exterior (abrangência "ZZ")
 - Só vota presidente no exterior (CF art. 14 §1º c/c LC 44/82)
 - Eleitorado ~1 M em 2026 (consulados). Já ESTÁ incluído no total BR
   — mas o TSE publica corte separado como UF virtual "ZZ":
@@ -94,12 +121,12 @@ Estimativa: 15 min.
 - Volume: 1 chave extra × 200 snapshots retidos = ~5 MB. Desprezível.
 - Estimativa: 15 min.
 
-### 6. Timestamp de "gerado_em_tse" visível na UI
+### 7. Timestamp de "gerado_em_tse" visível na UI
 - Info já vem na API (`gerado_em_tse`, `coletado_em`) — só falta subir pra tela
 - Ajuda o usuário entender divergências entre níveis (BR × UF × município) que são naturais no dia D (TSE gera cada arquivo em momentos diferentes)
 - Estimativa: 15 min. Discricionário do designer.
 
-### 7. Página `/urna` — verificação de boletim de urna
+### 8. Página `/urna` — verificação de boletim de urna
 Dá pra desenvolver antes da eleição usando BUs de 2024 como ground truth.
 BUs de eleições passadas continuam online no S3 do TSE, então testes
 automatizados funcionam hoje.
