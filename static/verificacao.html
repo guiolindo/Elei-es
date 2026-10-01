@@ -204,10 +204,14 @@
     <div class="verif-card">
       <div class="verif-card-topo">
         <span class="verif-metodo">GET</span>
-        <a class="verif-card-url" href="/api/apuracao/historico?cargo=1&amp;abrangencia=BR" target="_blank" rel="noopener">/api/apuracao/historico?cargo=1&amp;abrangencia=BR</a>
+        <a class="verif-card-url" href="/api/apuracao/historico?cargo=1&amp;abrangencia=BR&amp;candidatos=280002542548,280002551544" target="_blank" rel="noopener">/api/apuracao/historico?cargo=1&amp;abrangencia=BR&amp;candidatos=&lt;sqs&gt;</a>
       </div>
       <div class="verif-card-desc">
-        Série temporal dos últimos snapshots (até 200 por chave).
+        Série temporal dos últimos snapshots (até 200 por chave) para
+        os candidatos indicados. Parâmetro <code>candidatos</code> é
+        obrigatório — lista de <code>sq_candidato</code> separada por
+        vírgula (ex.: dois candidatos do exemplo). Pegue os
+        <code>sq_candidato</code> em <code>/api/candidatos?cargo=1</code>.
         Permite reconstruir a curva de evolução da apuração no dia D.
       </div>
     </div>
