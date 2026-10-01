@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Content-Security-Policy"
+ content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<title>Verificação e API pública · Apuração 2026</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/app.css" />
+<style>
+  .verif-wrap { max-width: 820px; margin: 0 auto; padding: 24px 20px 80px; }
+  .verif-intro {
+    background: var(--surface-2); border: 1px solid var(--line-2);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 24px;
+    color: var(--fg-2); line-height: 1.5;
+  }
+  .verif-intro strong { color: var(--fg); }
+  .verif-grupo { margin: 32px 0 16px; }
+  .verif-grupo h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--muted); margin-bottom: 12px; font-weight: 700;
+  }
+  .verif-card {
+    background: var(--surface-2); border: 1px solid var(--line-2);
+    border-radius: var(--radius); padding: 16px 18px; margin-bottom: 10px;
+    transition: border-color .15s, background .15s;
+  }
+  .verif-card:hover { border-color: var(--brand); background: var(--surface-3); }
+  .verif-card-topo {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 6px;
+  }
+  .verif-metodo {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-weight: 700; padding: 2px 6px; border-radius: 3px;
+    background: rgba(240,180,41,.15); color: var(--brand);
+  }
+  .verif-card-url {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    color: var(--fg); word-break: break-all;
+    text-decoration: none;
+  }
+  .verif-card-url:hover { color: var(--brand); text-decoration: underline; }
+  .verif-card-desc {
+    color: var(--fg-2); font-size: 13px; line-height: 1.45;
+    margin-top: 6px;
+  }
+  .verif-card-desc code {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 1px 4px; border-radius: 3px;
+    background: var(--surface-3); color: var(--brand);
+  }
+  .verif-voltar {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--muted); text-decoration: none; font-size: 14px;
+    margin-bottom: 24px;
+  }
+  .verif-voltar:hover { color: var(--brand); }
+  h1.verif-titulo {
+    font-size: 28px; font-weight: 800; letter-spacing: -0.03em;
+    margin-bottom: 6px;
+  }
+  .verif-sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<main class="verif-wrap">
+  <a href="/" class="verif-voltar">← voltar para o placar</a>
+
+  <h1 class="verif-titulo">Verificação e API pública</h1>
+  <div class="verif-sub">Transparência · Dados abertos · Sem autenticação</div>
+
+  <div class="verif-intro">
+    Este site é independente e republica dados públicos do TSE.
+    <strong>Qualquer pessoa</strong> pode conferir os números abertamente —
+    sem login, sem token, sem app. Os links abaixo apontam direto para
+    a API deste site, que por sua vez busca no
+    <code>resultados.tse.jus.br</code>. Cada resposta inclui um
+    <strong>hash SHA-256</strong> do JSON bruto do TSE, permitindo
+    verificar que o número mostrado aqui bate byte-a-byte com o que
+    o TSE publicou.
+  </div>
+
+  <div class="verif-grupo">
+    <h2>Saúde do sistema</h2>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/health" target="_blank" rel="noopener">/health</a>
+      </div>
+      <div class="verif-card-desc">
+        Verifica se o app está no ar e se o banco está conectado.
+        Retorna <code>{"ok": true}</code> em condições normais.
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/config-publica" target="_blank" rel="noopener">/api/config-publica</a>
+      </div>
+      <div class="verif-card-desc">
+        Mostra os códigos de eleição do TSE que este site está usando
+        (<code>eleicao_cod_1t</code> presidente, <code>eleicao_cod_1t_estadual</code>
+        governador/senador/deputados). Permite auditar que estamos
+        apontando pros pleitos corretos.
+      </div>
+    </div>
+  </div>
+
+  <div class="verif-grupo">
+    <h2>Catálogos</h2>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/cargos" target="_blank" rel="noopener">/api/cargos</a>
+      </div>
+      <div class="verif-card-desc">
+        Lista todos os cargos em disputa (presidente, governador,
+        senador, dep. federal, dep. estadual) com código TSE
+        correspondente.
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/ufs" target="_blank" rel="noopener">/api/ufs</a>
+      </div>
+      <div class="verif-card-desc">
+        Lista as 27 unidades federativas + <code>BR</code> (agregado nacional).
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/candidatos?cargo=1" target="_blank" rel="noopener">/api/candidatos?cargo=1</a>
+      </div>
+      <div class="verif-card-desc">
+        Candidatos de um cargo (aqui, presidente). Para outros cargos
+        passe <code>cargo=3</code> (governador), <code>5</code> (senador),
+        <code>6</code> (dep. federal), <code>7</code> (dep. estadual)
+        e opcionalmente <code>uf=SP</code>.
+      </div>
+    </div>
+  </div>
+
+  <div class="verif-grupo">
+    <h2>Apuração ao vivo</h2>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/apuracao/atual?cargo=1&amp;abrangencia=BR" target="_blank" rel="noopener">/api/apuracao/atual?cargo=1&amp;abrangencia=BR</a>
+      </div>
+      <div class="verif-card-desc">
+        Snapshot mais recente da apuração — votos totais, candidatos
+        ordenados, % apurado, hash SHA-256 do JSON bruto do TSE para
+        verificação. Troque <code>cargo</code> e <code>abrangencia</code>
+        para outros cortes (ex.: <code>cargo=3&amp;abrangencia=SP</code>
+        pra governador de SP).
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/apuracao/historico?cargo=1&amp;abrangencia=BR" target="_blank" rel="noopener">/api/apuracao/historico?cargo=1&amp;abrangencia=BR</a>
+      </div>
+      <div class="verif-card-desc">
+        Série temporal dos últimos snapshots (até 200 por chave).
+        Permite reconstruir a curva de evolução da apuração no dia D.
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/apuracao/proporcional?cargo=6&amp;uf=SP" target="_blank" rel="noopener">/api/apuracao/proporcional?cargo=6&amp;uf=SP</a>
+      </div>
+      <div class="verif-card-desc">
+        Simulação do cálculo proporcional (quociente eleitoral,
+        barreira de 10%, sobras em 3 fases) com os dados atuais.
+        Só faz sentido para <code>cargo=6</code> (dep. federal) ou
+        <code>cargo=7</code> (dep. estadual).
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/eventos?cargo=1&amp;abrangencia=BR" target="_blank" rel="noopener">/api/eventos?cargo=1&amp;abrangencia=BR</a>
+      </div>
+      <div class="verif-card-desc">
+        Eventos matemáticos registrados: candidatos eleitos no 1º turno,
+        2º turno definido, viradas, candidatos matematicamente eliminados.
+      </div>
+    </div>
+  </div>
+
+  <div class="verif-grupo">
+    <h2>Drill-down (município e zona)</h2>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/apuracao/lideres-por-uf?cargo=1" target="_blank" rel="noopener">/api/apuracao/lideres-por-uf?cargo=1</a>
+      </div>
+      <div class="verif-card-desc">
+        Líder em cada uma das 27 UFs — para o mapa nacional.
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/apuracao/lideres-por-municipio?cargo=3&amp;uf=SP" target="_blank" rel="noopener">/api/apuracao/lideres-por-municipio?cargo=3&amp;uf=SP</a>
+      </div>
+      <div class="verif-card-desc">
+        Líder em cada município de uma UF (vindo do próprio snapshot
+        estadual que o TSE já traz com breakdown por município).
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/apuracao/municipio-tse?uf=SP&amp;municipio=71099&amp;cargo=3&amp;turno=1" target="_blank" rel="noopener">/api/apuracao/municipio-tse?uf=SP&amp;municipio=71099&amp;cargo=3&amp;turno=1</a>
+      </div>
+      <div class="verif-card-desc">
+        Puxa a apuração de um município direto do TSE (busca ao vivo,
+        cache de 45s). Útil quando o breakdown do snapshot estadual
+        não traz detalhes suficientes.
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/apuracao/zona?uf=SP&amp;municipio=71099&amp;zona=130&amp;cargo=3&amp;turno=1" target="_blank" rel="noopener">/api/apuracao/zona?uf=SP&amp;municipio=71099&amp;zona=130&amp;cargo=3&amp;turno=1</a>
+      </div>
+      <div class="verif-card-desc">
+        Drill-down numa zona eleitoral específica dentro de um município.
+        Cache 45s em memória, sem persistir no banco.
+      </div>
+    </div>
+  </div>
+
+  <div class="verif-grupo">
+    <h2>Páginas do site</h2>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/" target="_blank" rel="noopener">/</a>
+      </div>
+      <div class="verif-card-desc">
+        Placar principal da apuração.
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/sobre" target="_blank" rel="noopener">/sobre</a>
+      </div>
+      <div class="verif-card-desc">
+        Sobre o projeto, FAQ, termos de uso e política de privacidade.
+      </div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/importar" target="_blank" rel="noopener">/importar</a>
+      </div>
+      <div class="verif-card-desc">
+        Página de importação manual (precisa de token admin para efetivar
+        o upload — útil quando a Railway é bloqueada pelo divulgacandcontas).
+      </div>
+    </div>
+  </div>
+
+  <div class="verif-intro" style="margin-top: 40px;">
+    <strong>Nota sobre endpoints administrativos.</strong>
+    Endpoints sob <code>/api/admin/*</code> existem para operações
+    reservadas (importar candidatos manualmente, limpar seed de teste,
+    disparar sincronização). Eles exigem token (<code>X-Admin-Token</code>)
+    e por isso <strong>não aparecem aqui</strong> — não há nada que
+    uma pessoa comum do público precise fazer com eles.
+  </div>
+</main>
+
+</body>
+</html>

@@ -268,6 +268,10 @@ def create_app() -> FastAPI:
     async def privacidade_page():
         return _servir_html_com_versao("static/sobre.html")
 
+    @app.get("/verificacao")
+    async def verificacao_page():
+        return _servir_html_com_versao("static/verificacao.html")
+
     return app
 
 
