@@ -870,8 +870,8 @@ async def _fetch_tse_json(url: str) -> dict | None:
         return None
 
 
-@router.get("/apuracao/municipio")
-async def apuracao_municipio(
+@router.get("/apuracao/municipio-tse")
+async def apuracao_municipio_tse(
     uf: str = Query(..., min_length=2, max_length=2),
     municipio: str = Query(..., min_length=1, max_length=6),
     cargo: int = Query(...),
@@ -879,6 +879,11 @@ async def apuracao_municipio(
 ) -> dict[str, Any]:
     """Puxa apuração de um município específico direto do TSE, sem
     persistir no banco. Usado pelo mapa (drill-down "quem ganhou aqui").
+
+    NOTA: existe `/apuracao/municipio` (sem -tse) que usa dados
+    JÁ persistidos no DB (vindos dentro do snapshot UF). Este endpoint
+    é complementar: busca ao vivo, útil quando o JSON agregado da UF
+    não trouxe aquela cidade específica.
 
     Cache em memória de 45s: se muita gente clica no mesmo município,
     só 1 request sai pro TSE. Nada é gravado — some quando expira.
