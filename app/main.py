@@ -29,7 +29,6 @@ log = logging.getLogger("app")
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
-
 async def _descobrir_cod_loop():
     """A cada 5 min tenta descobrir os códigos reais da Eleição Geral 2026
     no TSE. Descobre os 4 códigos (presidencial + estadual, 1T + 2T).
@@ -50,30 +49,18 @@ async def _descobrir_cod_loop():
             log.exception("descoberta cod falhou")
         await asyncio.sleep(300)
 
-
 async def _cleanup_snapshots_loop():
     """Retenção enxuta de snapshots: mantém os N=200 mais recentes por
     (cargo, abrangencia, turno) e apaga o resto.
-
-    200 snapshots × ~1min entre updates = ~3h de granularidade fina no
-    gráfico temporal, mais que suficiente pra visualizar a curva do
-    dia D. Delta com o anterior continua exato (só precisa dos 2
-    últimos). Auditoria do SHA-256 continua no mais recente.
-
-    Roda a cada 1h. No dia D pode ser preciso rodar mais frequente —
-    fica de knob.
     """
     from sqlalchemy import select, delete, func
     from app.db import SessionLocal
     from app.models import Snapshot, SnapshotTotais, SnapshotCandidato, SnapshotMunicipio, Evento
     N = 200
-    await asyncio.sleep(120)  # warmup mais longo, não urgente
+    await asyncio.sleep(120)
     while True:
         try:
             async with SessionLocal() as sess:
-                # Primeiro: apaga snapshots com 0 votos, mantendo só o
-                # mais recente por chave (pré-apuração não precisa de
-                # histórico, só de 1 testemunho).
                 zero = (await sess.execute(
                     select(Snapshot.id, Snapshot.cod_cargo, Snapshot.abrangencia,
                            Snapshot.turno, Snapshot.coletado_em)
@@ -91,141 +78,49 @@ async def _cleanup_snapshots_loop():
                             mantidos.add(row.id)
                     ids_zero = [r.id for r in zero if r.id not in mantidos]
                     if ids_zero:
-                        for tabela in (Evento, SnapshotCandidato,
-                                       SnapshotMunicipio, SnapshotTotais):
-                            await sess.execute(
-                                delete(tabela)
-                                .where(tabela.snapshot_id.in_(ids_zero))
-                            )
-                        await sess.execute(
-                            delete(Snapshot).where(Snapshot.id.in_(ids_zero))
-                        )
-                        log.info("cleanup: %d snapshots com 0 votos apagados",
-                                 len(ids_zero))
-
-                # Depois: retenção N=200 das chaves normais
-                # Descobre todas as chaves (cargo, abrangencia, turno) com snapshots
+                        for tabela in (Evento, SnapshotCandidato, SnapshotMunicipio, SnapshotTotais):
+                            await sess.execute(delete(tabela).where(tabela.snapshot_id.in_(ids_zero)))
+                        await sess.execute(delete(Snapshot).where(Snapshot.id.in_(ids_zero)))
                 chaves = (await sess.execute(
                     select(Snapshot.cod_cargo, Snapshot.abrangencia, Snapshot.turno)
                     .group_by(Snapshot.cod_cargo, Snapshot.abrangencia, Snapshot.turno)
                 )).all()
                 total_apagado = 0
                 for cargo, abr, turno in chaves:
-                    # Pega o N-ésimo snapshot mais recente dessa chave
                     corte = (await sess.execute(
                         select(Snapshot.coletado_em)
-                        .where(Snapshot.cod_cargo == cargo,
-                               Snapshot.abrangencia == abr,
+                        .where(Snapshot.cod_cargo == cargo, Snapshot.abrangencia == abr,
                                Snapshot.turno == turno)
-                        .order_by(Snapshot.coletado_em.desc())
-                        .offset(N).limit(1)
+                        .order_by(Snapshot.coletado_em.desc()).offset(N).limit(1)
                     )).scalar_one_or_none()
                     if not corte:
                         continue
-                    # IDs dos snapshots antigos dessa chave
                     ids_antigos = [r[0] for r in (await sess.execute(
                         select(Snapshot.id)
-                        .where(Snapshot.cod_cargo == cargo,
-                               Snapshot.abrangencia == abr,
-                               Snapshot.turno == turno,
-                               Snapshot.coletado_em < corte)
+                        .where(Snapshot.cod_cargo == cargo, Snapshot.abrangencia == abr,
+                               Snapshot.turno == turno, Snapshot.coletado_em < corte)
                     )).all()]
                     if not ids_antigos:
                         continue
-                    # Apaga filhos primeiro (FK)
                     for tabela in (SnapshotCandidato, SnapshotMunicipio, SnapshotTotais):
-                        await sess.execute(
-                            delete(tabela).where(tabela.snapshot_id.in_(ids_antigos))
-                        )
-                    await sess.execute(
-                        delete(Snapshot).where(Snapshot.id.in_(ids_antigos))
-                    )
+                        await sess.execute(delete(tabela).where(tabela.snapshot_id.in_(ids_antigos)))
+                    await sess.execute(delete(Snapshot).where(Snapshot.id.in_(ids_antigos)))
                     total_apagado += len(ids_antigos)
-                if total_apagado:
+                if total_apagado or ids_zero:
                     await sess.commit()
-                    log.info("cleanup snapshots: %d apagados (mantendo %d por chave)",
-                             total_apagado, N)
         except Exception:
             log.exception("cleanup snapshots falhou")
         await asyncio.sleep(3600)
 
-
 async def _sync_candidatos_loop():
-    """Sincroniza candidatos oficiais do TSE.
-
-    Roda uma vez logo no startup (30s de warmup pra DB e pool estarem
-    prontos) e depois a cada 6h. Nas semanas antes da eleição o TSE
-    atualiza a lista com frequência (impugnações, substituições); após
-    a apuração começar, as mudanças são raras.
-    """
-    await asyncio.sleep(30)  # warmup
-    # Self-heal: corrige partido_numero de candidatos importados antes do
-    # fix do bug do Senador (numero 3 dígitos, partido = 2 primeiros).
+    """Sincroniza candidatos oficiais do TSE."""
+    await asyncio.sleep(30)
     try:
         n = await corrigir_partidos_orfaos()
         if n:
             log.info("self-heal: %d candidatos com partido_numero corrigido", n)
     except Exception:
         log.exception("self-heal partidos falhou")
-    # Self-heal: apaga snapshots com 0 votos (e seus eventos/totais/
-    # candidatos/municípios associados) — fantasmas do bug corrigido em
-    # 01/10/2026 que lotam o gráfico temporal com pontos "0% em
-    # 30/09/2026 16h" e deixam um platô vazio até o dia D. Mantém APENAS
-    # o snapshot mais recente de cada chave pra servir de "testemunho"
-    # de que estamos monitorando (eleitorado apto, nº de seções, etc).
-    # Idempotente.
-    try:
-        from sqlalchemy import select, delete, func, and_ as sql_and
-        from app.db import SessionLocal
-        from app.models import (
-            Snapshot, SnapshotTotais, SnapshotCandidato,
-            SnapshotMunicipio, Evento,
-        )
-        async with SessionLocal() as sess:
-            # IDs dos snapshots com 0 votos
-            zero = (await sess.execute(
-                select(Snapshot.id, Snapshot.cod_cargo, Snapshot.abrangencia,
-                       Snapshot.turno, Snapshot.coletado_em)
-                .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
-                .where(SnapshotTotais.qt_secoes_totalizadas == 0)
-                .order_by(Snapshot.coletado_em.desc())
-            )).all()
-            if zero:
-                # Mantém o mais recente por chave (cargo, abrangência, turno)
-                mantidos: set[int] = set()
-                vistos: set[tuple] = set()
-                for row in zero:
-                    chave = (row.cod_cargo, row.abrangencia, row.turno)
-                    if chave not in vistos:
-                        vistos.add(chave)
-                        mantidos.add(row.id)
-                ids_apagar = [r.id for r in zero if r.id not in mantidos]
-                if ids_apagar:
-                    # Apaga filhos (FK) na ordem segura
-                    for tabela in (Evento, SnapshotCandidato,
-                                   SnapshotMunicipio, SnapshotTotais):
-                        await sess.execute(
-                            delete(tabela)
-                            .where(tabela.snapshot_id.in_(ids_apagar))
-                        )
-                    await sess.execute(
-                        delete(Snapshot).where(Snapshot.id.in_(ids_apagar))
-                    )
-                    await sess.commit()
-                    log.info("self-heal: %d snapshots fantasma apagados "
-                             "(mantidos %d como testemunho)",
-                             len(ids_apagar), len(mantidos))
-                # Também apaga eventos presos nos snapshots-testemunho
-                # (não devem existir, mas idempotente)
-                r = await sess.execute(
-                    delete(Evento).where(Evento.snapshot_id.in_(mantidos))
-                )
-                if r.rowcount:
-                    await sess.commit()
-                    log.info("self-heal: %d eventos fantasma no testemunho apagados",
-                             r.rowcount)
-    except Exception:
-        log.exception("self-heal snapshots fantasma falhou")
     while True:
         try:
             log.info("sync_candidatos: iniciando ciclo")
@@ -234,7 +129,6 @@ async def _sync_candidatos_loop():
         except Exception:
             log.exception("sync_candidatos falhou")
         await asyncio.sleep(6 * 3600)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -245,9 +139,7 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(poller_loop(broadcaster=broadcaster)))
         tasks.append(asyncio.create_task(_sync_candidatos_loop()))
         tasks.append(asyncio.create_task(_cleanup_snapshots_loop()))
-        log.info("poller + descoberta + sync + cleanup iniciados (intervalo=%ss)",
-                 settings.poll_interval_seconds)
-    # Bot do Telegram: só sobe se TELEGRAM_BOT_TOKEN estiver setado.
+    log.info("poller + descoberta + sync + cleanup iniciados (intervalo=%ss)", settings.poll_interval_seconds)
     if (settings.telegram_bot_token or "").strip():
         from notif.telegram_bot import loop_bot
         tasks.append(asyncio.create_task(loop_bot()))
@@ -262,7 +154,6 @@ async def lifespan(app: FastAPI):
                 await t
             except (asyncio.CancelledError, Exception):
                 pass
-
 
 def create_app() -> FastAPI:
     settings = get_settings()
@@ -286,9 +177,6 @@ def create_app() -> FastAPI:
     app.include_router(ws_router)
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-    # Cache-Control em GETs de apuração: 3s no browser + 5s no CDN.
-    # Reduz picos de carga no dia D sem comprometer o "ao vivo" (WS
-    # continua pushando eventos em tempo real).
     @app.middleware("http")
     async def _cache_publico(request: Request, call_next):
         resp = await call_next(request)
@@ -300,8 +188,6 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health():
-        """Endpoint leve pra healthcheck do Railway/uptime monitors.
-        Checa conexão com o banco; retorna 503 se cair."""
         from sqlalchemy import text
         from app.db import SessionLocal
         try:
@@ -313,10 +199,6 @@ def create_app() -> FastAPI:
             return JSONResponse({"ok": False, "erro": str(e)[:200]}, status_code=503)
 
     def _servir_html_com_versao(caminho: str) -> HTMLResponse:
-        """Serve HTML injetando `?v=<mtime>` em referências pra app.js e
-        app.css. Sem isso o browser cacheia agressivamente as versões
-        antigas e fixes de frontend não chegam ao usuário sem hard reload.
-        """
         try:
             with open(caminho, "r", encoding="utf-8") as f:
                 html = f.read()
@@ -349,7 +231,6 @@ def create_app() -> FastAPI:
 
     @app.get("/faq")
     async def faq_page():
-        # /faq é apelido pra /sobre#faq
         return _servir_html_com_versao("static/sobre.html")
 
     @app.get("/termos")
@@ -364,7 +245,10 @@ def create_app() -> FastAPI:
     async def verificacao_page():
         return _servir_html_com_versao("static/verificacao.html")
 
-    return app
+    @app.get("/cola")
+    async def cola_page():
+        return _servir_html_com_versao("static/cola.html")
 
+    return app
 
 app = create_app()
