@@ -77,20 +77,29 @@ def resultado_url(base: str, cod_eleicao: int, cod_cargo: int, abrangencia: str)
     )
 
 
+# Sentinel: retornado quando TSE devolve 404 (JSON ainda não publicado,
+# ex.: 2º turno antes do 1º terminar). Distinto de None (erro real)
+# pra que o poller não contabilize 404 como falha ruidosa.
+NAO_PUBLICADO = "not_published"
+
+
 async def buscar_json(
     client: httpx.AsyncClient,
     url: str,
     *,
     max_retries: int = 4,
-) -> tuple[dict[str, Any], str] | None:
-    """Baixa JSON com backoff exponencial. Retorna (payload, sha256) ou None."""
+) -> tuple[dict[str, Any], str] | str | None:
+    """Baixa JSON com backoff exponencial.
+    Retorna (payload, sha256) em sucesso, NAO_PUBLICADO em 404,
+    None em erro real (timeout, 5xx após retries, JSON inválido).
+    """
     delay = 1.0
     for tentativa in range(1, max_retries + 1):
         try:
             r = await client.get(url, timeout=15.0, headers=BROWSER_HEADERS)
             if r.status_code == 404:
                 log.debug("json ainda não publicado (404): %s", url)
-                return None
+                return NAO_PUBLICADO
             r.raise_for_status()
             content = r.content
             payload = r.json()

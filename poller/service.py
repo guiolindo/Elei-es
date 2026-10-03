@@ -116,7 +116,8 @@ async def _eventos_existentes(
 # Contadores do ciclo em curso — zerados no `loop()` antes de cada
 # gather e logados no fim. Dict em escopo de módulo pra evitar ter
 # que passar objeto por parâmetro em processar_alvo (chamado em paralelo).
-_stats_ciclo: dict[str, int] = {"novos": 0, "dedup": 0, "falhas": 0, "retrocesso": 0}
+_stats_ciclo: dict[str, int] = {"novos": 0, "dedup": 0, "falhas": 0,
+                                 "retrocesso": 0, "nao_publicado": 0}
 # Observabilidade: info exposta via /api/poller-status pro user confirmar
 # que o loop está vivo e no intervalo esperado.
 _poller_info: dict[str, Any] = {
@@ -126,7 +127,8 @@ _poller_info: dict[str, Any] = {
     "ultimo_ciclo_duracao_s": None,
     "intervalo_s": None,
     "alvos_total": 0,
-    "ultimo": {"novos": 0, "dedup": 0, "falhas": 0, "retrocesso": 0},
+    "ultimo": {"novos": 0, "dedup": 0, "falhas": 0,
+                "retrocesso": 0, "nao_publicado": 0},
 }
 
 
@@ -154,6 +156,9 @@ async def processar_alvo(
     res = await buscar_json(client, url)
     if res is None:
         _stats_ciclo["falhas"] += 1
+        return
+    if isinstance(res, str):  # NAO_PUBLICADO (404 esperado)
+        _stats_ciclo["nao_publicado"] += 1
         return
     payload, sha = res
     parsed = parse_snapshot(payload)
@@ -469,6 +474,7 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
         _stats_ciclo["dedup"] = 0
         _stats_ciclo["falhas"] = 0
         _stats_ciclo["retrocesso"] = 0
+        _stats_ciclo["nao_publicado"] = 0
         # Recria o cliente a cada ciclo pra permitir troca de proxy quando um cair
         t_ini = time.perf_counter()
         async with await cliente_tse() as client:
@@ -482,6 +488,7 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
             "dedup": _stats_ciclo["dedup"],
             "falhas": _stats_ciclo["falhas"],
             "retrocesso": _stats_ciclo["retrocesso"],
+            "nao_publicado": _stats_ciclo["nao_publicado"],
         }
         # Log por ciclo com stats agregados — só INFO quando teve
         # mudança real (snapshot novo, falha, retrocesso). Caso contrário
@@ -490,8 +497,10 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
         dedup = _stats_ciclo["dedup"]
         falhas = _stats_ciclo["falhas"]
         retro = _stats_ciclo["retrocesso"]
+        nao_pub = _stats_ciclo["nao_publicado"]
         msg = (f"ciclo {ciclo}: {novos} novos, {dedup} dedup, "
-               f"{falhas} falhas, {retro} retrocesso ({len(alvos)} alvos)")
+               f"{falhas} falhas, {nao_pub} nao-pub (2T), "
+               f"{retro} retrocesso ({len(alvos)} alvos)")
         if novos or falhas or retro:
             log.info(msg)
         elif ciclo % HEARTBEAT_A_CADA == 0:
