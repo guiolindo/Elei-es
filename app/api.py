@@ -441,30 +441,40 @@ async def lideres_por_municipio(
         )
         .scalar_subquery()
     )
+    # Top-5 por município pra conseguir pular retirados/cassados —
+    # mesma lógica do lideres-por-uf, votos deles são nulos por lei.
     q = (
         select(
             SnapshotMunicipio.cod_ibge,
             SnapshotMunicipio.sq_candidato,
             SnapshotMunicipio.votos,
-            Candidato.nome_urna,
+            SnapshotMunicipio.posicao,
+            Candidato.nome_urna, Candidato.situacao,
         )
         .join(Candidato, Candidato.sq_candidato == SnapshotMunicipio.sq_candidato)
         .where(
             SnapshotMunicipio.snapshot_id == subq,
-            SnapshotMunicipio.posicao == 1,
+            SnapshotMunicipio.posicao <= 5,
         )
+        .order_by(SnapshotMunicipio.cod_ibge, SnapshotMunicipio.posicao)
     )
     r = await sess.execute(q)
+    por_mun: dict[str, list[Any]] = {}
+    for row in r.all():
+        por_mun.setdefault(row.cod_ibge, []).append(row)
     municipios: dict[str, dict[str, Any]] = {}
     sq_para_idx: dict[str, int] = {}
-    for row in r.all():
-        if row.sq_candidato not in sq_para_idx:
-            sq_para_idx[row.sq_candidato] = len(sq_para_idx)
-        municipios[row.cod_ibge] = {
-            "sq_candidato": row.sq_candidato,
-            "nome_lider": row.nome_urna,
-            "votos": row.votos,
-            "cor_idx": sq_para_idx[row.sq_candidato],
+    for cod_ibge, linhas in por_mun.items():
+        lider = next((l for l in linhas if l.situacao == "ativo"), None)
+        if not lider:
+            continue
+        if lider.sq_candidato not in sq_para_idx:
+            sq_para_idx[lider.sq_candidato] = len(sq_para_idx)
+        municipios[cod_ibge] = {
+            "sq_candidato": lider.sq_candidato,
+            "nome_lider": lider.nome_urna,
+            "votos": lider.votos,
+            "cor_idx": sq_para_idx[lider.sq_candidato],
         }
     return {"municipios": municipios}
 
@@ -492,29 +502,40 @@ async def lideres_por_uf(
         .group_by(Snapshot.abrangencia)
         .subquery()
     )
+    # Pega top-5 candidatos de cada UF (não só posicao=1) pra conseguir
+    # pular os retirados/cassados — votos deles são nulos por lei
+    # (9.504 §3º) e não devem pintar o mapa.
     q = (
         select(
             Snapshot.abrangencia, SnapshotCandidato.sq_candidato,
-            SnapshotCandidato.votos, Candidato.nome_urna,
+            SnapshotCandidato.votos, SnapshotCandidato.posicao,
+            Candidato.nome_urna, Candidato.situacao,
         )
         .join(SnapshotCandidato, SnapshotCandidato.snapshot_id == Snapshot.id)
         .join(Candidato, Candidato.sq_candidato == SnapshotCandidato.sq_candidato)
         .join(subq, and_(subq.c.abr == Snapshot.abrangencia,
                          subq.c.ts == Snapshot.coletado_em))
-        .where(Snapshot.cod_cargo == cargo, SnapshotCandidato.posicao == 1)
+        .where(Snapshot.cod_cargo == cargo, SnapshotCandidato.posicao <= 5)
+        .order_by(Snapshot.abrangencia, SnapshotCandidato.posicao)
     )
     r = await sess.execute(q)
-    # Atribui uma cor a cada candidato distinto (cor_idx estável)
+    # Agrupa por UF; dentro de cada UF pega o primeiro ATIVO
+    por_uf: dict[str, list[Any]] = {}
+    for row in r.all():
+        por_uf.setdefault(row.abrangencia, []).append(row)
     ufs: dict[str, dict[str, Any]] = {}
     sq_para_idx: dict[str, int] = {}
-    for row in r.all():
-        if row.sq_candidato not in sq_para_idx:
-            sq_para_idx[row.sq_candidato] = len(sq_para_idx)
-        ufs[row.abrangencia] = {
-            "sq_candidato": row.sq_candidato,
-            "nome_lider": row.nome_urna,
-            "votos": row.votos,
-            "cor_idx": sq_para_idx[row.sq_candidato],
+    for abr, linhas in por_uf.items():
+        lider = next((l for l in linhas if l.situacao == "ativo"), None)
+        if not lider:
+            continue  # Todos os top-5 retirados → UF fica cinza (improvável)
+        if lider.sq_candidato not in sq_para_idx:
+            sq_para_idx[lider.sq_candidato] = len(sq_para_idx)
+        ufs[abr] = {
+            "sq_candidato": lider.sq_candidato,
+            "nome_lider": lider.nome_urna,
+            "votos": lider.votos,
+            "cor_idx": sq_para_idx[lider.sq_candidato],
         }
     return {"ufs": ufs}
 

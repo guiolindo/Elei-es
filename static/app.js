@@ -1284,7 +1284,12 @@ function atualizarTituloAba(dados) {
     document.title = TITULO_BASE;
     return;
   }
-  const lider = cands[0];
+  // Líder = primeiro candidato ATIVO em votação. Retirados/cassados têm
+  // votos nulos por lei (9.504 §3º), não podem ser 'líder' no título.
+  const lider = cands.find(c => {
+    const f = state.ficha[c.sq_candidato];
+    return !f?.situacao || f.situacao === "ativo";
+  });
   if (!lider?.votos || lider.votos <= 0) {
     document.title = TITULO_BASE;
     return;
