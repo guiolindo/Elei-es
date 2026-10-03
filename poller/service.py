@@ -369,7 +369,18 @@ async def processar_alvo(
                 qt_eleitorado_apto_totalizadas=parsed.totais.qt_eleitorado_apto_totalizadas,
                 qt_votos_validos=parsed.totais.qt_votos_validos,
             )
-            eventos = avaliar_apuracao(resumos, tot, cod_cargo=alvo.cod_cargo, turno=alvo.turno)
+            # IMPORTANTE: Presidente é cargo nacional (CF art. 77 §2º) —
+            # a regra de maioria absoluta vale sobre os válidos do BRASIL
+            # inteiro, nunca de um estado isolado. Alvos (cargo=1, UF)
+            # existem só pra alimentar o mapa colorido; não geram eventos
+            # de "eleito" (um candidato pode ter 70% na BA e perder o pleito).
+            # Mesma lógica pro voto do exterior (ZZ).
+            if alvo.cod_cargo == 1 and alvo.abrangencia != "BR":
+                eventos = []
+            else:
+                eventos = avaliar_apuracao(resumos, tot,
+                                           cod_cargo=alvo.cod_cargo,
+                                           turno=alvo.turno)
 
             # Detecta viradas comparando com o snapshot anterior.
             # Bug antigo: `.limit(50)` no join pegava linhas de MÚLTIPLOS
