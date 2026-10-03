@@ -167,3 +167,58 @@ def test_qe_exato_sem_fracao():
                                     partido_numero=13, votos=960)]
     r = calcular_eleitos_proporcional(cands, vagas=16)
     assert r.qe == 60
+
+
+# ============ Filtragem por situacao (Lei 9.504/97 art. 175 §3º) ============
+
+def test_cassado_nao_puxa_vagas_pro_partido():
+    """Candidato não-ativo tem votos descontados: partido pode perder vaga.
+    Caso real: um deputado 'puxador de votos' é cassado → suas vagas de
+    sobras devem ir pra OUTRO partido, não ao mesmo partido dele.
+    """
+    from math_engine.proporcional import (
+        CandidatoProporcional, calcular_eleitos_proporcional
+    )
+    # Partido A: 1 candidato gigante (cassado) + 1 pequeno. Sem o cassado,
+    # o partido A fica com votos muito menores que B.
+    cands = [
+        CandidatoProporcional("A1", "GIGANTE", 1111, 11, votos=100000, situacao="cassado"),
+        CandidatoProporcional("A2", "PEQUENO", 1112, 11, votos=5000,  situacao="ativo"),
+        CandidatoProporcional("B1", "FORTE",   2211, 22, votos=40000, situacao="ativo"),
+        CandidatoProporcional("B2", "MEDIO",   2212, 22, votos=30000, situacao="ativo"),
+    ]
+    r = calcular_eleitos_proporcional(cands, vagas=2, federacoes={})
+    # Votos válidos considerados: 5k + 40k + 30k = 75k (gigante não conta)
+    assert r.votos_validos == 75_000
+    eleitos = [c.sq_candidato for c in r.candidatos if c.status == "eleito"]
+    # Partido B deve levar as 2 vagas; partido A fica sem (só 5k vs 70k do B)
+    assert "A1" not in eleitos  # cassado nunca entra
+    assert set(eleitos) == {"B1", "B2"}
+
+
+def test_candidato_renunciado_removido_do_calculo():
+    from math_engine.proporcional import (
+        CandidatoProporcional, calcular_eleitos_proporcional
+    )
+    cands = [
+        CandidatoProporcional("X", "RENUNCIOU", 1111, 11, votos=99999,
+                              situacao="renunciou"),
+        CandidatoProporcional("Y", "ATIVO",     1112, 11, votos=100,
+                              situacao="ativo"),
+    ]
+    r = calcular_eleitos_proporcional(cands, vagas=1, federacoes={})
+    assert r.votos_validos == 100  # só o ativo
+    assert all(c.sq_candidato != "X" for c in r.candidatos)
+
+
+def test_todos_cassados_resultado_vazio():
+    from math_engine.proporcional import (
+        CandidatoProporcional, calcular_eleitos_proporcional
+    )
+    cands = [
+        CandidatoProporcional("X", "A", 1111, 11, votos=100, situacao="cassado"),
+        CandidatoProporcional("Y", "B", 2222, 22, votos=100, situacao="renunciou"),
+    ]
+    r = calcular_eleitos_proporcional(cands, vagas=5, federacoes={})
+    assert r.candidatos == []
+    assert r.votos_validos == 0

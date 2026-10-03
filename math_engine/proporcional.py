@@ -59,6 +59,12 @@ class CandidatoProporcional:
     numero: int
     partido_numero: int
     votos: int
+    # Situação do candidato pela Justiça Eleitoral. Pela Lei 9.504/97 art.
+    # 175 §3º, votos em candidato que não seja 'ativo' são nulos — não
+    # devem contar nem pro candidato nem pro partido/federação. O motor
+    # exclui qualquer status != 'ativo' antes do cálculo do QE, QP,
+    # barreira e sobras.
+    situacao: str = "ativo"
 
 
 @dataclass
@@ -177,6 +183,14 @@ def calcular_eleitos_proporcional(
         listas de partidos (com vagas ganhas).
     """
     cands = list(candidatos)
+    # EXCLUSÃO LEGAL: candidatos com situação não-ativa (renunciou,
+    # cancelado, cassado, indeferido_sem_recurso) têm votos considerados
+    # nulos pela Lei 9.504/97 art. 175 §3º. Removê-los AQUI significa que
+    # seus votos não entram nem no QE, nem no QP da legenda, nem na
+    # barreira, nem no D'Hondt — exatamente como manda a lei. Importante:
+    # isso pode fazer o partido/federação perder vagas pra outro, porque
+    # votos nulos nunca "puxam" chapa.
+    cands = [c for c in cands if c.situacao == "ativo"]
     if not cands or vagas <= 0:
         return ResultadoProporcional(0, 0, vagas, 0, [], [])
 

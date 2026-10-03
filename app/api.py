@@ -407,6 +407,7 @@ async def apuracao_proporcional(
             numero=cnd.numero,
             partido_numero=cnd.partido_numero,
             votos=sc.votos,
+            situacao=cnd.situacao,  # motor filtra != 'ativo' (votos nulos)
         )
         for sc, cnd in cands_db
     ]
