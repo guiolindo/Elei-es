@@ -97,6 +97,30 @@ async def listar_candidatos(
     if uf and cargo != 1:
         stmt = stmt.where(Candidato.uf == uf)
     r = await sess.execute(stmt.order_by(Candidato.numero))
+    todos = list(r.scalars())
+    # Dedup por (uf, numero): TSE às vezes mantém o sq antigo + o novo
+    # quando há substituição/reregistro. Prioriza situacao='ativo'; se
+    # nenhum ativo, mantém o sq mais recente (lex. maior → cadastro novo).
+    # Candidatos sem numero (ex.: 0, lixo) ficam todos.
+    por_chave: dict[tuple, Candidato] = {}
+    extras: list[Candidato] = []
+    for c in todos:
+        if not c.numero:
+            extras.append(c)
+            continue
+        chave = (c.uf or "BR", c.numero)
+        atual = por_chave.get(chave)
+        if atual is None:
+            por_chave[chave] = c
+            continue
+        # Preferência: ativo > qualquer outro status; empate → sq maior
+        atual_ativo = atual.situacao == "ativo"
+        novo_ativo = c.situacao == "ativo"
+        if novo_ativo and not atual_ativo:
+            por_chave[chave] = c
+        elif novo_ativo == atual_ativo and str(c.sq_candidato) > str(atual.sq_candidato):
+            por_chave[chave] = c
+    final = sorted(list(por_chave.values()) + extras, key=lambda x: (x.numero or 0))
     return [
         {
             "sq_candidato": c.sq_candidato,
@@ -108,7 +132,7 @@ async def listar_candidatos(
             "foto": _url_foto(c.sq_candidato, c.uf),
             "situacao": c.situacao,
         }
-        for c in r.scalars()
+        for c in final
     ]
 
 
@@ -876,6 +900,33 @@ async def corrigir_partidos(sess: AsyncSession = Depends(get_session)) -> dict[s
             corrigidos += 1
     await sess.commit()
     return {"ok": True, "corrigidos": corrigidos}
+
+
+@router.get("/admin/duplicatas", dependencies=[Depends(_exigir_admin)])
+async def admin_duplicatas(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Lista candidatos com (cod_cargo, uf, numero) duplicados — sinal de
+    substituição/reregistro TSE em que o sq antigo ficou no DB.
+    """
+    rows = (await sess.execute(select(Candidato))).scalars().all()
+    buckets: dict[tuple, list[Candidato]] = {}
+    for c in rows:
+        if not c.numero:
+            continue
+        chave = (c.cod_cargo, c.uf or "BR", c.numero)
+        buckets.setdefault(chave, []).append(c)
+    dups = []
+    for (cargo, uf, numero), lista in buckets.items():
+        if len(lista) < 2:
+            continue
+        dups.append({
+            "cargo": cargo, "uf": uf, "numero": numero,
+            "candidatos": [
+                {"sq": c.sq_candidato, "nome_urna": c.nome_urna,
+                 "situacao": c.situacao}
+                for c in lista
+            ],
+        })
+    return {"ok": True, "total": len(dups), "duplicatas": dups}
 
 
 @router.post("/admin/reavaliar-situacao", dependencies=[Depends(_exigir_admin)])
