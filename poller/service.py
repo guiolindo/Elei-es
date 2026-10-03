@@ -109,6 +109,12 @@ async def _eventos_existentes(
     return {(t, a) for t, a in r.all()}
 
 
+# Contadores do ciclo em curso — zerados no `loop()` antes de cada
+# gather e logados no fim. Dict em escopo de módulo pra evitar ter
+# que passar objeto por parâmetro em processar_alvo (chamado em paralelo).
+_stats_ciclo: dict[str, int] = {"novos": 0, "dedup": 0, "falhas": 0, "retrocesso": 0}
+
+
 async def processar_alvo(
     client: httpx.AsyncClient, alvo: AlvoColeta, broadcaster=None
 ) -> None:
@@ -117,13 +123,16 @@ async def processar_alvo(
     url = resultado_url(settings.tse_cdn_base, cod_eleicao, alvo.cod_cargo, alvo.abrangencia)
     res = await buscar_json(client, url)
     if res is None:
+        _stats_ciclo["falhas"] += 1
         return
     payload, sha = res
     parsed = parse_snapshot(payload)
 
     async with SessionLocal() as sess:
         if await _snapshot_ja_existe(sess, sha):
+            _stats_ciclo["dedup"] += 1
             return
+        _stats_ciclo["novos"] += 1
 
         suspeito = False
         ultimo = await _ultimo_totalizadas(sess, alvo.cod_cargo, alvo.abrangencia)
@@ -133,6 +142,7 @@ async def processar_alvo(
                 url, ultimo, parsed.totais.qt_secoes_totalizadas,
             )
             suspeito = True
+            _stats_ciclo["retrocesso"] += 1
 
         snap = Snapshot(
             coletado_em=datetime.now(timezone.utc),
@@ -411,16 +421,32 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
                 log.exception("erro processando %s", alvo)
 
     ciclo = 0
-    # Heartbeat log a cada N ciclos pra confirmar que o loop está vivo
-    # mesmo quando nada muda nos snapshots (dedup por hash cala a boca
-    # do processar_alvo). Com poll a cada 20s, 60 ciclos = 20 min.
+    # Heartbeat sintético a cada N ciclos (confirma vida mesmo quando
+    # dedup silencia tudo). Com poll_interval_seconds=20s, N=60 = 20 min.
     HEARTBEAT_A_CADA = 60
     while True:
+        # Zera contadores do ciclo
+        _stats_ciclo["novos"] = 0
+        _stats_ciclo["dedup"] = 0
+        _stats_ciclo["falhas"] = 0
+        _stats_ciclo["retrocesso"] = 0
         # Recria o cliente a cada ciclo pra permitir troca de proxy quando um cair
         async with await cliente_tse() as client:
             await asyncio.gather(*[_um(client, a) for a in alvos])
         ciclo += 1
-        if ciclo % HEARTBEAT_A_CADA == 0:
-            log.info("poller vivo: %d ciclos completos (intervalo %ss, %d alvos)",
-                     ciclo, settings.poll_interval_seconds, len(alvos))
+        # Log por ciclo com stats agregados — só INFO quando teve
+        # mudança real (snapshot novo, falha, retrocesso). Caso contrário
+        # DEBUG pra não poluir no caso comum (dedup 100%).
+        novos = _stats_ciclo["novos"]
+        dedup = _stats_ciclo["dedup"]
+        falhas = _stats_ciclo["falhas"]
+        retro = _stats_ciclo["retrocesso"]
+        msg = (f"ciclo {ciclo}: {novos} novos, {dedup} dedup, "
+               f"{falhas} falhas, {retro} retrocesso ({len(alvos)} alvos)")
+        if novos or falhas or retro:
+            log.info(msg)
+        elif ciclo % HEARTBEAT_A_CADA == 0:
+            log.info("poller vivo — %s", msg)
+        else:
+            log.debug(msg)
         await asyncio.sleep(settings.poll_interval_seconds)
