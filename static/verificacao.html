@@ -277,16 +277,10 @@
       </div>
     </div>
 
-    <div class="verif-card">
-      <div class="verif-card-topo">
-        <span class="verif-metodo">GET</span>
-        <a class="verif-card-url" href="/api/apuracao/zona?uf=SP&amp;municipio=71099&amp;zona=130&amp;cargo=3&amp;turno=1" target="_blank" rel="noopener">/api/apuracao/zona?uf=SP&amp;municipio=71099&amp;zona=130&amp;cargo=3&amp;turno=1</a>
-      </div>
-      <div class="verif-card-desc">
-        Drill-down numa zona eleitoral específica dentro de um município.
-        Cache 45s em memória, sem persistir no banco.
-      </div>
-    </div>
+    <!-- Zona removida 03/10/2026: TSE não publica agregado por zona no
+         S3 público. Testado em 2022/2024/2026 — sempre 404. Para
+         detalhamento por zona, usar /urna que puxa BU de cada seção. -->
+
 
     <div class="verif-card">
       <div class="verif-card-topo">

@@ -1033,7 +1033,7 @@ async def apuracao_municipio_tse(
     return body
 
 
-@router.get("/apuracao/zona")
+@router.get("/apuracao/zona", deprecated=True)
 async def apuracao_zona(
     uf: str = Query(..., min_length=2, max_length=2),
     municipio: str = Query(..., min_length=1, max_length=6),
@@ -1041,12 +1041,40 @@ async def apuracao_zona(
     cargo: int = Query(...),
     turno: int = Query(1, ge=1, le=2),
 ) -> dict[str, Any]:
-    """Apuração de uma zona eleitoral específica. Mesmo padrão do
-    endpoint de município: on-demand, cache 45s, sem persistência.
+    """DEPRECATED (03/10/2026). TSE não publica agregado por zona no S3
+    público — apenas BU por seção. Testamos padrões 2024/2026 e todos
+    retornam 404.
 
-    Zona é a subdivisão dentro do município (ex.: SP tem ~500 zonas).
-    Útil pra drill-down: usuário abre SP-SP no mapa → escolhe a zona
-    do bairro dele → vê onde cada candidato ganhou lá.
+    Pra drill-down por zona, o caminho correto é agregar BUs das seções
+    da zona client-side via /api/apuracao/bu — mas isso custa centenas
+    de requests por zona e não escala.
+
+    Endpoint mantido com 410 Gone pra documentar a limitação. Qualquer
+    tentativa de uso retorna `disponivel: false` com motivo claro.
+    """
+    return {
+        "disponivel": False,
+        "motivo": (
+            "TSE não publica agregado por zona eleitoral no S3 público. "
+            "Use /api/apuracao/municipio-tse (agregado por município) ou "
+            "/api/apuracao/bu (seção individual)."
+        ),
+        "deprecated": True,
+    }
+
+
+# Mantido pra referência: o código original do zona ficava aqui, com
+# cache e URL /{cod}/dados/{uf}/{uf}{mun}z{zn}-c{cargo:04d}-e{cod:06d}-u.json
+# que SEMPRE retorna 404 em testes contra TSE 2022, 2024 e 2026 pré-apuração.
+async def _apuracao_zona_removida(
+    uf: str = Query(..., min_length=2, max_length=2),
+    municipio: str = Query(..., min_length=1, max_length=6),
+    zona: str = Query(..., min_length=1, max_length=5),
+    cargo: int = Query(...),
+    turno: int = Query(1, ge=1, le=2),
+) -> dict[str, Any]:
+    """Código original mantido pra referência histórica — removido do
+    endpoint real em 03/10/2026 após validação contra TSE.
     """
     from app.config import get_settings
     from time import monotonic
