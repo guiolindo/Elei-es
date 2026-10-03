@@ -728,7 +728,7 @@ async def importar_candidatos(
     aqui pra alimentar o banco. Substitui o sync automático quando o
     Akamai bloqueia o backend.
     """
-    from poller.candidatos_tse import parse_lista, _upsert
+    from poller.candidatos_tse import parse_lista, _upsert, _marcar_removidos_pelo_tse
     cargo = int(payload["cargo"])
     uf_arg = payload.get("uf")
     uf = None if uf_arg in ("BR", "", None) else uf_arg
@@ -737,7 +737,9 @@ async def importar_candidatos(
     if not cands:
         return {"atualizados": 0, "aviso": "JSON não tinha candidatos ou schema desconhecido"}
     n = await _upsert(sess, cands)
-    return {"atualizados": n, "cargo": cargo, "uf": uf_arg or "BR"}
+    sq_vistos = {c.sq_candidato for c in cands}
+    removidos = await _marcar_removidos_pelo_tse(sess, uf_arg or "BR", cargo, sq_vistos)
+    return {"atualizados": n, "removidos": removidos, "cargo": cargo, "uf": uf_arg or "BR"}
 
 
 @router.post("/admin/atualizar-detalhe", dependencies=[Depends(_exigir_admin)])

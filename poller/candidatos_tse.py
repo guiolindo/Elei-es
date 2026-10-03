@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -285,6 +285,49 @@ async def _baixar_fotos(
                 continue
 
 
+async def _marcar_removidos_pelo_tse(
+    sess: AsyncSession, uf: str | None, cod_cargo: int, sq_vistos: set[str]
+) -> int:
+    """Marca como 'cancelado' candidatos ativos no DB que o TSE removeu.
+
+    Caso real: candidato indeferido tardiamente (ex.: 'Avalanche' 2026) some
+    da listagem oficial do divulgacandcontas, mas segue no nosso DB porque
+    foi importado antes. Sem este sweep, apareceria na UI até a próxima
+    reimportação manual.
+
+    Só roda quando sq_vistos é NÃO-vazio — se o TSE devolveu zero
+    candidatos pra (uf, cargo), provavelmente é erro de rede ou bloqueio
+    Akamai, não remoção legítima. Idempotente: só mexe em situacao='ativo'.
+    """
+    if not sq_vistos:
+        return 0
+    stmt = select(Candidato.sq_candidato, Candidato.nome_urna).where(
+        Candidato.cod_cargo == cod_cargo,
+        Candidato.situacao == "ativo",
+    )
+    if uf and uf != "BR":
+        stmt = stmt.where(Candidato.uf == uf)
+    else:
+        stmt = stmt.where(Candidato.uf.is_(None) | (Candidato.uf == "BR"))
+    rows = (await sess.execute(stmt)).all()
+    removidos = [(sq, nome) for sq, nome in rows if sq not in sq_vistos]
+    if not removidos:
+        return 0
+    sqs = [sq for sq, _ in removidos]
+    await sess.execute(
+        update(Candidato)
+        .where(Candidato.sq_candidato.in_(sqs))
+        .values(situacao="cancelado")
+    )
+    await sess.commit()
+    for sq, nome in removidos:
+        log.warning(
+            "candidato removido pelo TSE: sq=%s nome='%s' cargo=%s uf=%s → situacao=cancelado",
+            sq, nome, cod_cargo, uf or "BR",
+        )
+    return len(removidos)
+
+
 async def corrigir_partidos_orfaos(sess: AsyncSession | None = None) -> int:
     """Self-heal do partido_numero em candidatos de cargos 5/6/7.
 
@@ -375,8 +418,13 @@ async def sincronizar_candidatos(
                     continue
                 async with SessionLocal() as sess:
                     n = await _upsert(sess, cands)
+                    sq_vistos = {c.sq_candidato for c in cands}
+                    removidos = await _marcar_removidos_pelo_tse(sess, uf, cargo, sq_vistos)
                 total += n
-                log.info("sincronizados %d candidatos cargo=%s uf=%s", n, cargo, uf)
+                log.info(
+                    "sincronizados %d candidatos cargo=%s uf=%s (removidos=%d)",
+                    n, cargo, uf, removidos,
+                )
                 if baixar_fotos:
                     await _baixar_fotos(client, cands, "static/candidatos")
     return total
