@@ -411,6 +411,25 @@ async def apuracao_proporcional(
         .join(Candidato, Candidato.sq_candidato == SnapshotCandidato.sq_candidato)
         .where(SnapshotCandidato.snapshot_id == snap.id)
     )).all()
+    def _idade_de(cnd) -> int | None:
+        """Extrai idade em anos completos a partir do dataDeNascimento no
+        raw_divulga. Usado só pra desempate interno do partido (art. 110 CE)."""
+        from datetime import date
+        raw = cnd.raw_divulga or {}
+        dn = raw.get("dataDeNascimento")
+        if not dn:
+            return None
+        try:
+            if "/" in dn:
+                d, m, y = dn.split("/")
+            else:
+                y, m, d = dn.split("-")
+            nasc = date(int(y), int(m), int(d))
+            hoje = date.today()
+            return hoje.year - nasc.year - ((hoje.month, hoje.day) < (nasc.month, nasc.day))
+        except (ValueError, AttributeError, TypeError):
+            return None
+
     cands_prop = [
         CandidatoProporcional(
             sq_candidato=sc.sq_candidato,
@@ -419,6 +438,7 @@ async def apuracao_proporcional(
             partido_numero=cnd.partido_numero,
             votos=sc.votos,
             situacao=cnd.situacao,  # motor filtra != 'ativo' (votos nulos)
+            idade_anos=_idade_de(cnd),  # desempate art. 110 CE
         )
         for sc, cnd in cands_db
     ]

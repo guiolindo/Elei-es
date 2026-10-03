@@ -65,6 +65,11 @@ class CandidatoProporcional:
     # exclui qualquer status != 'ativo' antes do cálculo do QE, QP,
     # barreira e sobras.
     situacao: str = "ativo"
+    # Idade em anos completos no dia da eleição. Usado SÓ pra desempate
+    # entre dois candidatos do MESMO partido com votação idêntica, por
+    # art. 110 CE: "em caso de empate, haver-se-á por eleito o mais idoso".
+    # Se None, o motor mantém a ordem recebida (não decide).
+    idade_anos: int | None = None
 
 
 @dataclass
@@ -246,7 +251,12 @@ def calcular_eleitos_proporcional(
         u = unidade_de(c.partido_numero)
         cands_por_unidade.setdefault(u, []).append(c)
     for u in cands_por_unidade:
-        cands_por_unidade[u].sort(key=lambda c: c.votos, reverse=True)
+        # Ordena por votos desc; empate → mais velho primeiro (art. 110 CE).
+        # Candidato sem idade cai pro fim do empate (idade = -1 vira menor).
+        cands_por_unidade[u].sort(
+            key=lambda c: (c.votos, c.idade_anos if c.idade_anos is not None else -1),
+            reverse=True,
+        )
 
     vagas_efetivas_por_unidade: dict[str, int] = {}
     for u, vagas_teoricas in vagas_por_unidade.items():

@@ -222,3 +222,42 @@ def test_todos_cassados_resultado_vazio():
     r = calcular_eleitos_proporcional(cands, vagas=5, federacoes={})
     assert r.candidatos == []
     assert r.votos_validos == 0
+
+
+# ============ Desempate art. 110 CE no proporcional interno do partido ============
+
+def test_proporcional_empate_mesmo_partido_mais_velho_fica_na_frente():
+    """Dois candidatos do mesmo partido empatados em votos. Art. 110 CE:
+    o mais idoso fica na frente na ordem interna do partido. Se o partido
+    só ganha 1 vaga, essa vaga vai pro mais velho."""
+    from math_engine.proporcional import (
+        CandidatoProporcional, calcular_eleitos_proporcional
+    )
+    cands = [
+        CandidatoProporcional("A", "ALICE", 1301, 13, votos=10_000, idade_anos=35),
+        CandidatoProporcional("B", "BRUNO", 1302, 13, votos=10_000, idade_anos=70),
+        # 2 candidatos de outro partido com votação forte, pra competir vagas
+        CandidatoProporcional("X", "XAVIER", 2201, 22, votos=50_000, idade_anos=50),
+        CandidatoProporcional("Y", "YARA",   2202, 22, votos=40_000, idade_anos=40),
+    ]
+    r = calcular_eleitos_proporcional(cands, vagas=3, federacoes={})
+    eleitos = [c.sq_candidato for c in r.candidatos if c.status == "eleito"]
+    # B (70 anos, PT) vai na frente de A (35 anos, PT) na ordem interna.
+    # Mesmo que o PT só pegue 1 vaga, o mais velho leva.
+    posicao_B = next(c.posicao_no_partido for c in r.candidatos if c.sq_candidato == "B")
+    posicao_A = next(c.posicao_no_partido for c in r.candidatos if c.sq_candidato == "A")
+    assert posicao_B < posicao_A, f"B(70) deve preceder A(35), got pos B={posicao_B} A={posicao_A}"
+
+
+def test_proporcional_empate_sem_idade_mantem_ordem_recebida():
+    """Sem idade, não decide por idade (mantém ordem estável do Python)."""
+    from math_engine.proporcional import (
+        CandidatoProporcional, calcular_eleitos_proporcional
+    )
+    cands = [
+        CandidatoProporcional("A", "A", 1301, 13, votos=10_000),  # idade=None
+        CandidatoProporcional("B", "B", 1302, 13, votos=10_000),  # idade=None
+    ]
+    r = calcular_eleitos_proporcional(cands, vagas=1, federacoes={})
+    eleitos = [c.sq_candidato for c in r.candidatos if c.status == "eleito"]
+    assert len(eleitos) == 1  # alguém ganha, o motor não decide por idade

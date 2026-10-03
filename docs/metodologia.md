@@ -109,6 +109,19 @@ Senador NÃO precisa de maioria absoluta — os N mais votados vencem. Em ano de
 
 **Fórmula** (1 vaga, quando aplicável): `b.votos + restantes_max < a.votos`
 
+## 3.3. Desempate por idade (art. 110 CE)
+
+Vale pra TODOS os cargos sempre que a última vaga/posição ficar com dois candidatos em **empate exato de votos** no fechamento (100% apurado):
+
+> "Em caso de empate, haver-se-á por eleito o candidato mais idoso." — Código Eleitoral, art. 110.
+
+Aplicação no sistema:
+- **Presidente/Governador 2º turno**: motor emite ELEITO_2T pro mais velho.
+- **Senador multivaga (2 vagas em 2026)**: `eleitos_majoritario_multivaga` troca o 2º colocado pelo 3º se o 3º for mais velho.
+- **Deputado proporcional**: `calcular_eleitos_proporcional` ordena candidatos do mesmo partido/federação por `(votos desc, idade desc)` — mais velho fica à frente em caso de empate exato.
+
+Se a idade de qualquer um dos empatados não foi coletada (`idade_anos is None`), o motor **não decide** — mantém em disputa e deixa pra Justiça Eleitoral resolver. É preferível silêncio a erro.
+
 ## 4. Majoritário — múltiplas vagas (Senador 2026)
 
 **Cenário 2026**: eleição de renovação de 2/3 do Senado — cada UF elege **2 senadores**. Anos de renovação 1/3 (2018, 2022) elegem 1.

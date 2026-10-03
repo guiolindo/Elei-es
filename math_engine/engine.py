@@ -170,14 +170,24 @@ def eleitos_majoritario_multivaga(
     if vagas < 1 or not candidatos:
         return []
     if len(candidatos) <= vagas:
-        # Todos os que existem seriam eleitos se ninguém mais pode entrar
         return list(candidatos) if votos_restantes_max(totais) == 0 else []
     restantes = votos_restantes_max(totais)
     n_esimo = candidatos[vagas - 1]
     primeiro_suplente = candidatos[vagas]
-    # Todos os top-N estão fechados se o N-ésimo é inalcançável pelo suplente
+    # Caso normal: N-ésimo é estritamente inalcançável pelo suplente
     if n_esimo.votos > primeiro_suplente.votos + restantes:
         return list(candidatos[:vagas])
+    # Empate exato no fechamento (100% apurado): art. 110 CE manda eleger
+    # o mais idoso. Só decide se as duas idades são conhecidas e diferentes.
+    if (restantes == 0
+            and n_esimo.votos == primeiro_suplente.votos
+            and n_esimo.idade_anos is not None
+            and primeiro_suplente.idade_anos is not None
+            and n_esimo.idade_anos != primeiro_suplente.idade_anos):
+        if n_esimo.idade_anos > primeiro_suplente.idade_anos:
+            return list(candidatos[:vagas])  # N-ésimo é mais velho → eleito
+        # Suplente é mais velho → ocupa a última vaga, N-ésimo sai
+        return list(candidatos[:vagas - 1]) + [primeiro_suplente]
     return []
 
 

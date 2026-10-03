@@ -342,8 +342,9 @@ async def processar_alvo(
                 hoje = date.today()
                 for sq, raw, situ in r_cands.all():
                     situacoes[sq] = situ or "ativo"
-                    if alvo.turno != 2:
-                        continue
+                    # Idade: carrega em TODOS os turnos/cargos — necessário
+                    # pra desempate (art. 110 CE) em Senador multivaga e
+                    # Deputado proporcional, não só no 2º turno de Pres/Gov.
                     dn = (raw or {}).get("dataDeNascimento")
                     if not dn:
                         continue

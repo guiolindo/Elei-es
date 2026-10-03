@@ -600,3 +600,59 @@ def test_candidato_ativo_com_maioria_ganha_normalmente():
     )
     evs = avaliar_apuracao(candidatos, totais, cod_cargo=1, turno=1)
     assert any(e["sq_candidato_a"] == "A" and "ELEITO" in e["tipo"] for e in evs)
+
+
+# ============ Desempate art. 110 CE em Senador multivaga ============
+
+def test_senador_multivaga_empate_ultima_vaga_mais_velho_vence():
+    """2 vagas, 2º e 3º empatados em 100% apurado → mais velho fica com a vaga."""
+    from math_engine.engine import eleitos_majoritario_multivaga, CandidatoResumo, TotaisResumo
+    cands = [
+        CandidatoResumo("A", 1_000_000, idade_anos=60),  # eleito direto
+        CandidatoResumo("B",   500_000, idade_anos=70),  # 2º empatado
+        CandidatoResumo("C",   500_000, idade_anos=45),  # 3º empatado
+    ]
+    tot = TotaisResumo(qt_secoes_total=100, qt_secoes_totalizadas=100,
+                       qt_eleitorado_apto=10_000_000, qt_eleitorado_apto_totalizadas=10_000_000, qt_votos_validos=1_500_000)
+    eleitos = eleitos_majoritario_multivaga(cands, tot, vagas=2)
+    assert [c.sq_candidato for c in eleitos] == ["A", "B"]
+
+
+def test_senador_multivaga_empate_mais_velho_e_o_suplente():
+    """O 3º colocado é mais velho que o 2º — o 3º fica com a vaga."""
+    from math_engine.engine import eleitos_majoritario_multivaga, CandidatoResumo, TotaisResumo
+    cands = [
+        CandidatoResumo("A", 1_000_000, idade_anos=60),
+        CandidatoResumo("B",   500_000, idade_anos=45),  # 2º, mais novo
+        CandidatoResumo("C",   500_000, idade_anos=70),  # 3º, mais velho → ganha
+    ]
+    tot = TotaisResumo(qt_secoes_total=100, qt_secoes_totalizadas=100,
+                       qt_eleitorado_apto=10_000_000, qt_eleitorado_apto_totalizadas=10_000_000, qt_votos_validos=1_500_000)
+    eleitos = eleitos_majoritario_multivaga(cands, tot, vagas=2)
+    assert sorted(c.sq_candidato for c in eleitos) == ["A", "C"]
+
+
+def test_senador_multivaga_empate_sem_idade_mantem_indeciso():
+    """Se não sabemos a idade, motor NÃO decide — deixa pra Justiça Eleitoral."""
+    from math_engine.engine import eleitos_majoritario_multivaga, CandidatoResumo, TotaisResumo
+    cands = [
+        CandidatoResumo("A", 1_000_000),
+        CandidatoResumo("B",   500_000),  # idade=None
+        CandidatoResumo("C",   500_000),  # idade=None
+    ]
+    tot = TotaisResumo(qt_secoes_total=100, qt_secoes_totalizadas=100,
+                       qt_eleitorado_apto=10_000_000, qt_eleitorado_apto_totalizadas=10_000_000, qt_votos_validos=1_500_000)
+    assert eleitos_majoritario_multivaga(cands, tot, vagas=2) == []
+
+
+def test_senador_multivaga_empate_antes_de_100pct_nao_decide():
+    """Enquanto houver seções não apuradas, empate não permite declarar."""
+    from math_engine.engine import eleitos_majoritario_multivaga, CandidatoResumo, TotaisResumo
+    cands = [
+        CandidatoResumo("A", 1_000_000, idade_anos=60),
+        CandidatoResumo("B",   500_000, idade_anos=70),
+        CandidatoResumo("C",   500_000, idade_anos=45),
+    ]
+    tot = TotaisResumo(qt_secoes_total=100, qt_secoes_totalizadas=99,
+                       qt_eleitorado_apto=10_000_000, qt_eleitorado_apto_totalizadas=9_999_000, qt_votos_validos=1_500_000)
+    assert eleitos_majoritario_multivaga(cands, tot, vagas=2) == []
