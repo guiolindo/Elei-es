@@ -92,9 +92,16 @@ async function selecionarUF(uf) {
       opt.dataset.codigo = c.codigo;
       dl.appendChild(opt);
     });
-    $("mu-hint").textContent = state.cidades.length
-      ? `${state.cidades.length} municípios disponíveis em ${uf}. Comece a digitar.`
-      : "TSE ainda não publicou a lista dessa UF. Digite o código TSE do município.";
+    if (state.cidades.length) {
+      $("mu-hint").textContent = `${state.cidades.length} municípios disponíveis em ${uf}. Comece a digitar.`;
+    } else {
+      // Mensagem rica quando TSE ainda não publicou (comum pré-apuração)
+      const erro = j.erro || "TSE ainda não publicou a lista.";
+      $("mu-hint").innerHTML = erro.replace(
+        /tse\.jus\.br\/eleitor\/onde-votar/,
+        '<a href="https://www.tse.jus.br/eleitor/onde-votar" target="_blank" rel="noopener">tse.jus.br/eleitor/onde-votar</a>'
+      );
+    }
   } catch (e) {
     $("mu-hint").textContent = "Não foi possível carregar a lista. Digite o código TSE manualmente.";
   }

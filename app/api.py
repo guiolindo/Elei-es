@@ -508,7 +508,13 @@ async def lideres_por_municipio(
     municipios: dict[str, dict[str, Any]] = {}
     sq_para_idx: dict[str, int] = {}
     for cod_ibge, linhas in por_mun.items():
-        lider = next((l for l in linhas if l.situacao == "ativo"), None)
+        # Primeiro ATIVO com voto > 0. Pré-apuração todos têm 0 votos
+        # e a 'posicao' vem arbitrária do TSE — sem voto não há líder,
+        # senão o mapa pinta todos os municípios da mesma cor fantasma.
+        lider = next(
+            (l for l in linhas if l.situacao == "ativo" and l.votos > 0),
+            None,
+        )
         if not lider:
             continue
         if lider.sq_candidato not in sq_para_idx:
@@ -569,9 +575,16 @@ async def lideres_por_uf(
     ufs: dict[str, dict[str, Any]] = {}
     sq_para_idx: dict[str, int] = {}
     for abr, linhas in por_uf.items():
-        lider = next((l for l in linhas if l.situacao == "ativo"), None)
+        # Mesma lógica do por-municipio: só é líder quem tem voto > 0.
+        # Pré-apuração a posicao é arbitrária e pintaria todo mapa com a
+        # mesma cor fantasma (bug reportado 03/10 — Flávio Bolsonaro
+        # aparecia em TODAS as 27 UFs com 0 votos).
+        lider = next(
+            (l for l in linhas if l.situacao == "ativo" and l.votos > 0),
+            None,
+        )
         if not lider:
-            continue  # Todos os top-5 retirados → UF fica cinza (improvável)
+            continue  # Sem voto → UF fica cinza no mapa
         if lider.sq_candidato not in sq_para_idx:
             sq_para_idx[lider.sq_candidato] = len(sq_para_idx)
         ufs[abr] = {
@@ -1062,7 +1075,7 @@ async def apuracao_municipio_tse(
     hit = _CACHE_MUN.get(chave)
     if hit and (agora - hit[0]) < _CACHE_MUN_TTL:
         return {"cache_hit": True, **hit[1]}
-    base = settings.tse_cdn_base.rstrip("/").rsplit("/", 1)[0]  # sem /ele2026
+    base = settings.tse_cdn_base.rstrip("/")  # inclui /ele2026
     # Padrão do TSE: /{cod}/dados/{uf}/{uf}{municipio}-c{cargo:04d}-e{cod:06d}-u.json
     # onde municipio pode ter 5 dígitos (código IBGE truncado do TSE)
     mu_pad = mu.zfill(5)
@@ -1167,7 +1180,7 @@ async def _apuracao_zona_removida(
     hit = _CACHE_MUN.get(chave)  # reusa o mesmo cache
     if hit and (agora - hit[0]) < _CACHE_MUN_TTL:
         return {"cache_hit": True, **hit[1]}
-    base = settings.tse_cdn_base.rstrip("/").rsplit("/", 1)[0]
+    base = settings.tse_cdn_base.rstrip("/")
     # Padrão TSE zona: /{cod}/dados/{uf}/{uf}{mun}z{zn}-c{cargo:04d}-e{cod:06d}-u.json
     url = f"{base}/{cod}/dados/{uf}/{uf}{mu}z{zn}-c{cargo:04d}-e{cod:06d}-u.json"
     j = await _fetch_tse_json(url)
@@ -1230,7 +1243,7 @@ async def listar_municipios(uf: str = Query(..., min_length=2, max_length=2)) ->
         return {"cache_hit": True, "municipios": hit[1]}
 
     settings = get_settings()
-    base = settings.tse_cdn_base.rstrip("/").rsplit("/", 1)[0]
+    base = settings.tse_cdn_base.rstrip("/")
     cod = settings.eleicao_cod_1t  # usa o da presidencial, serve pra todas
     # TSE publica config dos municípios por UF nesse padrão:
     url = f"{base}/comum/config/mun-e{cod:06d}-{uf}.json"
@@ -1240,7 +1253,16 @@ async def listar_municipios(uf: str = Query(..., min_length=2, max_length=2)) ->
         url2 = f"{base}/comum/config/mun-{uf}.json"
         j = await _fetch_tse_json(url2)
     if not j:
-        return {"municipios": [], "erro": "TSE não publicou lista pra esta UF ainda"}
+        return {
+            "municipios": [],
+            "erro": (
+                "TSE ainda não publicou a lista oficial de municípios "
+                "para esta UF. Isso é esperado em pré-apuração — o TSE "
+                "costuma publicar na manhã do dia D. Até lá, use o código "
+                "numérico do município direto (campo aceita digitação "
+                "livre). Encontre em tse.jus.br/eleitor/onde-votar."
+            ),
+        }
 
     # Formato típico: {"mu": [{"cd": "71099", "nm": "SÃO PAULO"}, ...]}
     # Mas pode variar — tenta várias chaves.
@@ -1299,7 +1321,7 @@ async def apuracao_bu(
     if hit and (agora - hit[0]) < _CACHE_BU_TTL:
         return {"cache_hit": True, **hit[1]}
 
-    base = settings.tse_cdn_base.rstrip("/").rsplit("/", 1)[0]
+    base = settings.tse_cdn_base.rstrip("/")
     # JSON do BU: /dados/{uf}/{uf}{mun}/{zona}/{secao}/o{cod}-{mun}{zona}{secao}.json
     url_json = f"{base}/{cod}/dados/{uf}/{uf}{mu}/{zn}/{se}/o{cod_pad}-{mu}{zn}{se}.json"
     # Imagem assinada do BU: /dados_bu_imgbu/{uf}/{mun}/{zona}/{secao}/o{cod}-{mun}{zona}{secao}-bu.jpeg
@@ -1309,7 +1331,12 @@ async def apuracao_bu(
     if not j:
         return {
             "disponivel": False,
-            "motivo": "BU não encontrado ou seção ainda não totalizada",
+            "motivo": (
+                "BU não encontrado. Causas comuns: (1) a seção ainda não "
+                "foi totalizada (BUs só saem a partir das 17h de domingo "
+                "do dia D); (2) o código do município/zona/seção está "
+                "incorreto — confira em tse.jus.br/eleitor/onde-votar."
+            ),
             "url_tentada": url_json,
             "url_imagem_bu": url_bu_img,
         }
