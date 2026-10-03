@@ -267,7 +267,7 @@ async def cmd_pct(client, chat_id: int, args: list[str]) -> None:
         res = await _snapshot_atual(sess, cargo, uf)
     if not res:
         await _send(client, chat_id,
-                    f"Sem dados de {CARGOS[cargo]}/{uf} ainda. Apuração começa 5/10 17h BRT.")
+                    f"Sem dados de {CARGOS[cargo]}/{uf} ainda. Apuração começa 4/10 17h BRT.")
         return
     snap, tot, _ = res
     pct = (tot.qt_secoes_totalizadas / tot.qt_secoes_total * 100) if tot.qt_secoes_total else 0

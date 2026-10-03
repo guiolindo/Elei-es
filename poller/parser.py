@@ -7,7 +7,7 @@ no JSON são tratados como 0.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 
@@ -65,16 +65,47 @@ class ParsedSnapshot:
     municipios: list[ParsedMunicipio]
 
 
+# TSE devolve horários no fuso de Brasília (sem offset no JSON). Marcamos
+# com BRT explicitamente pra que o conversor pra UTC (feito pelo Postgres
+# ao salvar em TIMESTAMPTZ) resulte no instante correto.
+_BRT = timezone(timedelta(hours=-3))
+
+
 def _parse_dt(raw: str | None) -> datetime | None:
+    """Parse de uma string de data+hora do TSE em datetime timezone-aware (BRT).
+
+    Formatos aceitos: '12/10/2026 20:35:12', '2026-10-12T20:35:12',
+    '2026-10-12 20:35:12'. Pra variante ISO já com offset ('...+00:00'),
+    respeita o fuso recebido; senão assume BRT.
+    """
     if not raw:
         return None
-    # TSE costuma mandar "dd/mm/aaaa hh:mm:ss"
     for fmt in ("%d/%m/%Y %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
         try:
-            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+            dt = datetime.strptime(raw, fmt)
+            return dt.replace(tzinfo=_BRT)
         except ValueError:
             continue
-    return None
+    # Último fallback: fromisoformat aceita ISO com offset (ex.: "+00:00")
+    try:
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_BRT)
+        return dt
+    except ValueError:
+        return None
+
+
+def _parse_dt_dg_hg(dg: str | None, hg: str | None) -> datetime | None:
+    """Combina `dg` (dd/mm/aaaa) e `hg` (HH:MM:SS) que vêm separados nos JSONs
+    reais do TSE (ex.: dg='02/10/2026', hg='20:13:54'). Fuso: BRT.
+    """
+    if not dg:
+        return None
+    if hg:
+        return _parse_dt(f"{dg} {hg}")
+    # Só a data — meio-noite BRT como aproximação (melhor que None)
+    return _parse_dt(f"{dg} 00:00:00")
 
 
 def parse_snapshot(payload: dict) -> ParsedSnapshot:
@@ -118,7 +149,12 @@ def parse_snapshot(payload: dict) -> ParsedSnapshot:
         qt_votos_validos=_to_int(v.get("vv") or root.get("qt_votos_validos")),
         qt_votos_brancos=_to_int(v.get("vb") or root.get("qt_votos_brancos")),
         qt_votos_nulos=_to_int(v.get("vn") or root.get("qt_votos_nulos")),
-        gerado_em=_parse_dt(root.get("dg") or root.get("gerado_em")),
+        # TSE 2026: dg (data) e hg (hora) vêm SEPARADOS. Fixtures legadas
+        # usam `gerado_em` já formatado em uma string única.
+        gerado_em=(
+            _parse_dt_dg_hg(root.get("dg"), root.get("hg"))
+            or _parse_dt(root.get("gerado_em"))
+        ),
     )
 
     def _parse_cand_list(raw_list) -> list[ParsedCandidato]:
