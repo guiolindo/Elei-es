@@ -103,6 +103,21 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   content: ""; position: absolute; left: 16px; right: 16px; bottom: -1px;
   height: 2px; background: var(--brand); border-radius: 1px 1px 0 0;
 }
+/* CTA destacado na navegação (ex.: "Minha cola") — vira pill dourada
+   que o olho pega imediatamente, sem gritar como botão primário. */
+.d-topnav-link.d-topnav-cta {
+  color: var(--brand); background: rgba(240,180,41,.08);
+  border: 1px solid rgba(240,180,41,.3);
+  border-radius: 999px; padding: 8px 14px; margin-left: 8px;
+}
+.d-topnav-link.d-topnav-cta:hover {
+  background: rgba(240,180,41,.18); border-color: rgba(240,180,41,.5);
+}
+.d-topnav-link.d-topnav-cta::after { display: none !important; }
+
+/* Mobile: botão da cola ao lado do sino, com cor brand pra destacar */
+.m-icon-btn.m-icon-cta { color: var(--brand); }
+.m-icon-btn.m-icon-cta svg { stroke-width: 2.2; }
 
 /* ============ Hero ============ */
 .hero {
