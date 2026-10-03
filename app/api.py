@@ -111,29 +111,40 @@ async def listar_candidatos(
         stmt = stmt.where(Candidato.uf == uf)
     r = await sess.execute(stmt.order_by(Candidato.numero))
     todos = list(r.scalars())
-    # Dedup por (uf, numero): TSE às vezes mantém o sq antigo + o novo
-    # quando há substituição/reregistro. Prioriza situacao='ativo'; se
-    # nenhum ativo, mantém o sq mais recente (lex. maior → cadastro novo).
-    # Candidatos sem numero (ex.: 0, lixo) ficam todos.
-    por_chave: dict[tuple, Candidato] = {}
+    # Dedup HONESTO por (uf, numero). O TSE às vezes mantém dois registros
+    # pro mesmo número (substituição por renúncia/indeferimento). Três casos:
+    #
+    #   a) 1 ativo + N inativos  → mostra só o ativo. Padrão legítimo de
+    #                               substituição com baixa do antigo.
+    #   b) 0 ativos               → mostra TODOS. Ex.: PRTB-28 em 2026 teve
+    #                               Avalanche (renunciou) e Marçal
+    #                               (indeferido) — são pessoas distintas,
+    #                               esconder um seria mentir.
+    #   c) 2+ ativos              → mostra TODOS. Não sabemos qual é o
+    #                               "real" (nem o TSE marcou um como
+    #                               cancelado). Os votos no snapshot do
+    #                               dia D vão revelar: só um recebe votos,
+    #                               o outro fica em zero.
+    #
+    # Candidatos sem numero (ex.: 0, lixo) nunca são deduped.
+    from collections import defaultdict
+    grupos: dict[tuple, list[Candidato]] = defaultdict(list)
     extras: list[Candidato] = []
     for c in todos:
         if not c.numero:
             extras.append(c)
             continue
         chave = (c.uf or "BR", c.numero)
-        atual = por_chave.get(chave)
-        if atual is None:
-            por_chave[chave] = c
-            continue
-        # Preferência: ativo > qualquer outro status; empate → sq maior
-        atual_ativo = atual.situacao == "ativo"
-        novo_ativo = c.situacao == "ativo"
-        if novo_ativo and not atual_ativo:
-            por_chave[chave] = c
-        elif novo_ativo == atual_ativo and str(c.sq_candidato) > str(atual.sq_candidato):
-            por_chave[chave] = c
-    final = sorted(list(por_chave.values()) + extras, key=lambda x: (x.numero or 0))
+        grupos[chave].append(c)
+    final: list[Candidato] = []
+    for cands_do_grupo in grupos.values():
+        ativos = [c for c in cands_do_grupo if c.situacao == "ativo"]
+        if len(ativos) == 1 and len(cands_do_grupo) > 1:
+            final.append(ativos[0])  # caso (a): dedup limpo
+        else:
+            final.extend(cands_do_grupo)  # casos (b) e (c): mostra todos
+    final.extend(extras)
+    final.sort(key=lambda x: (x.numero or 0, str(x.sq_candidato)))
     return [
         {
             "sq_candidato": c.sq_candidato,
