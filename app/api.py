@@ -144,7 +144,7 @@ async def ficha(sq: str, sess: AsyncSession = Depends(get_session)) -> dict[str,
         "coligacao": c.coligacao,
         "situacao": c.situacao,
         "foto": _url_foto(c.sq_candidato, c.uf),
-        "situacao": _p("descricaoSituacao"),
+        "situacao_tse": _p("descricaoSituacao"),
         "situacao_candidatura": _p("descricaoSituacao"),
         "sexo": _p("descricaoSexo"),
         "cor_raca": _p("descricaoCorRaca"),
@@ -876,6 +876,19 @@ async def corrigir_partidos(sess: AsyncSession = Depends(get_session)) -> dict[s
             corrigidos += 1
     await sess.commit()
     return {"ok": True, "corrigidos": corrigidos}
+
+
+@router.post("/admin/reavaliar-situacao", dependencies=[Depends(_exigir_admin)])
+async def admin_reavaliar_situacao(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Reavalia a situacao de todos os candidatos a partir do raw_divulga.
+
+    Útil quando o TSE atualizou um status (ex.: 'Inapto' depois de ter
+    sido 'Pendente de julgamento') e queremos refletir isso sem esperar
+    o próximo ciclo de sync completo.
+    """
+    from poller.candidatos_tse import reavaliar_situacao_pelo_raw
+    n = await reavaliar_situacao_pelo_raw(sess)
+    return {"ok": True, "mudados": n}
 
 
 @router.get("/admin/diagnostico-mismatches", dependencies=[Depends(_exigir_admin)])

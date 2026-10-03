@@ -120,8 +120,20 @@ def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoT
     # dia D) mas marcados pra motor excluí-los do cálculo de "eleito".
     # Lei 9.504/97 art. 175 §3º: votos considerados nulos na apuração
     # oficial final.
-    sit_raw = (_pick(payload, "descricaoSituacao", "descricaoTotalizacao") or "").lower()
+    sit_raw = (_pick(
+        payload,
+        "descricaoSituacao", "descricaoTotalizacao",
+        "descricaoSituacaoCandidato", "descricaoSituacaoTotalizacao",
+        "ds_sit_tot_turno", "ds_situacao_candidatura",
+        "situacao",
+    ) or "").lower()
+    # "inapto" aparece na listagem TSE pra candidatos que perderam direitos
+    # políticos ou cujo registro foi indeferido pela JE. Caso 2026: Leonardo
+    # Avalanche e Pablo Marçal (PRTB). Pelo art. 175 §3º da Lei 9.504/97,
+    # votos neles são nulos — motor exclui situacao != 'ativo'.
     if "indeferido" in sit_raw and "recurso" not in sit_raw:
+        situacao = "indeferido_sem_recurso"
+    elif "inapto" in sit_raw or "inelegível" in sit_raw or "inelegivel" in sit_raw:
         situacao = "indeferido_sem_recurso"
     elif "renunc" in sit_raw:
         situacao = "renunciou"
@@ -283,6 +295,48 @@ async def _baixar_fotos(
                     break
             except httpx.HTTPError:
                 continue
+
+
+async def reavaliar_situacao_pelo_raw(sess: AsyncSession | None = None) -> int:
+    """Reaplica o parser de situacao em cima de raw_divulga já salvo.
+
+    Caso real: 'Leonardo Avalanche' e 'Pablo Marçal' (PRTB 2026) foram
+    importados quando TSE ainda retornava descricaoSituacao='Pendente de
+    julgamento' → situacao='ativo'. Depois o TSE mudou pra 'Inapto'. Sem
+    isso, até a próxima sincronização completa (que pode levar 6h ou ser
+    bloqueada por Akamai), o motor continuaria contando os votos deles.
+
+    Idempotente — só UPDATE quando o enum muda.
+    """
+    close_sess = False
+    if sess is None:
+        sess = SessionLocal()
+        close_sess = True
+    try:
+        rows = (await sess.execute(select(Candidato))).scalars().all()
+        mudados = 0
+        for c in rows:
+            raw = c.raw_divulga or {}
+            if not isinstance(raw, dict):
+                continue
+            parsed = parse_candidato(raw, c.cod_cargo, c.uf)
+            if parsed is None:
+                continue
+            nova = parsed.situacao
+            if nova and nova != c.situacao:
+                log.warning(
+                    "situacao mudou: sq=%s nome='%s' %s → %s (raw.descricaoSituacao=%r)",
+                    c.sq_candidato, c.nome_urna, c.situacao, nova,
+                    raw.get("descricaoSituacao"),
+                )
+                c.situacao = nova
+                mudados += 1
+        if mudados:
+            await sess.commit()
+        return mudados
+    finally:
+        if close_sess:
+            await sess.close()
 
 
 async def _marcar_removidos_pelo_tse(

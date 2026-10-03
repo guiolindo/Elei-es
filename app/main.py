@@ -19,7 +19,9 @@ from app.api import router, ws_router
 from app.config import get_settings
 from app.ws import broadcaster
 from poller.service import loop as poller_loop
-from poller.candidatos_tse import sincronizar_candidatos, corrigir_partidos_orfaos
+from poller.candidatos_tse import (
+    sincronizar_candidatos, corrigir_partidos_orfaos, reavaliar_situacao_pelo_raw,
+)
 from poller.descoberta import descobrir_cods_eleicao
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -122,6 +124,12 @@ async def _sync_candidatos_loop():
             log.info("self-heal: %d candidatos com partido_numero corrigido", n)
     except Exception:
         log.exception("self-heal partidos falhou")
+    try:
+        n = await reavaliar_situacao_pelo_raw()
+        if n:
+            log.info("self-heal: %d candidatos com situacao reavaliada", n)
+    except Exception:
+        log.exception("self-heal situacao falhou")
     while True:
         try:
             log.info("sync_candidatos: iniciando ciclo")
