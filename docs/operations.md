@@ -134,9 +134,12 @@ python scripts/importar_termux.py https://elei-es-production.up.railway.app SEU_
 ### O que o script faz
 
 1. Limpa candidatos-seed antigos via `POST /api/admin/limpar-seed`.
-2. Pra cada cargo (Presidente, Governador, Senador, Dep. Federal, Dep. Estadual) × cada UF:
-   - Baixa a lista via `divulgacandcontas/rest/v1/candidatura/listar/...`.
+2. Pra cada cargo (Presidente, Governador, Senador, Dep. Federal, Dep. Estadual/Distrital) × cada UF:
+   - Baixa a lista via `divulgacandcontas/rest/v1/candidatura/listar/...` (DF usa cargo `8` pra Dep. Distrital — mapeado em `_cargo_tse(cargo, uf)` no script).
    - Envia pro Railway via `POST /api/admin/importar-candidatos`.
+   - O backend faz duas coisas automaticamente:
+     1. **Upsert** + marca `cancelado` quem o TSE não devolveu mais (self-heal pra "candidato sumiu da listagem").
+     2. **Reavalia `situacao`** de todos ativos a partir do `raw_divulga` novo. Isso cobre casos como Avalanche/Marçal 2026, cujo `descricaoSituacao` virou "Renúncia" só após o cadastro inicial.
 3. Pra cada majoritário (cargos 1, 3, 5): baixa a **ficha completa** via `divulgacandcontas/rest/v1/candidatura/buscar/{ano}/{uf}/{cod}/candidato/{sq}` — com fallback de UFs pra presidente (tenta BR + SP + RJ + MG + DF + UF do payload).
 4. Baixa a **foto** via `divulgacandcontas/rest/arquivo/img/{cod}/{sq}/{uf}` e envia base64 pro Railway via `/api/admin/upload-foto`.
 
@@ -145,7 +148,20 @@ Todo com header `X-Admin-Token`.
 ### Rodagem recomendada
 
 - **Antes da apuração** (D-1 e D-0 manhã): rodar 1x pra popular candidatos + fotos + fichas completas.
+- **Rodadas adicionais em D-1**: sempre que o TSE atualizar status (ex.: um candidato é marcado "Inapto"/"Renúncia"), rodar de novo pra sincronizar — leva ~15 min pra completar os 5 cargos × 27 UFs.
 - **Durante a apuração**: NÃO precisa. A apuração ao vivo vem por `resultados.tse.jus.br` que o Railway acessa direto.
+
+### Verificação pós-execução
+
+Após o script terminar, rodar:
+```bash
+curl -s -H "X-Admin-Token: $ADMIN_TOKEN" \
+  https://elei-es-production.up.railway.app/api/admin/duplicatas | jq
+curl -s -H "X-Admin-Token: $ADMIN_TOKEN" \
+  https://elei-es-production.up.railway.app/api/admin/diagnostico-mismatches | jq
+```
+- `duplicatas.total == 0`: nenhum `(cargo, uf, numero)` com 2+ `sq_candidato` ativos.
+- `diagnostico-mismatches.orfaos == []`: nenhum sq em snapshot sem registro em `candidatos`.
 
 ## Endpoints admin
 
@@ -156,11 +172,35 @@ Todos exigem header `X-Admin-Token: <valor>`. Se `ADMIN_TOKEN` está vazio (dev)
 | `/api/admin/status` | GET | Contadores rápidos do banco |
 | `/api/admin/testar-tse` | GET | Testa conectividade com 5 endpoints do TSE |
 | `/api/admin/diagnostico-ids` | GET | Confere se SQs de snapshots batem com candidatos |
+| `/api/admin/diagnostico-mismatches` | GET | Lista sq_candidato órfãos (em snapshot sem ficha) |
+| `/api/admin/duplicatas` | GET | Lista `(cargo, uf, numero)` com >1 sq_candidato ativo |
+| `/api/admin/reavaliar-situacao` | POST | Re-aplica parser de `descricaoSituacao` sobre raw_divulga salvo |
 | `/api/admin/limpar-seed` | POST | Remove candidatos "PR2026_*" (seed antigo) |
-| `/api/admin/importar-candidatos` | POST | Recebe JSON do TSE (via Termux) e upsert |
+| `/api/admin/importar-candidatos` | POST | Recebe JSON do TSE (via Termux) + sweep de removidos + reavaliação |
 | `/api/admin/atualizar-detalhe` | POST | Merge do JSON de detalhe em `raw_divulga` |
 | `/api/admin/upload-foto` | POST | Recebe base64 e salva em `static/candidatos/` |
-| `/api/admin/sync-candidatos` | POST | Roda sincronizador programaticamente |
+| `/api/admin/sync-candidatos` | POST | Roda sincronizador programaticamente (falha no Akamai) |
+
+### Observabilidade do poller (sem auth)
+
+`GET /api/poller-status` expõe o estado do loop de coleta — útil pra confirmar externamente que o backend está vivo e no intervalo esperado, sem precisar de token.
+
+```bash
+# Snapshot pontual
+curl -s https://elei-es-production.up.railway.app/api/poller-status | jq
+
+# Watch (atualiza a cada 2s)
+watch -n 2 'curl -s https://elei-es-production.up.railway.app/api/poller-status | jq'
+```
+
+Interpretação:
+- `ciclo_atual`: deve subir ~a cada 20s (ou o valor de `POLL_INTERVAL_SECONDS`).
+- `segundos_desde_ultimo_ciclo`: deve oscilar entre 0 e `intervalo_s + ultimo_ciclo_duracao_s`. Passou de 60s? Algo travou.
+- `ultimo.falhas`: deve ser `0` em condições normais. Qualquer número aqui é erro **real** (503, timeout, DNS).
+- `ultimo.nao_publicado`: alvos que o TSE devolve 404 (ex.: 2º turno antes de ser aberto, Senador em UF sem senadores no ano). **Não é falha.** Esperado 56 pré-apuração (2 BR+ZZ + 27 Pres UF + 27 Gov UF — todos de 2T).
+- `ultimo.novos`: snapshot novo gravado (hash SHA-256 diferente do último). Zero quando TSE não publica atualização.
+- `ultimo.dedup`: snapshot idêntico ao anterior — descartado por hash. Comum quando TSE serve o mesmo JSON entre polls.
+- `ultimo.retrocesso`: snapshots suspeitos (totalizadas < anterior). Deve ser zero; se >0, TSE pode estar reprocessando.
 
 ## Capacidade e crescimento do banco
 

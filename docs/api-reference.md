@@ -5,94 +5,136 @@ Endpoints REST + WebSocket. Todos sob prefixo `/api`. Rate limit global: 100/min
 ## Público (sem autenticação)
 
 ### `GET /api/config-publica`
-Config exposta ao frontend (username do bot, ano da eleição). Só devolve `telegram_bot` se o token estiver configurado.
+Config exposta ao frontend (username do bot, ano da eleição, códigos TSE em uso). Só devolve `telegram_bot` se o token estiver configurado.
+
+### `GET /api/poller-status`
+Observabilidade do loop de coleta. Permite confirmar externamente que o poller está rodando no intervalo esperado.
+```json
+{
+  "ciclo_atual": 42, "intervalo_s": 20, "alvos_total": 193,
+  "ultimo_ciclo_em": "2026-10-04T20:14:23+00:00",
+  "ultimo_ciclo_duracao_s": 3.21,
+  "segundos_desde_ultimo_ciclo": 7.4,
+  "uptime_s": 851.2,
+  "ultimo": {"novos": 2, "dedup": 135, "falhas": 0,
+              "nao_publicado": 56, "retrocesso": 0}
+}
+```
+`nao_publicado` = alvos que o TSE devolve 404 (ex.: 2º turno antes de ser aberto) — **não** é falha. `falhas > 0` significa erro real (5xx, timeout, DNS).
 
 ### `GET /api/cargos`
-Lista dos 5 cargos (Presidente, Governador, Senador, Dep. Federal, Dep. Estadual).
+Lista dos cargos (Presidente, Governador, Senador, Dep. Federal, Dep. Estadual/Distrital). DF usa cargo `7` no nosso enum (unificado com Dep. Estadual); a tradução pra `c0008` do TSE acontece internamente.
 
 ### `GET /api/ufs`
 27 UFs com sigla, nome e código IBGE.
 
 ### `GET /api/candidatos?cargo={n}[&uf={UF}]`
-Lista de candidatos daquele cargo (opcionalmente por UF). Dados básicos.
+Lista de candidatos daquele cargo (opcionalmente por UF). **Dedup por `(uf, numero)`**: quando o TSE mantém dois `sq_candidato` pra mesma vaga (substituição/reregistro), devolve só um — preferência pra `situacao='ativo'`; empate → sq_candidato mais recente.
 
 ### `GET /api/candidato/{sq}`
-Ficha completa: nome, número, partido, situação, sexo, cor/raça, estado civil, data nascimento, escolaridade, ocupação, UF/município nascimento, gasto de campanha, CNPJ, vice. Todo o `raw_divulga` do TSE mesclado.
+Ficha completa. Campos:
+- `situacao`: enum interno (`ativo` | `renunciou` | `cancelado` | `cassado` | `indeferido_sem_recurso`). Fonte da verdade pra motor e UI.
+- `situacao_tse`: `descricaoSituacao` cru do TSE (ex.: `"Renúncia"`, `"Inapto"`, `"Pendente de julgamento"`).
+- `situacao_candidatura`: alias do campo acima pra compatibilidade.
+- `sexo`, `cor_raca`, `estado_civil`, `data_nascimento`, `grau_instrucao`, `ocupacao`, `uf_nascimento`, `municipio_nascimento`, `gasto_campanha`, `cnpj_campanha`, `vice_nome`, `vice_partido_sigla`.
 
-### `GET /api/apuracao/atual?cargo={n}&abrangencia={BR|UF}`
-Último snapshot não-suspeito. Inclui `snapshot_id` e `hash_conteudo` SHA-256 pra verificação.
-
-**Resposta**:
+### `GET /api/apuracao/atual?cargo={n}&abrangencia={BR|UF}[&inflate=true]`
+Último snapshot não-suspeito.
 ```json
 {
   "disponivel": true,
-  "coletado_em": "2026-10-05T20:14:23Z",
-  "gerado_em_tse": "2026-10-05T20:13:00Z",
+  "coletado_em": "2026-10-04T20:14:23Z",
+  "gerado_em_tse": "2026-10-04T20:13:00-03:00",
   "snapshot_id": 1234,
-  "hash_conteudo": "abc123...",
-  "totais": {...},
-  "candidatos": [{"sq_candidato", "votos", "pct_validos", "posicao"}]
+  "hash_conteudo": "abc...",
+  "totais": {"secoes_total": 499248, "secoes_totalizadas": 100000, ...},
+  "candidatos": [{"sq_candidato", "votos", "pct_validos", "posicao",
+                   "projecao_linear"}],
+  "orfaos": []
 }
 ```
+- `orfaos`: lista de `sq_candidato` presentes no snapshot mas **sem registro em `candidatos`** (importação pendente via Termux). Frontend usa isso pra re-fetchar `/api/candidatos` sem recarregar.
+- `inflate=true` adiciona `nome_urna`, `numero`, `partido`, `situacao`, `uf` em cada candidato (payload mais pesado, útil pra evitar join no cliente).
+- `gerado_em_tse` vem em BRT (`-03:00`); demais datas em UTC.
 
 ### `GET /api/apuracao/historico?cargo={n}&abrangencia={...}[&desde=ISO8601]`
 Séries temporais dos votos de cada candidato.
 
 ### `GET /api/apuracao/proporcional?cargo={6|7}&uf={UF}`
-Cálculo proporcional completo: QE, barreiras, lista de eleitos/suplentes por status, lista de partidos com vagas ganhas em cada fase. Ver `docs/metodologia.md` pras regras.
+Cálculo proporcional completo: QE, barreiras, eleitos/suplentes por status, partidos com vagas ganhas em cada fase. **Candidatos com `situacao != "ativo"` são excluídos antes do cálculo** (Lei 9.504/97 art. 175 §3º). Ver `docs/metodologia.md` seção 7.
 
 ### `GET /api/apuracao/municipio?uf={UF}&cargo={n}[&cod_ibge={7-digits}]`
-Resultados por município (quando o TSE inclui breakdown `abr[].mu[]`).
+Resultados por município (quando TSE inclui breakdown `abr[].mu[]`).
 
 ### `GET /api/apuracao/lideres-por-uf?cargo={n}`
-Líder de cada UF pra montar o mapa cloroplético. Retorna `{UF: {sq_candidato, nome_lider, cor, votos}}`.
+Líder de cada UF pra montar o mapa cloroplético. **Exige `votos > 0`** pra o candidato ser considerado líder — evita "líder fantasma" pré-apuração (candidato com 0 votos aparecendo colorido).
 
 ### `GET /api/apuracao/lideres-por-municipio?uf={UF}&cargo={n}`
 Idem, mas por município da UF.
 
+### `GET /api/apuracao/bu?uf={UF}&municipio={cod_tse}&zona={n}&secao={n}&cargo={n}[&turno={1|2}]`
+Boletim de urna (BU) por seção eleitoral individual. Inclui `url_imagem_bu`: link direto pra imagem JPEG assinada digitalmente pelo TSE da seção.
+
+### `GET /api/municipios?uf={UF}`
+Lista de municípios da UF pra o wizard do `/urna`. Dados vindos de `arquivo-urna/3220/config/{uf}/{uf}-p003220-cs.json` do TSE.
+
+### `GET /api/municipios/{municipio}/zonas?uf={UF}`
+Zonas eleitorais do município, cada uma com a lista de seções disponíveis. Alimenta os pickers em cascata do wizard do BU.
+
 ### `GET /api/eventos?[cargo={n}][&abrangencia={...}]`
-Timeline dos eventos matemáticos (ELEITO_1T, VIRADA, etc). Ordenados por `ocorrido_em` desc, limit 100.
+Timeline dos eventos matemáticos (ELEITO_1T, VIRADA, SEGUNDO_TURNO_DEFINIDO, ELEITO_MAJORITARIO, ELEITO_2T, MATEMATICAMENTE_ELIMINADO). Ordenados por `ocorrido_em` desc, limit 100.
+
+**Garantia importante**: eventos NUNCA são emitidos pra alvos `(cargo=1 Presidente, UF)`. Maioria absoluta pra Presidente é nacional (CF art. 77 §2º).
 
 ## Admin (requer `X-Admin-Token`)
 
 ### `GET /api/admin/status`
-Contadores rápidos: total de snapshots, eventos, candidatos, hora do último snapshot.
+Contadores por cargo/UF, total de snapshots, hora do último.
 
 ### `GET /api/admin/testar-tse`
-Faz requisições de teste pros 5 endpoints principais do TSE, retorna status HTTP de cada.
+Testa 5 endpoints do TSE a partir do IP do backend (Railway).
 
 ### `GET /api/admin/diagnostico-ids`
-Confere consistência entre SQs nos snapshots e SQs nos candidatos importados. Alerta candidatos "faltando ficha".
+Confere consistência entre SQs em snapshots e SQs importados. Alerta candidatos faltando ficha.
+
+### `GET /api/admin/diagnostico-mismatches`
+Alias do anterior focado em sq_candidatos vistos em snapshots **mas não em `candidatos`** — órfãos. Diz quantos existem e lista até 50.
+
+### `GET /api/admin/duplicatas`
+Lista `(cod_cargo, uf, numero)` com mais de um `sq_candidato` ativo no DB — sinal de substituição/reregistro TSE em que o antigo ainda não foi marcado como `cancelado`. Payload inclui todos os sq_candidatos conflitantes com nome e situação de cada.
+
+### `POST /api/admin/reavaliar-situacao`
+Reaplica o parser de `descricaoSituacao` sobre o `raw_divulga` salvo pra TODOS os candidatos. Útil quando um fix no parser (ex.: acentos) precisa valer sem esperar o próximo ciclo de sync. Retorna `{"mudados": N}`.
 
 ### `POST /api/admin/limpar-seed`
-Remove candidatos com SQ começando em `PR2026_`, `GO2026_`, `SE2026_`, etc. (candidatos de seed antigo).
+Remove candidatos de seed (`PR2026_`, `GO2026_`, …).
 
 ### `POST /api/admin/importar-candidatos`
-Recebe `{cargo, uf, json}` — JSON bruto do TSE — e faz upsert em `candidatos`.
+Recebe `{cargo, uf, json}` — payload bruto do TSE. Faz upsert em `candidatos` + **marca como `cancelado` qualquer ativo daquele (cargo, uf) que o TSE não devolveu** (self-heal pra "candidato sumiu da listagem oficial"). Retorna `{"atualizados": N, "removidos": M, ...}`.
 
 ### `POST /api/admin/atualizar-detalhe`
-Recebe `{sq_candidato, detalhe}` — mescla `detalhe` no `raw_divulga` do candidato + denormaliza `foto_url`/`coligacao`/`vice` quando vazios.
+Recebe `{sq_candidato, detalhe}` — mescla no `raw_divulga` + denormaliza `foto_url`/`coligacao`/`vice`.
 
 ### `POST /api/admin/upload-foto`
-Recebe `{sq_candidato, b64}` — salva foto em `static/candidatos/{sq}.jpg`.
+Recebe `{sq_candidato, b64}` → salva em `static/candidatos/{sq}.jpg`.
 
 ### `POST /api/admin/sync-candidatos`
-Roda `sincronizar_candidatos()` programaticamente. Falha nos endpoints que dão 403 do Akamai.
+Dispara `sincronizar_candidatos()` programaticamente. Falha nos endpoints bloqueados pelo Akamai.
 
 ## Compare
 
 ### `POST /api/comparacoes`
-Registra que uma sessão comparou candidatos A e B (analytics).
+Registra comparação de 2 candidatos (analytics anônimo por `session_id`).
 
 ## Web Push (opcional)
 
 ### `POST /api/push/subscribe`
-Registra endpoint anônimo do navegador pra receber push notifications de eventos.
+Registra endpoint anônimo do navegador pra receber push notifications.
 
 ## WebSocket
 
 ### `WS /ws/apuracao?cargo={n}&abrangencia={BR|UF}`
-Cada snapshot novo (não-suspeito) dispara broadcast:
+Broadcast a cada snapshot novo (não-suspeito):
 ```json
 {
   "type": "snapshot",
@@ -102,10 +144,9 @@ Cada snapshot novo (não-suspeito) dispara broadcast:
   ]
 }
 ```
-
-Cliente deve reconectar com backoff em caso de queda. Frontend implementa exponencial 1s → 15s teto + jitter.
+Cliente deve reconectar com backoff exponencial. Frontend usa 1s → 15s teto + jitter. Ao reconectar, chama `GET /api/apuracao/atual` imediatamente pra evitar "buraco" de eventos.
 
 ## Sistema
 
 ### `GET /health`
-Healthcheck: retorna `{"ok": true}` se `SELECT 1` no banco funciona, 503 caso contrário. Usado pelo Railway/UptimeRobot.
+`SELECT 1` + 200 OK se banco responde; 503 caso contrário.
