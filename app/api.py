@@ -1230,58 +1230,102 @@ _CACHE_MUN_LIST_TTL = 24 * 3600  # 24h — a lista raramente muda
 
 @router.get("/municipios")
 async def listar_municipios(uf: str = Query(..., min_length=2, max_length=2)) -> dict[str, Any]:
-    """Lista de municípios da UF (código IBGE + nome).
+    """Lista oficial de municípios da UF com código TSE + nome.
 
-    Fonte: geojsons locais em /static/municipios/{uf}.geojson que já
-    temos pra render do mapa — contém todos os 5.570 municípios com
-    código IBGE e nome.
+    Fonte: config/arquivo-urna do pleito 3220 (eleição federal 2026).
+    URL: /arquivo-urna/3220/config/{uf}/{uf}-p003220-cs.json
+    Esse arquivo também traz todas as zonas de cada município e seções
+    de cada zona — base pro dropdown em cascata da /urna.
 
-    IMPORTANTE: o código IBGE (ex.: 3550308 = SP capital) **não é** o
-    código TSE (ex.: 71099 = SP capital). Pra drill-down por município
-    o endpoint /bu precisa do código TSE, que o TSE só publica quando
-    a apuração começa (via snapshot municipal). Pré-dia D, a lista de
-    nomes está disponível pra UX; mas a seleção não leva a dados ainda.
+    Cacheado 24h. Retorna lista enxuta (só codigo + nome); use
+    /api/municipios/zonas pra zonas de um município específico.
     """
-    import os
+    from app.config import get_settings
     from time import monotonic
-    import json as _json
     uf = uf.lower()
     agora = monotonic()
     hit = _CACHE_MUN_LIST.get(uf)
     if hit and (agora - hit[0]) < _CACHE_MUN_LIST_TTL:
         return {"cache_hit": True, "municipios": hit[1]}
 
-    path = os.path.join("static", "municipios", f"{uf}.geojson")
-    if not os.path.exists(path):
-        return {"municipios": [], "erro": f"geojson de {uf.upper()} não encontrado"}
+    settings = get_settings()
+    base = settings.tse_cdn_base.rstrip("/")
+    # Pleito 3220 = eleição federal 2026 (04/10). Hardcoded pq é o
+    # pleito da eleição em curso. Se mudar, trocar aqui.
+    cd_pleito = "3220"
+    url = f"{base}/arquivo-urna/{cd_pleito}/config/{uf}/{uf}-p00{cd_pleito}-cs.json"
+    j = await _fetch_tse_json(url)
+    if not j:
+        return {
+            "municipios": [],
+            "erro": f"TSE não publicou configuração pra {uf.upper()} (url: {url})",
+        }
 
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            geo = _json.load(f)
-    except Exception as e:
-        return {"municipios": [], "erro": f"erro ao ler geojson: {e}"}
-
+    # Formato: {"abr": [{"cd": "sp", "mu": [{"cd": "71072", "nm": "SÃO PAULO",
+    #   "zon": [{"cd": "0001", "sec": [{"ns": "0001"}, ...]}]}, ...]}]}
     municipios: list[dict] = []
-    for feat in geo.get("features", []):
-        p = feat.get("properties", {})
-        cod_ibge = p.get("id") or p.get("cod_ibge") or p.get("codIbge")
-        nome = p.get("nome") or p.get("name")
-        if cod_ibge and nome:
-            municipios.append({
-                "codigo": str(cod_ibge),  # IBGE, não TSE
-                "nome": str(nome),
-                "fonte": "ibge",
-            })
+    for abr in j.get("abr", []):
+        if not isinstance(abr, dict):
+            continue
+        for m in abr.get("mu", []):
+            if not isinstance(m, dict):
+                continue
+            cd = m.get("cd")
+            nm = m.get("nm")
+            if cd and nm:
+                municipios.append({
+                    "codigo": str(cd),
+                    "nome": str(nm).title(),
+                    "qtd_zonas": len(m.get("zon", [])),
+                })
     municipios.sort(key=lambda m: m["nome"])
     _CACHE_MUN_LIST[uf] = (agora, municipios)
-    return {
-        "municipios": municipios,
-        "aviso": (
-            "Códigos são IBGE (fonte: geojson local). Para drill-down em "
-            "/api/apuracao/bu use o código TSE do município (geralmente "
-            "disponível em tse.jus.br/eleitor/onde-votar)."
-        ) if municipios else None,
-    }
+    return {"municipios": municipios, "total": len(municipios)}
+
+
+@router.get("/municipios/{municipio}/zonas")
+async def listar_zonas_municipio(
+    municipio: str,
+    uf: str = Query(..., min_length=2, max_length=2),
+) -> dict[str, Any]:
+    """Zonas e seções de um município específico. Fonte: mesmo arquivo
+    config/arquivo-urna que /api/municipios usa.
+
+    Retorna estrutura: {"zonas": [{"codigo": "0001", "secoes": [...]}]}
+    """
+    from app.config import get_settings
+    from time import monotonic
+    uf = uf.lower()
+    agora = monotonic()
+    # Reusa cache do arquivo bruto (chave diferente)
+    chave_raw = f"raw:{uf}"
+    hit = _CACHE_MUN_LIST.get(chave_raw)
+    if hit and (agora - hit[0]) < _CACHE_MUN_LIST_TTL:
+        raw = hit[1]
+    else:
+        settings = get_settings()
+        base = settings.tse_cdn_base.rstrip("/")
+        url = f"{base}/arquivo-urna/3220/config/{uf}/{uf}-p003220-cs.json"
+        j = await _fetch_tse_json(url)
+        if not j:
+            return {"zonas": [], "erro": "config não disponível"}
+        raw = j
+        _CACHE_MUN_LIST[chave_raw] = (agora, raw)
+
+    for abr in raw.get("abr", []):
+        for m in abr.get("mu", []):
+            if str(m.get("cd")) == str(int(municipio)):
+                return {
+                    "municipio": {"codigo": m["cd"], "nome": m.get("nm", "")},
+                    "zonas": [
+                        {
+                            "codigo": z.get("cd"),
+                            "secoes": [s.get("ns") for s in z.get("sec", []) if s.get("ns")],
+                        }
+                        for z in m.get("zon", [])
+                    ],
+                }
+    return {"zonas": [], "erro": f"município {municipio} não achado em {uf.upper()}"}
 
 
 # ============ Boletim de Urna (BU) — verificação por seção ============

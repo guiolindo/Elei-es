@@ -125,7 +125,10 @@ $("municipio").addEventListener("input", (e) => {
 });
 
 $("municipio").addEventListener("change", () => {
-  if (state.municipio) $("s3").scrollIntoView({ behavior: "smooth", block: "center" });
+  if (state.municipio) {
+    carregarZonasMunicipio();
+    $("s3").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 });
 
 // ============ Passo 3: zona + seção ============
@@ -135,8 +138,54 @@ $("municipio").addEventListener("change", () => {
     e.target.value = v;
     state[id] = v || null;
     atualizarUI();
+    if (id === "zona" && v) carregarSecoesDaZona(v);
   });
 });
+
+// Quando usuário escolhe município, baixa zonas pra autocompletar
+let _zonas = [];  // [{codigo, secoes: [...]}]
+async function carregarZonasMunicipio() {
+  _zonas = [];
+  if (!state.uf || !state.municipio?.codigo) return;
+  try {
+    const r = await fetch(`/api/municipios/${state.municipio.codigo}/zonas?uf=${state.uf}`);
+    const d = await r.json();
+    _zonas = d.zonas || [];
+    // Popula datalist de zonas se há mais de 1
+    const dl = document.getElementById("zona-opts") || (() => {
+      const d = document.createElement("datalist");
+      d.id = "zona-opts";
+      document.body.appendChild(d);
+      $("zona").setAttribute("list", "zona-opts");
+      return d;
+    })();
+    dl.innerHTML = "";
+    _zonas.forEach(z => {
+      const opt = document.createElement("option");
+      opt.value = String(parseInt(z.codigo));
+      opt.label = `${z.secoes.length} seções`;
+      dl.appendChild(opt);
+    });
+  } catch (e) {}
+}
+
+function carregarSecoesDaZona(zona) {
+  const z = _zonas.find(x => parseInt(x.codigo) === parseInt(zona));
+  if (!z) return;
+  const dl = document.getElementById("secao-opts") || (() => {
+    const d = document.createElement("datalist");
+    d.id = "secao-opts";
+    document.body.appendChild(d);
+    $("secao").setAttribute("list", "secao-opts");
+    return d;
+  })();
+  dl.innerHTML = "";
+  z.secoes.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = String(parseInt(s));
+    dl.appendChild(opt);
+  });
+}
 
 // ============ Passo 4: cargo + turno ============
 $("cargo").addEventListener("change", (e) => { state.cargo = e.target.value; atualizarUI(); });
