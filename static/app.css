@@ -182,16 +182,40 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   transition: max-height .25s, opacity .2s, margin .2s;
   max-height: 300px; overflow: hidden;
 }
-.hero.scrolled { padding-top: 6px; }
+.hero.scrolled { padding-top: 4px; }
 .hero.scrolled .stat-secundarias {
   max-height: 0; opacity: 0; margin: 0;
 }
-.hero.scrolled .stats { padding-bottom: 10px; }
-.hero.scrolled .stat-hero { padding: 10px 16px; }
-.hero.scrolled .stat-hero .stat-value { font-size: 28px; }
-.hero.scrolled .stat-hero .stat-label { font-size: 10px; margin-bottom: 2px; }
-.hero.scrolled .stat-hero .stat-sub { font-size: 11px; }
-.hero.scrolled .stat-hero .stat-progress { height: 4px; margin-top: 4px; }
+/* Scrolled: a "stats" vira uma barra FINA horizontal com só o %+barra,
+   não um painel. Fica em ~36px de altura total — resto do viewport
+   livre pra lista. */
+.hero.scrolled .stats {
+  padding: 2px 36px 8px;
+  gap: 0;
+  grid-template-columns: 1fr;
+}
+.hero.scrolled .stat-hero {
+  padding: 6px 14px;
+  display: flex; flex-direction: row; align-items: center; gap: 14px;
+  border-radius: 10px;
+}
+.hero.scrolled .stat-hero .stat-label {
+  font-size: 10px; margin: 0; white-space: nowrap; flex-shrink: 0;
+  opacity: 0.75;
+}
+.hero.scrolled .stat-hero .stat-value {
+  font-size: 20px; margin: 0; letter-spacing: -0.02em;
+  flex-shrink: 0; min-width: 72px;
+}
+.hero.scrolled .stat-hero .stat-progress {
+  flex: 1; margin: 0; height: 6px; border-radius: 3px;
+}
+.hero.scrolled .stat-hero .stat-sub { display: none; }
+/* Nav (brand + filtros) também encolhe pra deixar a barra fina mais em evidência */
+.hero.scrolled .nav { padding-top: 8px; padding-bottom: 8px; }
+.hero.scrolled .brand-sub { display: none; }
+.hero.scrolled .brand-title { font-size: 16px; }
+.hero.scrolled .logo { width: 32px !important; height: 32px !important; }
 .hero-bg {
   position: absolute; inset: 0; opacity: 0.4;
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><circle cx='1' cy='1' r='1' fill='%23303a4d'/></svg>");
