@@ -256,11 +256,41 @@ function candidatosFiltrados() {
       String(c.partido).includes(t)
     );
   });
+  // Identifica retirados (situacao != ativo). Avalanche, Marçal e cia:
+  // votos neles são nulos por lei (9.504/97 art. 175 §3º) → sempre pro FIM
+  // da lista, independente do filtro de ordenação, pra não ocupar lugar
+  // de candidato real na visão principal do usuário.
+  const retiradoDe = (c) => {
+    const f = state.ficha[c.sq_candidato];
+    return !!(f?.situacao && f.situacao !== "ativo");
+  };
+  // Detecta "fantasma de duplicata ativa": quando 2+ candidatos ativos
+  // compartilham (uf, numero) e um tem votos > 0 e outro tem 0. O de 0
+  // é o cadastro TSE que ficou órfão — mandamos pro fim também.
+  const chaveNumero = (c) => `${c.uf || "BR"}|${c.numero}`;
+  const temVotosNoGrupo = new Map();
+  for (const c of arr) {
+    const k = chaveNumero(c);
+    const v = votosPorSq.get(c.sq_candidato) || 0;
+    temVotosNoGrupo.set(k, Math.max(temVotosNoGrupo.get(k) || 0, v));
+  }
+  const fantasmaDe = (c) => {
+    const k = chaveNumero(c);
+    const meus = votosPorSq.get(c.sq_candidato) || 0;
+    const maxDoGrupo = temVotosNoGrupo.get(k) || 0;
+    return maxDoGrupo > 0 && meus === 0 && !retiradoDe(c);
+  };
   const ord = state.filtro.ordenar;
   arr.sort((a, b) => {
+    // 1) retirados sempre no fim
+    const rA = retiradoDe(a) ? 1 : 0, rB = retiradoDe(b) ? 1 : 0;
+    if (rA !== rB) return rA - rB;
+    // 2) fantasmas de duplicata ativa no fim do grupo ativo
+    const gA = fantasmaDe(a) ? 1 : 0, gB = fantasmaDe(b) ? 1 : 0;
+    if (gA !== gB) return gA - gB;
+    // 3) critério escolhido pelo usuário
     if (ord === "nome") return (a.nome_urna || "").localeCompare(b.nome_urna || "");
     if (ord === "numero") return a.numero - b.numero;
-    // votos (padrão)
     return (votosPorSq.get(b.sq_candidato) || 0) - (votosPorSq.get(a.sq_candidato) || 0);
   });
   return arr;
