@@ -5,7 +5,9 @@ const PALETA = ["#f0b429", "#3b82f6", "#ec4899", "#10b981", "#a855f7", "#f97316"
 const TZ = "America/Sao_Paulo";
 const MAX_SEL = 4;
 // Início oficial da apuração 2026: domingo, 5/10/2026 às 17h de Brasília
-const DIA_D = new Date("2026-10-05T17:00:00-03:00");
+// Eleições Gerais 2026 — primeiro domingo de outubro, art. 1º da Lei 9.504/97.
+// 17h BRT = fechamento das urnas e início da apuração.
+const DIA_D = new Date("2026-10-04T17:00:00-03:00");
 const TITULO_BASE = "Apuração 2026 · Brasil";
 
 const state = {
