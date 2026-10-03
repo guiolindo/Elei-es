@@ -10,6 +10,20 @@ Todas as regras que o site usa pra decidir "resultado matematicamente definido",
 
 **Silêncio inicial**. Enquanto `pct_apurado < 20%`, o motor não emite nada. Antes disso o `restantes_max` é grande demais pra qualquer desigualdade fechar.
 
+**Exclusão de candidatos não-ativos**. Antes de qualquer cálculo (maioria absoluta, inalcançabilidade, QE, QP, barreira, D'Hondt, matematicamente eliminado), o motor remove todo candidato cuja `situacao` seja diferente de `ativo` — ou seja, `renunciou`, `cancelado`, `cassado` ou `indeferido_sem_recurso`.
+
+**Base legal**: Lei 9.504/97, art. 175 §3º:
+> "Serão nulos, para todos os efeitos, os votos dados a candidatos inelegíveis ou não registrados."
+
+**Impacto prático**:
+- Majoritário: os votos no cassado/renunciado **não contam** no total de válidos usado pra testar maioria absoluta. O 2º colocado efetivo passa a disputar com o líder.
+- Proporcional: os votos **não entram no QE**, **não entram no QP** da legenda nem da federação, **não puxam chapa**. Vagas que seriam do partido do cassado via sobras D'Hondt vão pra outro partido.
+- Isso é defesa em profundidade: filtragem acontece em `avaliar_apuracao` (`math_engine/engine.py`) e em `calcular_eleitos_proporcional` (`math_engine/proporcional.py`), independente do caller.
+
+**Fonte da verdade**: campo `situacao` na tabela `candidatos`, atualizado pelo parser de `descricaoSituacao` do TSE (`poller/candidatos_tse.py`), com normalização de acentos. Caso real 2026: Leonardo Avalanche e Pablo Marçal (PRTB) marcados `renunciou`.
+
+**Escopo nacional vs. estadual**. A regra constitucional de maioria absoluta pra Presidente vale sobre os válidos do **Brasil inteiro** (CF art. 77 §2º). O coletor baixa `(cargo=1, UF)` apenas pra alimentar o mapa colorido por estado; o motor matemático **não avalia** nenhum evento (`ELEITO_1T`, `SEGUNDO_TURNO_DEFINIDO`, `MATEMATICAMENTE_ELIMINADO`) nesses alvos. Um candidato pode ter 70% dos válidos num estado e perder o pleito nacional.
+
 ## 1. Presidente eleito no 1º turno
 
 **Fórmula**:
@@ -135,13 +149,15 @@ Compara posições no top-5 entre dois snapshots consecutivos. Se A subiu passan
 
 Sistema atual pós-STF ADI 7228/7263 (2024): **três fases**.
 
+> **Pré-filtro obrigatório**: antes de QE/QP/barreira/D'Hondt, o motor remove todo candidato com `situacao != "ativo"`. Ver seção "Exclusão de candidatos não-ativos" no topo do documento. Isso impede que o partido do cassado "puxe" vagas via sobras com votos que legalmente são nulos (Lei 9.504/97 art. 175 §3º).
+
 ### 7.1. Quociente Eleitoral (QE)
 
 ```
 QE = int(votos_validos / vagas)
 ```
 
-Onde `votos_validos = votos nominais + votos de legenda + votos de todas as unidades`.
+Onde `votos_validos = soma dos votos nominais dos candidatos ATIVOS + votos de legenda`.
 
 **Base**: Código Eleitoral art. 106.
 

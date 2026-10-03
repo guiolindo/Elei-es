@@ -10,9 +10,13 @@ Este documento é otimizado pra IAs e desenvolvedores novos que precisam entrar 
 
 **Depois**: `math_engine/engine.py` e `math_engine/proporcional.py`. São puros — nada de I/O.
 
-**Testes**: `tests/test_math_engine.py` (24 casos) e `tests/test_proporcional.py` (20 casos). Rodam em 0.2s. `pytest -k <nome>` pra rodar caso específico.
+**Testes**: `tests/test_math_engine.py`, `tests/test_proporcional.py` e `tests/test_candidatos_tse_situacao.py`. Rodam em <1s. `pytest -k <nome>` pra rodar caso específico.
 
 **Regra de ouro**: toda alteração aqui precisa de teste. Bugs matemáticos no dia D são catastróficos. Sempre desigualdade estrita.
+
+**Invariantes que não podem ser quebradas**:
+- Ambos motores (majoritário e proporcional) **filtram `situacao != "ativo"`** antes de qualquer cálculo. Lei 9.504/97 art. 175 §3º: votos em cassados/renunciados/indeferidos são nulos — não contam no QE, QP, barreira, D'Hondt, nem no total de válidos pra maioria absoluta. Se adicionar novo `CandidatoResumo`/`CandidatoProporcional`, propague o campo `situacao`.
+- Alvos `(cargo=1 Presidente, UF)` **não geram eventos**. Guard em `poller/service.py`. Presidente só é avaliado quando `abrangencia="BR"` (CF art. 77 §2º é nacional).
 
 ### ...ajustar o poller / coleta do TSE
 
