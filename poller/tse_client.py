@@ -43,6 +43,19 @@ BROWSER_HEADERS = {
 }
 
 
+def cargo_tse(cod_cargo: int, abrangencia: str) -> int:
+    """Traduz nosso enum interno de cargo pro código usado pelo TSE na URL.
+
+    Normalmente é 1-pra-1, exceto no DF: lá a Câmara Legislativa é formada
+    por Deputados DISTRITAIS, não Estaduais, e o TSE publica sob c0008.
+    Mantemos cod_cargo=7 no DB (motor e UI tratam Dep. Estadual/Distrital
+    como mesmo enum), mas a URL do TSE precisa de c0008 pra DF.
+    """
+    if cod_cargo == 7 and abrangencia.upper() == "DF":
+        return 8
+    return cod_cargo
+
+
 def resultado_url(base: str, cod_eleicao: int, cod_cargo: int, abrangencia: str) -> str:
     """URL do JSON de resultados no formato oficial TSE.
 
@@ -52,13 +65,15 @@ def resultado_url(base: str, cod_eleicao: int, cod_cargo: int, abrangencia: str)
     Exemplos:
       Presidente BR:  ele2026/21270/dados/br/br-c0001-e021270-u.json
       Gov SP:         ele2026/21270/dados/sp/sp-c0003-e021270-u.json
+      Dep Distrital DF: ele2026/.../dados/df/df-c0008-...  (ver cargo_tse)
 
     Note o sufixo `-u.json` (não -r ou -br) — u = "urna".
     """
     abr = abrangencia.lower()
+    cargo_url = cargo_tse(cod_cargo, abrangencia)
     return (
         f"{base.rstrip('/')}/{cod_eleicao}/dados/{abr}/"
-        f"{abr}-c{cod_cargo:04d}-e{cod_eleicao:06d}-u.json"
+        f"{abr}-c{cargo_url:04d}-e{cod_eleicao:06d}-u.json"
     )
 
 

@@ -118,9 +118,17 @@ def baixar_foto(sq: str, uf: str) -> bool:
         return False
 
 
+def _cargo_tse(cargo, uf):
+    """DF: Dep. Distrital usa c0008 no TSE, não c0007 (= Dep. Estadual)."""
+    if cargo == 7 and uf == "DF":
+        return 8
+    return cargo
+
+
 for cargo, nome, ufs in CARGOS:
     for uf in ufs:
-        url = f"{TSE}/{ANO}/{uf}/{COD}/{cargo}/candidatos"
+        cargo_tse = _cargo_tse(cargo, uf)
+        url = f"{TSE}/{ANO}/{uf}/{COD}/{cargo_tse}/candidatos"
         try:
             # impersonate="chrome" → TLS fingerprint idêntico ao Chrome 116
             r = requests.get(url, impersonate="chrome", timeout=20)
