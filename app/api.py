@@ -1230,54 +1230,58 @@ _CACHE_MUN_LIST_TTL = 24 * 3600  # 24h — a lista raramente muda
 
 @router.get("/municipios")
 async def listar_municipios(uf: str = Query(..., min_length=2, max_length=2)) -> dict[str, Any]:
-    """Lista oficial de municípios da UF (código TSE + nome). Vem do
-    config público do TSE, cacheada 24h. Usado por /urna pra permitir
-    dropdown com nome em vez de forçar o usuário a saber o código TSE.
+    """Lista de municípios da UF (código IBGE + nome).
+
+    Fonte: geojsons locais em /static/municipios/{uf}.geojson que já
+    temos pra render do mapa — contém todos os 5.570 municípios com
+    código IBGE e nome.
+
+    IMPORTANTE: o código IBGE (ex.: 3550308 = SP capital) **não é** o
+    código TSE (ex.: 71099 = SP capital). Pra drill-down por município
+    o endpoint /bu precisa do código TSE, que o TSE só publica quando
+    a apuração começa (via snapshot municipal). Pré-dia D, a lista de
+    nomes está disponível pra UX; mas a seleção não leva a dados ainda.
     """
-    from app.config import get_settings
+    import os
     from time import monotonic
+    import json as _json
     uf = uf.lower()
     agora = monotonic()
     hit = _CACHE_MUN_LIST.get(uf)
     if hit and (agora - hit[0]) < _CACHE_MUN_LIST_TTL:
         return {"cache_hit": True, "municipios": hit[1]}
 
-    settings = get_settings()
-    base = settings.tse_cdn_base.rstrip("/")
-    cod = settings.eleicao_cod_1t  # usa o da presidencial, serve pra todas
-    # TSE publica config dos municípios por UF nesse padrão:
-    url = f"{base}/comum/config/mun-e{cod:06d}-{uf}.json"
-    j = await _fetch_tse_json(url)
-    if not j:
-        # Fallback: tenta sem o -e{cod}
-        url2 = f"{base}/comum/config/mun-{uf}.json"
-        j = await _fetch_tse_json(url2)
-    if not j:
-        return {
-            "municipios": [],
-            "erro": (
-                "TSE ainda não publicou a lista oficial de municípios "
-                "para esta UF. Isso é esperado em pré-apuração — o TSE "
-                "costuma publicar na manhã do dia D. Até lá, use o código "
-                "numérico do município direto (campo aceita digitação "
-                "livre). Encontre em tse.jus.br/eleitor/onde-votar."
-            ),
-        }
+    path = os.path.join("static", "municipios", f"{uf}.geojson")
+    if not os.path.exists(path):
+        return {"municipios": [], "erro": f"geojson de {uf.upper()} não encontrado"}
 
-    # Formato típico: {"mu": [{"cd": "71099", "nm": "SÃO PAULO"}, ...]}
-    # Mas pode variar — tenta várias chaves.
-    raw = j.get("mu") or j.get("municipios") or j.get("abr") or []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            geo = _json.load(f)
+    except Exception as e:
+        return {"municipios": [], "erro": f"erro ao ler geojson: {e}"}
+
     municipios: list[dict] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        cd = item.get("cd") or item.get("cod") or item.get("codigo")
-        nm = item.get("nm") or item.get("nome") or item.get("nmTse")
-        if cd and nm:
-            municipios.append({"codigo": str(cd), "nome": str(nm).title()})
+    for feat in geo.get("features", []):
+        p = feat.get("properties", {})
+        cod_ibge = p.get("id") or p.get("cod_ibge") or p.get("codIbge")
+        nome = p.get("nome") or p.get("name")
+        if cod_ibge and nome:
+            municipios.append({
+                "codigo": str(cod_ibge),  # IBGE, não TSE
+                "nome": str(nome),
+                "fonte": "ibge",
+            })
     municipios.sort(key=lambda m: m["nome"])
     _CACHE_MUN_LIST[uf] = (agora, municipios)
-    return {"municipios": municipios}
+    return {
+        "municipios": municipios,
+        "aviso": (
+            "Códigos são IBGE (fonte: geojson local). Para drill-down em "
+            "/api/apuracao/bu use o código TSE do município (geralmente "
+            "disponível em tse.jus.br/eleitor/onde-votar)."
+        ) if municipios else None,
+    }
 
 
 # ============ Boletim de Urna (BU) — verificação por seção ============
