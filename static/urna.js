@@ -1,6 +1,7 @@
 // Wizard de verificação por seção. 4 passos:
-//   1. UF (chips) → 2. Município (autocomplete) → 3. Zona/Seção → 4. Cargo/Turno
-// A ideia é guiar o usuário em vez de pedir 6 campos de uma vez.
+//   1. UF (chips) → 2. Município (bottom-sheet) → 3. Zona + Seção (bottom-sheet) → 4. Cargo/Turno
+// Troquei datalist por bottom-sheet com busca e lista clicável. Datalist nativo
+// não aparecia direito em mobile e a seleção implícita por input confundia.
 
 const $ = id => document.getElementById(id);
 const fmt = new Intl.NumberFormat("pt-BR").format;
@@ -10,38 +11,59 @@ const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","P
 const state = {
   uf: null,
   municipio: null,  // { codigo, nome }
-  zona: null,
-  secao: null,
+  zona: null,       // string
+  secao: null,      // string
   cargo: "1",
   turno: "1",
-  cidades: [],  // lista completa da UF selecionada
+  cidades: [],
+  zonas: [],        // [{codigo, secoes:[...]}]
 };
 
 // ============ Steps ============
-function marcarStep(n, status /* 'ativa' | 'pronta' | 'inativa' */) {
+function marcarStep(n, status) {
   const s = $(`s${n}`);
   s.classList.remove("ativa", "pronta");
   if (status === "ativa") s.classList.add("ativa");
   if (status === "pronta") s.classList.add("pronta");
 }
 
+function setPickerLabel(btnId, texto, placeholder) {
+  const b = $(btnId);
+  if (texto) {
+    b.innerHTML = `<span>${texto}</span><span class="pb-arrow">▾</span>`;
+  } else {
+    b.innerHTML = `<span class="pb-placeholder">${placeholder}</span><span class="pb-arrow">▾</span>`;
+  }
+}
+
 function atualizarUI() {
-  // Valores resumo nos cabeçalhos
   $("v-uf").textContent = state.uf || "";
   $("v-mu").textContent = state.municipio?.nome || "";
   $("v-zs").textContent = state.zona && state.secao ? `Zona ${state.zona} · Seção ${state.secao}` : "";
   $("v-ct").textContent = `${nomeCargo(state.cargo)} · ${state.turno}º turno`;
 
-  // Qual é o próximo step a abrir
-  if (!state.uf) {
-    [1,2,3,4].forEach(n => marcarStep(n, n === 1 ? "ativa" : "inativa"));
-  } else if (!state.municipio) {
-    marcarStep(1, "pronta"); marcarStep(2, "ativa"); marcarStep(3, "inativa"); marcarStep(4, "inativa");
-  } else if (!state.zona || !state.secao) {
-    marcarStep(1, "pronta"); marcarStep(2, "pronta"); marcarStep(3, "ativa"); marcarStep(4, "inativa");
-  } else {
-    marcarStep(1, "pronta"); marcarStep(2, "pronta"); marcarStep(3, "pronta"); marcarStep(4, "ativa");
-  }
+  // Labels dos pickers
+  setPickerLabel("btn-municipio",
+    state.municipio?.nome,
+    state.uf ? "Toque para escolher a cidade" : "Selecione o estado primeiro");
+  $("btn-municipio").disabled = !state.uf;
+
+  setPickerLabel("btn-zona",
+    state.zona ? `Zona ${state.zona}` : null,
+    state.municipio ? "Toque para escolher a zona" : "Selecione o município");
+  $("btn-zona").disabled = !state.municipio;
+
+  setPickerLabel("btn-secao",
+    state.secao ? `Seção ${state.secao}` : null,
+    state.zona ? "Toque para escolher a seção" : "Selecione a zona");
+  $("btn-secao").disabled = !state.zona;
+
+  // Step ativo
+  if (!state.uf)                         [1,2,3,4].forEach(n => marcarStep(n, n===1?"ativa":"inativa"));
+  else if (!state.municipio)             { marcarStep(1,"pronta"); marcarStep(2,"ativa"); marcarStep(3,"inativa"); marcarStep(4,"inativa"); }
+  else if (!state.zona || !state.secao)  { marcarStep(1,"pronta"); marcarStep(2,"pronta"); marcarStep(3,"ativa"); marcarStep(4,"inativa"); }
+  else                                   { marcarStep(1,"pronta"); marcarStep(2,"pronta"); marcarStep(3,"pronta"); marcarStep(4,"ativa"); }
+
   $("btn-buscar").disabled = !(state.uf && state.municipio && state.zona && state.secao);
 }
 
@@ -49,7 +71,68 @@ function nomeCargo(c) {
   return {1:"Presidente",3:"Governador",5:"Senador",6:"Dep. Federal",7:"Dep. Estadual"}[c] || "?";
 }
 
-// ============ Passo 1: UFs como chips ============
+// ============ Bottom-sheet picker ============
+let _sheetOnPick = null;
+let _sheetItems = [];
+let _sheetFilter = (q, it) => it.label.toLocaleLowerCase("pt-BR").includes(q.toLocaleLowerCase("pt-BR"));
+
+function abrirSheet({ titulo, items, onPick, placeholder = "Buscar...", filter }) {
+  _sheetOnPick = onPick;
+  _sheetItems = items;
+  if (filter) _sheetFilter = filter;
+  $("sheet-titulo").textContent = titulo;
+  const b = $("sheet-busca");
+  b.value = "";
+  b.placeholder = placeholder;
+  renderSheetLista("");
+  $("sheet").classList.add("aberto");
+  document.body.style.overflow = "hidden";
+  setTimeout(() => b.focus(), 50);
+}
+
+function fecharSheet() {
+  $("sheet").classList.remove("aberto");
+  document.body.style.overflow = "";
+  _sheetOnPick = null;
+  _sheetItems = [];
+}
+
+function renderSheetLista(q) {
+  const lista = $("sheet-lista");
+  const filtered = q ? _sheetItems.filter(it => _sheetFilter(q, it)) : _sheetItems;
+  if (!filtered.length) {
+    lista.innerHTML = `<div class="sheet-vazio">Nenhum resultado para "${q}"</div>`;
+    return;
+  }
+  // Limita a 500 pra não travar scroll — usuário filtra se precisar
+  const slice = filtered.slice(0, 500);
+  lista.innerHTML = slice.map(it => `
+    <button type="button" class="sheet-opt" data-value="${it.value}">
+      <span>${it.label}</span>
+      ${it.sub ? `<span class="sheet-opt-sub">${it.sub}</span>` : ""}
+    </button>
+  `).join("");
+  if (filtered.length > 500) {
+    lista.innerHTML += `<div class="sheet-vazio">+${filtered.length - 500} itens — refine a busca</div>`;
+  }
+  lista.querySelectorAll(".sheet-opt").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const val = btn.dataset.value;
+      const it = _sheetItems.find(x => String(x.value) === val);
+      if (_sheetOnPick) _sheetOnPick(it);
+      fecharSheet();
+    });
+  });
+}
+
+$("sheet-busca").addEventListener("input", e => renderSheetLista(e.target.value.trim()));
+document.querySelectorAll("[data-sheet-close]").forEach(el =>
+  el.addEventListener("click", fecharSheet));
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("sheet").classList.contains("aberto")) fecharSheet();
+});
+
+// ============ Passo 1: UFs ============
 function renderUFs() {
   const wrap = $("ufs");
   wrap.innerHTML = "";
@@ -66,17 +149,16 @@ function renderUFs() {
 async function selecionarUF(uf) {
   state.uf = uf;
   state.municipio = null;
+  state.zona = null;
+  state.secao = null;
   state.cidades = [];
-  $("municipio").value = "";
+  state.zonas = [];
   renderUFs();
   atualizarUI();
-  // Scroll suave pro próximo step
   $("s2").scrollIntoView({ behavior: "smooth", block: "center" });
-  // Carrega lista de municípios da UF
+
   if (uf === "ZZ") {
-    // Exterior: TSE agrupa por zona consular, não há município — campo
-    // vira input manual simples.
-    $("mu-hint").textContent = "Para o exterior, informe o nome do consulado onde votou.";
+    $("mu-hint").textContent = "Para o exterior, use o site oficial do TSE.";
     return;
   }
   $("mu-hint").textContent = "Carregando municípios...";
@@ -84,110 +166,104 @@ async function selecionarUF(uf) {
     const r = await fetch(`/api/municipios?uf=${uf}`);
     const j = await r.json();
     state.cidades = j.municipios || [];
-    const dl = $("mu-opts");
-    dl.innerHTML = "";
-    state.cidades.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c.nome;
-      opt.dataset.codigo = c.codigo;
-      dl.appendChild(opt);
-    });
     if (state.cidades.length) {
-      $("mu-hint").textContent = `${state.cidades.length} municípios disponíveis em ${uf}. Comece a digitar.`;
+      $("mu-hint").textContent = `${state.cidades.length} municípios disponíveis em ${uf}.`;
     } else {
-      // Mensagem rica quando TSE ainda não publicou (comum pré-apuração)
-      const erro = j.erro || "TSE ainda não publicou a lista.";
-      $("mu-hint").innerHTML = erro.replace(
-        /tse\.jus\.br\/eleitor\/onde-votar/,
-        '<a href="https://www.tse.jus.br/eleitor/onde-votar" target="_blank" rel="noopener">tse.jus.br/eleitor/onde-votar</a>'
-      );
+      $("mu-hint").textContent = j.erro || "TSE ainda não publicou a lista.";
     }
   } catch (e) {
-    $("mu-hint").textContent = "Não foi possível carregar a lista. Digite o código TSE manualmente.";
+    $("mu-hint").textContent = "Não foi possível carregar a lista.";
   }
 }
 
-// ============ Passo 2: município com datalist ============
-$("municipio").addEventListener("input", (e) => {
-  const texto = e.target.value.trim();
-  // Procura pelo nome exato na lista
-  const bate = state.cidades.find(c =>
-    c.nome.toLocaleLowerCase("pt-BR") === texto.toLocaleLowerCase("pt-BR"));
-  if (bate) {
-    state.municipio = bate;
-  } else if (/^\d+$/.test(texto)) {
-    // Usuário digitou código TSE direto (fallback)
-    state.municipio = { codigo: texto, nome: `Código ${texto}` };
-  } else {
-    state.municipio = null;
-  }
-  atualizarUI();
-});
-
-$("municipio").addEventListener("change", () => {
-  if (state.municipio) {
-    carregarZonasMunicipio();
-    $("s3").scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-});
-
-// ============ Passo 3: zona + seção ============
-["zona", "secao"].forEach(id => {
-  $(id).addEventListener("input", (e) => {
-    const v = e.target.value.replace(/\D/g, "");
-    e.target.value = v;
-    state[id] = v || null;
-    atualizarUI();
-    if (id === "zona" && v) carregarSecoesDaZona(v);
+// ============ Passo 2: Município ============
+$("btn-municipio").addEventListener("click", () => {
+  if (!state.uf) return;
+  abrirSheet({
+    titulo: `Cidades de ${state.uf}`,
+    placeholder: `Buscar cidade em ${state.uf}...`,
+    items: state.cidades.map(c => ({ value: c.codigo, label: c.nome, sub: `cód ${c.codigo}` })),
+    onPick: (it) => {
+      state.municipio = { codigo: String(it.value), nome: it.label };
+      state.zona = null;
+      state.secao = null;
+      state.zonas = [];
+      atualizarUI();
+      carregarZonasMunicipio();
+      $("s3").scrollIntoView({ behavior: "smooth", block: "center" });
+    },
   });
 });
 
-// Quando usuário escolhe município, baixa zonas pra autocompletar
-let _zonas = [];  // [{codigo, secoes: [...]}]
+// ============ Passo 3: Zona + Seção ============
 async function carregarZonasMunicipio() {
-  _zonas = [];
+  state.zonas = [];
   if (!state.uf || !state.municipio?.codigo) return;
   try {
     const r = await fetch(`/api/municipios/${state.municipio.codigo}/zonas?uf=${state.uf}`);
     const d = await r.json();
-    _zonas = d.zonas || [];
-    // Popula datalist de zonas se há mais de 1
-    const dl = document.getElementById("zona-opts") || (() => {
-      const d = document.createElement("datalist");
-      d.id = "zona-opts";
-      document.body.appendChild(d);
-      $("zona").setAttribute("list", "zona-opts");
-      return d;
-    })();
-    dl.innerHTML = "";
-    _zonas.forEach(z => {
-      const opt = document.createElement("option");
-      opt.value = String(parseInt(z.codigo));
-      opt.label = `${z.secoes.length} seções`;
-      dl.appendChild(opt);
-    });
+    state.zonas = d.zonas || [];
   } catch (e) {}
 }
 
-function carregarSecoesDaZona(zona) {
-  const z = _zonas.find(x => parseInt(x.codigo) === parseInt(zona));
-  if (!z) return;
-  const dl = document.getElementById("secao-opts") || (() => {
-    const d = document.createElement("datalist");
-    d.id = "secao-opts";
-    document.body.appendChild(d);
-    $("secao").setAttribute("list", "secao-opts");
-    return d;
-  })();
-  dl.innerHTML = "";
-  z.secoes.forEach(s => {
-    const opt = document.createElement("option");
-    opt.value = String(parseInt(s));
-    dl.appendChild(opt);
+$("btn-zona").addEventListener("click", () => {
+  if (!state.municipio) return;
+  const items = (state.zonas || []).map(z => ({
+    value: parseInt(z.codigo),
+    label: `Zona ${parseInt(z.codigo)}`,
+    sub: `${z.secoes.length} seção(ões)`,
+  }));
+  if (!items.length) {
+    abrirSheet({
+      titulo: "Nenhuma zona encontrada",
+      items: [],
+      onPick: () => {},
+    });
+    return;
+  }
+  abrirSheet({
+    titulo: `Zonas de ${state.municipio.nome}`,
+    placeholder: "Buscar número da zona...",
+    items,
+    filter: (q, it) => String(it.value).includes(q.replace(/\D/g, "")),
+    onPick: (it) => {
+      state.zona = String(it.value);
+      state.secao = null;
+      atualizarUI();
+    },
   });
-}
+});
 
-// ============ Passo 4: cargo + turno ============
+$("btn-secao").addEventListener("click", () => {
+  if (!state.zona) return;
+  const z = state.zonas.find(x => parseInt(x.codigo) === parseInt(state.zona));
+  const secoes = z ? z.secoes : [];
+  const items = secoes.map(s => ({
+    value: parseInt(s),
+    label: `Seção ${parseInt(s)}`,
+  }));
+  if (!items.length) {
+    abrirSheet({
+      titulo: `Zona ${state.zona}`,
+      items: [{ value: 0, label: "Nenhuma seção disponível" }],
+      onPick: () => {},
+    });
+    return;
+  }
+  abrirSheet({
+    titulo: `Seções da zona ${state.zona}`,
+    placeholder: "Buscar número da seção...",
+    items,
+    filter: (q, it) => String(it.value).includes(q.replace(/\D/g, "")),
+    onPick: (it) => {
+      state.secao = String(it.value);
+      atualizarUI();
+      $("s4").scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+  });
+});
+
+// ============ Passo 4: Cargo + Turno ============
 $("cargo").addEventListener("change", (e) => { state.cargo = e.target.value; atualizarUI(); });
 $("turno").addEventListener("change", (e) => { state.turno = e.target.value; atualizarUI(); });
 

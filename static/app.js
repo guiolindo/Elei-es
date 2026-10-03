@@ -1680,6 +1680,7 @@ async function boot() {
   const onScroll = () => {
     const y = window.scrollY;
     hero.classList.toggle("scrolled", y > 8);
+    document.body.classList.toggle("scrolled", y > 8);  // mobile: encolhe .m-stats
     btnTopo.classList.toggle("visible", y > 400);
     // scroll-spy: qual section está mais visível
     let ativa = "lista";

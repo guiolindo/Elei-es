@@ -18,7 +18,6 @@
 .urna-head{margin:22px 0 10px;font-size:clamp(26px,6vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1.1}
 .urna-sub{color:var(--fg-2);margin-bottom:28px;line-height:1.5;font-size:15px}
 
-/* Steps verticais — guia o usuário passo a passo, sem jogar 6 campos de uma vez */
 .urna-step{background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:18px;margin-bottom:12px;transition:border-color .2s,background .2s}
 .urna-step.ativa{border-color:var(--brand);background:var(--surface-3)}
 .urna-step.pronta{border-color:color-mix(in srgb,var(--ok) 40%,var(--line-2))}
@@ -32,15 +31,20 @@
 .urna-step.ativa .urna-step-corpo{display:block}
 .urna-step label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;font-weight:600}
 
-/* Botões UF estilo pills */
 .urna-ufs{display:flex;flex-wrap:wrap;gap:6px}
 .urna-uf-btn{background:var(--surface-3);border:1px solid var(--line-2);color:var(--fg);border-radius:999px;padding:8px 14px;font:600 13px 'JetBrains Mono',monospace;cursor:pointer;transition:all .15s}
 .urna-uf-btn:hover{border-color:var(--brand)}
 .urna-uf-btn.ativo{background:var(--brand);color:#17130b;border-color:var(--brand)}
 
+/* Botão-seletor (abre bottom-sheet) */
+.urna-picker-btn{width:100%;box-sizing:border-box;background:var(--surface-3);color:var(--fg);border:1px solid var(--line-2);border-radius:10px;padding:14px 16px;font:600 15px inherit;min-height:52px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.urna-picker-btn:hover{border-color:var(--brand)}
+.urna-picker-btn[disabled]{opacity:.5;cursor:not-allowed}
+.urna-picker-btn .pb-placeholder{color:var(--muted);font-weight:400}
+.urna-picker-btn .pb-arrow{color:var(--muted);font-size:12px}
+
 .urna-input,.urna-select{width:100%;box-sizing:border-box;background:var(--surface-3);color:var(--fg);border:1px solid var(--line-2);border-radius:10px;padding:12px 14px;font:600 15px inherit;min-height:48px}
 .urna-input:focus,.urna-select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(240,180,41,.2)}
-.urna-input::placeholder{color:var(--muted);font-weight:400}
 .urna-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
 .urna-hint{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.4}
@@ -51,6 +55,24 @@
 .urna-btn-primario{background:var(--brand);color:#17130b;border:none;border-radius:12px;padding:16px;width:100%;font:800 16px inherit;cursor:pointer;margin-top:8px;transition:opacity .15s}
 .urna-btn-primario:hover{opacity:.9}
 .urna-btn-primario:disabled{opacity:.4;cursor:not-allowed}
+
+/* Bottom-sheet picker */
+.sheet{position:fixed;inset:0;z-index:100;display:none;align-items:flex-end;justify-content:center}
+.sheet.aberto{display:flex}
+.sheet-back{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+.sheet-card{position:relative;background:var(--surface-2);border:1px solid var(--line-2);border-radius:18px 18px 0 0;width:100%;max-width:640px;max-height:85vh;display:flex;flex-direction:column;animation:slide-up .22s ease-out}
+@keyframes slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-grip{width:40px;height:4px;background:var(--line-2);border-radius:2px;margin:10px auto}
+.sheet-head{padding:4px 18px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line-2)}
+.sheet-head h3{margin:0;font-size:16px;font-weight:700;flex:1}
+.sheet-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px}
+.sheet-busca{padding:10px 14px;border-bottom:1px solid var(--line-2)}
+.sheet-busca input{width:100%;box-sizing:border-box;background:var(--surface-3);color:var(--fg);border:1px solid var(--line-2);border-radius:10px;padding:12px 14px;font:500 15px inherit}
+.sheet-lista{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:4px 0}
+.sheet-opt{padding:14px 18px;border-bottom:1px solid var(--line-2);cursor:pointer;font-size:15px;background:none;border-left:none;border-right:none;border-top:none;width:100%;text-align:left;color:var(--fg);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet-opt:hover,.sheet-opt:focus{background:var(--surface-3)}
+.sheet-opt-sub{color:var(--muted);font-size:12px;font-family:'JetBrains Mono',monospace}
+.sheet-vazio{padding:40px 20px;text-align:center;color:var(--muted);font-size:14px}
 
 /* Resposta */
 .urna-resp{background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:22px;margin-top:24px;display:none}
@@ -104,10 +126,12 @@
       <span class="urna-step-valor" id="v-mu"></span>
     </div>
     <div class="urna-step-corpo">
-      <label for="municipio">Comece a digitar o nome</label>
-      <input id="municipio" class="urna-input" type="text" list="mu-opts" placeholder="ex: São Paulo" autocomplete="off">
-      <datalist id="mu-opts"></datalist>
-      <div class="urna-hint" id="mu-hint">Selecione o estado primeiro.</div>
+      <label>Toque para escolher a cidade</label>
+      <button type="button" class="urna-picker-btn" id="btn-municipio" disabled>
+        <span class="pb-placeholder">Selecione o estado primeiro</span>
+        <span class="pb-arrow">▾</span>
+      </button>
+      <div class="urna-hint" id="mu-hint"></div>
     </div>
   </div>
 
@@ -121,12 +145,18 @@
     <div class="urna-step-corpo">
       <div class="urna-row">
         <div>
-          <label for="zona">Zona</label>
-          <input id="zona" class="urna-input" type="text" inputmode="numeric" placeholder="ex: 1" maxlength="4">
+          <label>Zona</label>
+          <button type="button" class="urna-picker-btn" id="btn-zona" disabled>
+            <span class="pb-placeholder">Selecione o município</span>
+            <span class="pb-arrow">▾</span>
+          </button>
         </div>
         <div>
-          <label for="secao">Seção</label>
-          <input id="secao" class="urna-input" type="text" inputmode="numeric" placeholder="ex: 42" maxlength="4">
+          <label>Seção</label>
+          <button type="button" class="urna-picker-btn" id="btn-secao" disabled>
+            <span class="pb-placeholder">Selecione a zona</span>
+            <span class="pb-arrow">▾</span>
+          </button>
         </div>
       </div>
       <div class="urna-help-box">
@@ -172,6 +202,21 @@
 
 <div class="urna-resp" id="resp"></div>
 </main>
+
+<!-- Bottom-sheet picker (reutilizável pra município/zona/seção) -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-titulo">
+  <div class="sheet-back" data-sheet-close></div>
+  <div class="sheet-card">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <h3 id="sheet-titulo">Escolher</h3>
+      <button type="button" class="sheet-close" data-sheet-close aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-busca"><input type="search" id="sheet-busca" placeholder="Buscar..." autocomplete="off"></div>
+    <div class="sheet-lista" id="sheet-lista"></div>
+  </div>
+</div>
+
 <script src="/static/urna.js"></script>
 </body>
 </html>

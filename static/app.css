@@ -129,15 +129,25 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   transition: box-shadow .2s, padding .2s;
 }
 .hero.scrolled { box-shadow: 0 8px 32px rgba(0,0,0,.5); }
-/* Ao rolar (todos os tamanhos), esconde o painel de stats — só barra fica */
+/* Ao rolar: mantém o % apurado visível (stat-hero compacto) mas esconde
+   os stats secundários (comparecimento, abstenções, etc.) pra ficar enxuto. */
 .hero .stats {
-  transition: max-height .25s, opacity .2s, padding .2s;
-  max-height: 400px; overflow: hidden;
+  transition: padding .25s;
 }
-.hero.scrolled { padding-top: 10px; }
-.hero.scrolled .stats {
-  max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0;
+.hero .stat-secundarias {
+  transition: max-height .25s, opacity .2s, margin .2s;
+  max-height: 300px; overflow: hidden;
 }
+.hero.scrolled { padding-top: 6px; }
+.hero.scrolled .stat-secundarias {
+  max-height: 0; opacity: 0; margin: 0;
+}
+.hero.scrolled .stats { padding-bottom: 10px; }
+.hero.scrolled .stat-hero { padding: 10px 16px; }
+.hero.scrolled .stat-hero .stat-value { font-size: 28px; }
+.hero.scrolled .stat-hero .stat-label { font-size: 10px; margin-bottom: 2px; }
+.hero.scrolled .stat-hero .stat-sub { font-size: 11px; }
+.hero.scrolled .stat-hero .stat-progress { height: 4px; margin-top: 4px; }
 .hero-bg {
   position: absolute; inset: 0; opacity: 0.4;
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><circle cx='1' cy='1' r='1' fill='%23303a4d'/></svg>");
@@ -1261,19 +1271,40 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
   .m-chip-arrow { position: absolute; right: 12px; top: 50%;
     transform: translateY(-50%); color: var(--muted, #94a3b8); font-size: 12px; }
 
-  /* --- Stats compactos horizontais --- */
-  .m-stats { display: flex; gap: 8px; padding: 8px 12px 0; }
+  /* --- Stats compactos horizontais — sticky logo abaixo do m-top --- */
+  .m-stats {
+    display: flex; gap: 8px; padding: 8px 12px;
+    position: sticky;
+    top: calc(50px + env(safe-area-inset-top));  /* altura do .m-top */
+    z-index: 49;
+    background: #0b1220;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+    transition: padding .22s, gap .22s;
+  }
   .m-stat { flex: 1; padding: 10px 12px; border-radius: 10px;
     background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);
-    display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    display: flex; flex-direction: column; gap: 4px; min-width: 0;
+    transition: padding .22s, gap .22s; }
   .m-stat-lab { font-size: 10px; color: var(--muted, #94a3b8);
-    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+    transition: font-size .22s, opacity .22s; }
   .m-stat-val { font-size: 18px; font-weight: 700; color: var(--gold, #f0b429);
-    font-variant-numeric: tabular-nums; }
+    font-variant-numeric: tabular-nums;
+    transition: font-size .22s; }
   .m-stat-bar { width: 100%; height: 4px; background: rgba(255,255,255,.06);
-    border-radius: 2px; overflow: hidden; margin-top: 4px; }
+    border-radius: 2px; overflow: hidden; margin-top: 4px;
+    transition: height .22s, margin-top .22s; }
   .m-stat-bar > div { height: 100%; background: var(--gold, #f0b429);
     transition: width .5s ease; width: 0%; }
+  /* Modo compacto ao scrollar — fica fininho mas sempre visível */
+  body.scrolled .m-stats { padding: 4px 12px; gap: 6px; }
+  body.scrolled .m-stat { padding: 4px 10px; gap: 1px; flex-direction: row;
+    align-items: center; justify-content: space-between; }
+  body.scrolled .m-stat-lab { font-size: 9px; opacity: 0.7; }
+  body.scrolled .m-stat-val { font-size: 13px; }
+  body.scrolled .m-stat-bar { height: 2px; margin-top: 0;
+    position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0; }
+  body.scrolled .m-stat { position: relative; }
 
   /* --- Tabs: só uma section visível por vez --- */
   main.page > section, main.page > .page-header, main.page > .filtro-lista,
