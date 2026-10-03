@@ -559,3 +559,44 @@ def test_detectar_viradas_candidato_zero_nao_cria_virada():
     agora = [CandidatoResumo("A", 500), CandidatoResumo("C", 0), CandidatoResumo("B", 0)]
     # B e C trocaram posição mas ambos com 0 — não é virada
     assert detectar_viradas(agora, antes) == []
+
+
+def test_candidato_retirado_nao_eleito_mesmo_com_mais_votos():
+    """Lei 9.504/97 art. 175 §3º: candidato com registro cancelado após
+    convenção tem votos nulos. Não pode ser marcado 'eleito' mesmo com
+    mais votos que todos."""
+    from math_engine.engine import avaliar_apuracao, CandidatoResumo, TotaisResumo
+    # Cenário: candidato "renunciou" com 60% dos votos
+    candidatos = [
+        CandidatoResumo("A", 6_000_000, situacao="renunciou"),  # 60%
+        CandidatoResumo("B", 3_000_000, situacao="ativo"),      # 30%
+        CandidatoResumo("C", 1_000_000, situacao="ativo"),      # 10%
+    ]
+    totais = TotaisResumo(
+        qt_secoes_total=100, qt_secoes_totalizadas=100,
+        qt_eleitorado_apto=15_000_000, qt_eleitorado_apto_totalizadas=15_000_000,
+        qt_votos_validos=10_000_000,
+    )
+    evs = avaliar_apuracao(candidatos, totais, cod_cargo=1, turno=1)
+    # A (retirado) NÃO deve ser eleito. B (ativo com 30%) tampouco (não tem maioria).
+    # Mas B pode aparecer como "eleito 1T" entre os ativos pois tem 75% dos votos
+    # válidos ativos (3M/4M). Correto.
+    eleitos = [e for e in evs if "ELEITO" in e["tipo"]]
+    assert all(e["sq_candidato_a"] != "A" for e in eleitos), \
+        "candidato A (retirado) foi marcado como eleito"
+
+
+def test_candidato_ativo_com_maioria_ganha_normalmente():
+    """Sanity: a exclusão de retirados não quebra o fluxo normal."""
+    from math_engine.engine import avaliar_apuracao, CandidatoResumo, TotaisResumo
+    candidatos = [
+        CandidatoResumo("A", 6_000_000, situacao="ativo"),
+        CandidatoResumo("B", 4_000_000, situacao="ativo"),
+    ]
+    totais = TotaisResumo(
+        qt_secoes_total=100, qt_secoes_totalizadas=100,
+        qt_eleitorado_apto=15_000_000, qt_eleitorado_apto_totalizadas=15_000_000,
+        qt_votos_validos=10_000_000,
+    )
+    evs = avaliar_apuracao(candidatos, totais, cod_cargo=1, turno=1)
+    assert any(e["sq_candidato_a"] == "A" and "ELEITO" in e["tipo"] for e in evs)

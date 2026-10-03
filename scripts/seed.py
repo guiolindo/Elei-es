@@ -35,42 +35,50 @@ UFS = [
     ("SP", "São Paulo", 35), ("SE", "Sergipe", 28), ("TO", "Tocantins", 17),
 ]
 
+# Partidos registrados no TSE para 2026. Sincronizado com static/partidos.js
+# em 03/10/2026 — mudanças desde 2022:
+#   14 PTB → MISSÃO (fundido em nov/2025)
+#   20 PSC → PODE (fusão em 2024)
+#   25 UNIÃO → PRD (União migrou pra 44)
+#   33 PMN → MOBILIZA
+#   35 PMB → O DEMOCRATA
+#   44 (novo) UNIÃO BRASIL
+#   Extintos: 17 PSL, 19, 51 PATRIOTA, 90 PROS (mantidos pra dados históricos)
 PARTIDOS = [
-    (10, "REP",    "Republicanos"),
+    (10, "REPUBLICANOS", "Republicanos"),
     (11, "PP",     "Progressistas"),
     (12, "PDT",    "Partido Democrático Trabalhista"),
     (13, "PT",     "Partido dos Trabalhadores"),
-    (14, "PTB",    "Partido Trabalhista Brasileiro"),
+    (14, "MISSÃO", "Missão"),
     (15, "MDB",    "Movimento Democrático Brasileiro"),
     (16, "PSTU",   "Partido Socialista dos Trabalhadores Unificado"),
-    (17, "PSL",    "Partido Social Liberal"),
     (18, "REDE",   "Rede Sustentabilidade"),
-    (19, "PODE",   "Podemos"),
-    (20, "PSC",    "Partido Social Cristão"),
+    (20, "PODE",   "Podemos"),
     (21, "PCB",    "Partido Comunista Brasileiro"),
     (22, "PL",     "Partido Liberal"),
     (23, "CIDADANIA", "Cidadania"),
-    (25, "UNIÃO",  "União Brasil"),
+    (25, "PRD",    "Partido Renovação Democrática"),
     (27, "DC",     "Democracia Cristã"),
-    (28, "AGIR",   "Agir"),
+    (28, "PRTB",   "Partido Renovador Trabalhista Brasileiro"),
     (29, "PCO",    "Partido da Causa Operária"),
     (30, "NOVO",   "Novo"),
-    (33, "PMN",    "Partido da Mobilização Nacional"),
-    (35, "PMB",    "Partido da Mulher Brasileira"),
-    (36, "PTC",    "Partido Trabalhista Cristão"),
+    (33, "MOBILIZA", "Mobiliza"),
+    (35, "O DEMOCRATA", "O Democrata"),
+    (36, "AGIR",   "Agir"),
     (40, "PSB",    "Partido Socialista Brasileiro"),
     (43, "PV",     "Partido Verde"),
-    (44, "NOVO",   "Novo"),
+    (44, "UNIÃO",  "União Brasil"),
     (45, "PSDB",   "Partido da Social Democracia Brasileira"),
     (50, "PSOL",   "Partido Socialismo e Liberdade"),
-    (51, "PATRIOTA", "Patriota"),
-    (54, "PRTB",   "Partido Renovador Trabalhista Brasileiro"),
     (55, "PSD",    "Partido Social Democrático"),
-    (65, "PC do B", "Partido Comunista do Brasil"),
+    (65, "PCdoB",  "Partido Comunista do Brasil"),
     (70, "AVANTE", "Avante"),
     (77, "SOLIDARIEDADE", "Solidariedade"),
     (80, "UP",     "Unidade Popular"),
-    (90, "PROS",   "Partido Republicano da Ordem Social"),
+    # Extintos — mantidos pra dados históricos
+    (17, "PSL",      "Partido Social Liberal"),
+    (51, "PATRIOTA", "Patriota"),
+    (90, "PROS",     "Partido Republicano da Ordem Social"),
 ]
 
 
@@ -82,9 +90,16 @@ async def main() -> None:
         for sig, nome, ibge in UFS:
             if not (await sess.execute(select(UF).where(UF.sigla == sig))).scalar_one_or_none():
                 sess.add(UF(sigla=sig, nome=nome, cod_ibge=ibge))
+        # Partidos: UPSERT para atualizar sigla/nome quando o TSE renumera
+        # (ex.: 25 era União Brasil em 2022, virou PRD em 2026).
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
         for num, sig, nome in PARTIDOS:
-            if not (await sess.execute(select(Partido).where(Partido.numero == num))).scalar_one_or_none():
-                sess.add(Partido(numero=num, sigla=sig, nome=nome))
+            stmt = pg_insert(Partido).values(numero=num, sigla=sig, nome=nome)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["numero"],
+                set_={"sigla": sig, "nome": nome},
+            )
+            await sess.execute(stmt)
         await sess.commit()
     print("seed de referência concluído (cargos, UFs, partidos)")
 

@@ -53,6 +53,7 @@ class CandidatoTSE:
     vice_nome: str | None
     vice_partido: str | None
     foto_url: str | None
+    situacao: str = "ativo"
     raw: dict | None = None
 
 
@@ -110,10 +111,22 @@ def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoT
     coligacao = _pick(payload, "nomeColigacao", "nm_coligacao", "coligacao")
     vice = payload.get("vice") or payload.get("candidatoVice") or {}
     foto_url = _pick(payload, "fotoUrl", "foto_url", "urlFoto")
-    # Ignora candidatos indeferidos / inaptos
-    situacao = (_pick(payload, "descricaoSituacao", "descricaoTotalizacao") or "").lower()
-    if "indeferido" in situacao and "recurso" not in situacao:
-        return None
+    # Mapeia descricaoSituacao do TSE pra enum interno. Candidatos
+    # retirados/cassados são MANTIDOS no banco (vão receber votos no
+    # dia D) mas marcados pra motor excluí-los do cálculo de "eleito".
+    # Lei 9.504/97 art. 175 §3º: votos considerados nulos na apuração
+    # oficial final.
+    sit_raw = (_pick(payload, "descricaoSituacao", "descricaoTotalizacao") or "").lower()
+    if "indeferido" in sit_raw and "recurso" not in sit_raw:
+        situacao = "indeferido_sem_recurso"
+    elif "renunc" in sit_raw:
+        situacao = "renunciou"
+    elif "cancel" in sit_raw:
+        situacao = "cancelado"
+    elif "cass" in sit_raw:
+        situacao = "cassado"
+    else:
+        situacao = "ativo"
     return CandidatoTSE(
         sq_candidato=str(sq),
         nome=_pick(payload, "nomeCompleto", "nomeCandidato", "nm_candidato", "nome", default=""),
@@ -128,6 +141,7 @@ def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoT
         vice_nome=_pick(vice, "nomeUrna", "nome") if isinstance(vice, dict) else None,
         vice_partido=_pick(vice.get("partido", {}) if isinstance(vice, dict) else {}, "sigla"),
         foto_url=foto_url,
+        situacao=situacao,
         raw=payload,
     )
 
@@ -216,6 +230,7 @@ async def _upsert(sess: AsyncSession, candidatos: Iterable[CandidatoTSE]) -> int
             "vice_nome": c.vice_nome,
             "vice_partido": c.vice_partido,
             "raw_divulga": c.raw,
+            "situacao": c.situacao,
         })
 
     # Partidos: upsert idempotente

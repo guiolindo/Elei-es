@@ -45,6 +45,16 @@ class Candidato(Base):
     vice_nome: Mapped[str | None] = mapped_column(String(128), nullable=True)
     vice_partido: Mapped[str | None] = mapped_column(String(32), nullable=True)
     raw_divulga: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # Situação do candidato pela Justiça Eleitoral.
+    #  'ativo'                  — concorre normalmente
+    #  'renunciou'              — desistiu após convenção
+    #  'cancelado'              — registro cancelado
+    #  'indeferido_sem_recurso' — barrado, sem recurso pendente
+    #  'cassado'                — cassado durante o pleito
+    # Lei 9.504/97 art. 175 §3º: votos em candidato com registro cancelado
+    # após convenção são considerados nulos. Motor exclui situacao != 'ativo'
+    # do cálculo de 'eleito' e '2º turno'.
+    situacao: Mapped[str] = mapped_column(String(32), nullable=False, server_default="ativo")
 
 
 class Snapshot(Base):

@@ -56,7 +56,8 @@ async def _cleanup_snapshots_loop():
     from sqlalchemy import select, delete, func
     from app.db import SessionLocal
     from app.models import Snapshot, SnapshotTotais, SnapshotCandidato, SnapshotMunicipio, Evento
-    N = 200
+    settings = get_settings()
+    N = settings.snapshots_retention_per_key
     await asyncio.sleep(120)
     while True:
         try:
@@ -110,7 +111,7 @@ async def _cleanup_snapshots_loop():
                     await sess.commit()
         except Exception:
             log.exception("cleanup snapshots falhou")
-        await asyncio.sleep(3600)
+        await asyncio.sleep(settings.cleanup_interval_seconds)
 
 async def _sync_candidatos_loop():
     """Sincroniza candidatos oficiais do TSE."""

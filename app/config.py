@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # Código da eleição no divulgacandcontas (usado para candidatos e fotos)
     eleicao_cod_divulga: int = 20322002026
     poll_interval_seconds: int = 20
+    # Intervalo do cleanup de snapshots (segundos). No dia D vale baixar
+    # pra 900 (15 min) pra não acumular; dias normais 3600 (1h) basta.
+    cleanup_interval_seconds: int = 3600
+    # Retenção máxima de snapshots por chave (cargo × abrangência × turno).
+    # 200 × ~1min = ~3h de curva fina — suficiente pro gráfico do dia D.
+    snapshots_retention_per_key: int = 200
     # Base do endpoint de listagem de candidatos (divulga do TSE).
     # Formato: {base}/{ano}/{uf}/{cod_eleicao}/{cargo}/candidatos
     tse_divulga_base: str = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1/candidatura/listar"

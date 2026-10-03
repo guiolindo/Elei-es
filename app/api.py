@@ -106,6 +106,7 @@ async def listar_candidatos(
             "partido": c.partido_numero,
             "uf": c.uf,
             "foto": _url_foto(c.sq_candidato, c.uf),
+            "situacao": c.situacao,
         }
         for c in r.scalars()
     ]
@@ -141,6 +142,7 @@ async def ficha(sq: str, sess: AsyncSession = Depends(get_session)) -> dict[str,
         "partido": c.partido_numero,
         "uf": c.uf,
         "coligacao": c.coligacao,
+        "situacao": c.situacao,
         "foto": _url_foto(c.sq_candidato, c.uf),
         "situacao": _p("descricaoSituacao"),
         "situacao_candidatura": _p("descricaoSituacao"),

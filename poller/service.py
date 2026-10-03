@@ -63,6 +63,7 @@ _UFS = [
 ALVOS_PADRAO: list[AlvoColeta] = (
     # ---- 1º turno ----
     [AlvoColeta(1, 1, "BR")]                       # Presidente nacional
+    + [AlvoColeta(1, 1, "ZZ")]                     # Presidente — voto do exterior (LC 44/82)
     + [AlvoColeta(1, 1, uf) for uf in _UFS]        # Presidente por UF (mapa)
     + [AlvoColeta(1, 3, uf) for uf in _UFS]        # Governador de cada UF
     + [AlvoColeta(1, 5, uf) for uf in _UFS]        # Senador de cada UF
@@ -73,6 +74,7 @@ ALVOS_PADRAO: list[AlvoColeta] = (
     # pula silenciosamente. Quando abrir, começa a coletar sozinho — sem
     # precisar de deploy nem mudança de config. Deputado não tem 2T.
     + [AlvoColeta(2, 1, "BR")]                     # Presidente 2T nacional
+    + [AlvoColeta(2, 1, "ZZ")]                     # Presidente 2T exterior
     + [AlvoColeta(2, 1, uf) for uf in _UFS]        # Presidente 2T por UF
     + [AlvoColeta(2, 3, uf) for uf in _UFS]        # Governador 2T de cada UF
 )
@@ -290,23 +292,28 @@ async def processar_alvo(
 
         eventos_novos: list[dict] = []
         if not suspeito:
-            # No 2º turno, incluir idade dos candidatos pra o motor poder
-            # aplicar art. 110 CE (desempate por idade) se necessário.
-            # Lê dataDeNascimento do raw_divulga que o Termux importou.
+            # Busca metadata dos candidatos deste snapshot:
+            #  - idade (pra desempate 2º turno, art. 110 CE)
+            #  - situação (ativo/renunciou/cancelado/cassado — Lei 9.504
+            #    art. 175 §3º exclui não-ativos do cálculo de eleito)
             idades: dict[str, int] = {}
-            if alvo.turno == 2 and ordenados:
+            situacoes: dict[str, str] = {}
+            if ordenados:
                 from datetime import date
                 sqs = [c.sq_candidato for c in ordenados]
                 r_cands = await sess.execute(
-                    select(Candidato.sq_candidato, Candidato.raw_divulga)
+                    select(Candidato.sq_candidato, Candidato.raw_divulga,
+                           Candidato.situacao)
                     .where(Candidato.sq_candidato.in_(sqs))
                 )
                 hoje = date.today()
-                for sq, raw in r_cands.all():
+                for sq, raw, situ in r_cands.all():
+                    situacoes[sq] = situ or "ativo"
+                    if alvo.turno != 2:
+                        continue
                     dn = (raw or {}).get("dataDeNascimento")
                     if not dn:
                         continue
-                    # Formato do TSE: "dd/mm/yyyy" ou "yyyy-mm-dd"
                     try:
                         if "/" in dn:
                             d, m, y = dn.split("/")
@@ -319,7 +326,8 @@ async def processar_alvo(
                     except (ValueError, AttributeError):
                         continue
             resumos = [CandidatoResumo(c.sq_candidato, c.votos,
-                                        idade_anos=idades.get(c.sq_candidato))
+                                        idade_anos=idades.get(c.sq_candidato),
+                                        situacao=situacoes.get(c.sq_candidato, "ativo"))
                        for c in ordenados]
             tot = TotaisResumo(
                 qt_secoes_total=parsed.totais.qt_secoes_total,

@@ -448,6 +448,25 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   color: color-mix(in srgb, var(--danger) 85%, #fff 15%);
   border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
 }
+/* Candidato retirado/cassado — vermelho mais forte que o "eliminado
+   matemático" porque é condição jurídica, não aritmética. */
+.tarja-retirado {
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
+  color: #fff;
+  border: 1px solid var(--danger);
+}
+.candidato.retirado .cand-foto {
+  filter: grayscale(1) brightness(.55);
+  opacity: .4;
+}
+.candidato.retirado .cand-nome,
+.candidato.retirado .cand-votos,
+.candidato.retirado .cand-pct {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+}
+.candidato.retirado { opacity: .9; }
 /* Foto do eliminado em preto-e-branco + opacidade reduzida.
    Aplicado só na foto — o resto do card continua legível pra que a
    pessoa consiga ler os votos e o status. */

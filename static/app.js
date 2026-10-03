@@ -206,13 +206,21 @@ function cargoRequerUF(cargo) {
 function ajustarUFParaCargo() {
   const selUF = $("sel-uf");
   selUF.disabled = false;
+  // Exterior ("ZZ") só vota em Presidente (CF art. 14 §1º + LC 44/82).
+  // Adiciona/remove a opção conforme o cargo pra evitar seleção inválida.
+  const temZZ = Array.from(selUF.options).some(o => o.value === "ZZ");
   if (state.cargo === 1) {
-    // Presidente: nacional por padrão, mas pode filtrar por UF pra ver
-    // como o candidato nacional está indo naquele estado.
+    if (!temZZ) {
+      const opt = document.createElement("option");
+      opt.value = "ZZ"; opt.textContent = "ZZ — Exterior";
+      selUF.appendChild(opt);
+    }
     if (!state.abrangencia) { state.abrangencia = "BR"; selUF.value = "BR"; }
   } else {
-    // Governador/Senador/Deputado precisam de UF. Se estava BR, cai em SP.
-    if (state.abrangencia === "BR") {
+    if (temZZ) {
+      Array.from(selUF.options).find(o => o.value === "ZZ")?.remove();
+    }
+    if (state.abrangencia === "BR" || state.abrangencia === "ZZ") {
       state.abrangencia = "SP";
       selUF.value = "SP";
     }
@@ -371,8 +379,14 @@ function renderLista() {
     const div = document.createElement("div");
     const eliminado = state.eliminados.has(c.sq_candidato);
     const eleito = state.eleitos.has(c.sq_candidato);
+    // Situação jurídica — se o candidato renunciou/foi cassado, votos
+    // são nulos por lei (Lei 9.504/97 art. 175 §3º). Prioridade visual
+    // acima de eleito/eliminado matemático.
+    const ficha = state.ficha[c.sq_candidato];
+    const retirado = ficha?.situacao && ficha.situacao !== "ativo";
     div.className = "candidato"
       + (sel >= 0 ? " selecionado" : "")
+      + (retirado ? " retirado" : "")
       + (eliminado ? " eliminado" : "")
       + (eleito ? " eleito" : "");
     div.dataset.sqCard = c.sq_candidato;
@@ -407,7 +421,19 @@ function renderLista() {
     // eleitoral, mesmo pra quem perdeu.
     const cargoMaj = [1, 3].includes(state.cargo);
     let tarja = "";
-    if (eleito) {
+    if (retirado) {
+      // Prioridade máxima: candidato não concorre mais. Lei 9.504 §3º.
+      const motivo = {
+        renunciou: "Candidatura retirada",
+        cancelado: "Registro cancelado",
+        cassado: "Candidatura cassada",
+        indeferido_sem_recurso: "Registro indeferido",
+      }[ficha.situacao] || "Fora da disputa";
+      tarja = `<div class="cand-tarja tarja-retirado">
+        <svg width="14" height="14" aria-hidden="true"><use href="#i-x"/></svg>
+        <span>${motivo} — votos nulos por lei</span>
+      </div>`;
+    } else if (eleito) {
       tarja = `<div class="cand-tarja tarja-eleito">
         <svg width="14" height="14" aria-hidden="true"><use href="#i-trophy"/></svg>
         <span>Eleito(a) matematicamente</span>

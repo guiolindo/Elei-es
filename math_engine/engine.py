@@ -24,6 +24,12 @@ class CandidatoResumo:
     # empate haver-se-á por eleito o mais idoso"). Se não fornecida, o
     # motor NÃO tenta desempatar e mantém a eleição em disputa.
     idade_anos: int | None = None
+    # Situação do candidato ('ativo', 'renunciou', 'cancelado',
+    # 'indeferido_sem_recurso', 'cassado'). Candidatos não-ativos ainda
+    # podem receber votos (TSE publica), mas o motor os EXCLUI do
+    # cálculo de "eleito" e "2º turno" porque Lei 9.504/97 art. 175 §3º
+    # trata esses votos como nulos. Default 'ativo' pra compat.
+    situacao: str = "ativo"
 
 
 @dataclass(frozen=True)
@@ -289,6 +295,12 @@ def detectar_viradas(
     """
     if not candidatos_atual or not candidatos_anterior:
         return []
+    # Exclui candidatos não-ativos (retirados/cassados) — votos deles são
+    # nulos (art. 175 §3º) e não constituem virada legítima.
+    candidatos_atual = [c for c in candidatos_atual if c.situacao == "ativo"]
+    candidatos_anterior = [c for c in candidatos_anterior if c.situacao == "ativo"]
+    if not candidatos_atual or not candidatos_anterior:
+        return []
     # Pré-apuração todos os candidatos têm 0 votos — a ordem fica arbitrária
     # (vem do TSE conforme ele lista) e muda entre snapshots sem significado.
     # Comparar essas ordens emitia "FULANO passou SICRANO" fantasma na timeline
@@ -464,6 +476,13 @@ def avaliar_apuracao(
     renovação de 1/3 do Senado).
     """
     if pct_apurado(totais) < APURACAO_MIN_PCT:
+        return []
+    # EXCLUSÃO LEGAL: candidatos com situação não-ativa recebem votos no
+    # TSE mas por Lei 9.504/97 art. 175 §3º esses votos são considerados
+    # nulos na apuração oficial. Motor os remove ANTES de qualquer
+    # cálculo pra não emitir "eleito" num candidato cassado/retirado.
+    candidatos = [c for c in candidatos if c.situacao == "ativo"]
+    if not candidatos:
         return []
     # 2º turno é uma máquina separada — só faz sentido pra cargos que
     # exigem maioria absoluta no 1T (Presidente, Governador).
