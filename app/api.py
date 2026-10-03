@@ -74,6 +74,19 @@ async def config_publica() -> dict[str, Any]:
     }
 
 
+@router.get("/poller-status")
+async def api_poller_status() -> dict[str, Any]:
+    """Observabilidade do loop do poller. Público — sem dados sensíveis.
+
+    Chame repetidamente pra ver o `ciclo_atual` subir e o
+    `segundos_desde_ultimo_ciclo` oscilar entre 0 e `intervalo_s`.
+    Se `segundos_desde_ultimo_ciclo` passar muito do intervalo, algo
+    travou (ex.: TSE devolvendo 503 em massa).
+    """
+    from poller.service import poller_status
+    return poller_status()
+
+
 @router.get("/cargos")
 async def listar_cargos(sess: AsyncSession = Depends(get_session)) -> list[dict[str, Any]]:
     r = await sess.execute(select(Cargo))

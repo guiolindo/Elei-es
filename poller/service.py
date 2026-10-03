@@ -9,8 +9,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 from sqlalchemy import select
@@ -115,6 +117,32 @@ async def _eventos_existentes(
 # gather e logados no fim. Dict em escopo de módulo pra evitar ter
 # que passar objeto por parâmetro em processar_alvo (chamado em paralelo).
 _stats_ciclo: dict[str, int] = {"novos": 0, "dedup": 0, "falhas": 0, "retrocesso": 0}
+# Observabilidade: info exposta via /api/poller-status pro user confirmar
+# que o loop está vivo e no intervalo esperado.
+_poller_info: dict[str, Any] = {
+    "ciclo_atual": 0,
+    "iniciado_em": None,       # datetime UTC
+    "ultimo_ciclo_em": None,   # datetime UTC do fim do último ciclo
+    "ultimo_ciclo_duracao_s": None,
+    "intervalo_s": None,
+    "alvos_total": 0,
+    "ultimo": {"novos": 0, "dedup": 0, "falhas": 0, "retrocesso": 0},
+}
+
+
+def poller_status() -> dict:
+    """Snapshot do estado do loop pra expor via API. Thread-safe o suficiente
+    pra GET — leitura de dict em Python é atômica."""
+    info = dict(_poller_info)
+    agora = datetime.now(timezone.utc)
+    info["agora_utc"] = agora.isoformat()
+    if info["iniciado_em"]:
+        info["uptime_s"] = (agora - info["iniciado_em"]).total_seconds()
+        info["iniciado_em"] = info["iniciado_em"].isoformat()
+    if info["ultimo_ciclo_em"]:
+        info["segundos_desde_ultimo_ciclo"] = (agora - info["ultimo_ciclo_em"]).total_seconds()
+        info["ultimo_ciclo_em"] = info["ultimo_ciclo_em"].isoformat()
+    return info
 
 
 async def processar_alvo(
@@ -420,6 +448,9 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
     settings = get_settings()
     alvos = alvos or ALVOS_PADRAO
     sem = asyncio.Semaphore(6)  # até 6 requisições concorrentes
+    _poller_info["intervalo_s"] = settings.poll_interval_seconds
+    _poller_info["alvos_total"] = len(alvos)
+    _poller_info["iniciado_em"] = datetime.now(timezone.utc)
 
     async def _um(client, alvo):
         async with sem:
@@ -439,9 +470,19 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
         _stats_ciclo["falhas"] = 0
         _stats_ciclo["retrocesso"] = 0
         # Recria o cliente a cada ciclo pra permitir troca de proxy quando um cair
+        t_ini = time.perf_counter()
         async with await cliente_tse() as client:
             await asyncio.gather(*[_um(client, a) for a in alvos])
         ciclo += 1
+        _poller_info["ciclo_atual"] = ciclo
+        _poller_info["ultimo_ciclo_em"] = datetime.now(timezone.utc)
+        _poller_info["ultimo_ciclo_duracao_s"] = round(time.perf_counter() - t_ini, 3)
+        _poller_info["ultimo"] = {
+            "novos": _stats_ciclo["novos"],
+            "dedup": _stats_ciclo["dedup"],
+            "falhas": _stats_ciclo["falhas"],
+            "retrocesso": _stats_ciclo["retrocesso"],
+        }
         # Log por ciclo com stats agregados — só INFO quando teve
         # mudança real (snapshot novo, falha, retrocesso). Caso contrário
         # DEBUG pra não poluir no caso comum (dedup 100%).
