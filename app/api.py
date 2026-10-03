@@ -177,6 +177,11 @@ async def _ultimo_snapshot(sess: AsyncSession, cargo: int, abr: str) -> Snapshot
 async def apuracao_atual(
     cargo: int = Query(...),
     abrangencia: str = Query("BR"),
+    inflate: bool = Query(False, description=
+        "Se true, inclui nome_urna/numero/partido/situacao de cada "
+        "candidato inline no snapshot. Facilita auditoria via curl/"
+        "verificacao sem precisar cruzar com /api/candidatos. Default "
+        "false pra manter o payload leve (hot path do WS)."),
     sess: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     snap = await _ultimo_snapshot(sess, cargo, abrangencia)
@@ -187,6 +192,21 @@ async def apuracao_atual(
         select(SnapshotCandidato).where(SnapshotCandidato.snapshot_id == snap.id)
         .order_by(SnapshotCandidato.posicao)
     )).scalars().all()
+
+    # Pre-fetch metadata dos candidatos (nome/numero/partido/situacao) —
+    # usado quer pra inflate=true, quer pra detectar sq_candidato
+    # órfãos (apareceu no snapshot mas não está em Candidato).
+    sqs_snap = [c.sq_candidato for c in cands]
+    ficha_rows = (await sess.execute(
+        select(Candidato.sq_candidato, Candidato.nome_urna, Candidato.numero,
+               Candidato.partido_numero, Candidato.situacao, Candidato.uf)
+        .where(Candidato.sq_candidato.in_(sqs_snap))
+    )).all() if sqs_snap else []
+    ficha_map = {r.sq_candidato: r for r in ficha_rows}
+    # Órfãos: sq_candidato no snapshot sem metadado — bug grave,
+    # frontend vai mostrar "sq 2800..." em vez de nome. Expor na
+    # resposta pra facilitar diagnóstico via /verificacao.
+    orfaos = [sq for sq in sqs_snap if sq not in ficha_map]
     return {
         "disponivel": True,
         "coletado_em": snap.coletado_em.isoformat(),
@@ -213,17 +233,40 @@ async def apuracao_atual(
         # como "projecao_linear" pra deixar claro que é estimativa,
         # não predição do vencedor.
         "candidatos": [
-            {
-                "sq_candidato": c.sq_candidato,
-                "votos": c.votos,
-                "pct_validos": float(c.pct_validos),
-                "posicao": c.posicao,
-                "projecao_linear": int(c.votos / (tot.qt_secoes_totalizadas / tot.qt_secoes_total))
-                    if tot.qt_secoes_total and tot.qt_secoes_totalizadas else c.votos,
-            }
+            _candidato_payload(c, tot, ficha_map.get(c.sq_candidato), inflate)
             for c in cands
         ],
+        # Órfãos (sq_candidato sem metadado em `candidatos` table).
+        # Em prod normal essa lista é vazia. Se aparecer algo, significa
+        # que o TSE devolveu sq que a nossa sincronização não tem —
+        # frontend precisa refetchar /api/candidatos.
+        "orfaos": orfaos,
     }
+
+
+def _candidato_payload(sc, tot, ficha, inflate: bool) -> dict:
+    """Monta a linha de candidato. Com inflate=True, inclui
+    nome/numero/partido/situacao pra o payload ser auditável sozinho
+    (sem precisar cruzar com /api/candidatos). Default enxuto."""
+    base = {
+        "sq_candidato": sc.sq_candidato,
+        "votos": sc.votos,
+        "pct_validos": float(sc.pct_validos),
+        "posicao": sc.posicao,
+        "projecao_linear": int(sc.votos / (tot.qt_secoes_totalizadas / tot.qt_secoes_total))
+            if tot.qt_secoes_total and tot.qt_secoes_totalizadas else sc.votos,
+    }
+    if inflate and ficha:
+        base["nome_urna"] = ficha.nome_urna
+        base["numero"] = ficha.numero
+        base["partido"] = ficha.partido_numero
+        base["situacao"] = ficha.situacao
+        base["uf"] = ficha.uf
+    elif inflate and not ficha:
+        # Órfão — sinaliza explicitamente em vez de omitir
+        base["nome_urna"] = None
+        base["orfao"] = True
+    return base
 
 
 @router.get("/apuracao/historico")
@@ -818,6 +861,39 @@ async def corrigir_partidos(sess: AsyncSession = Depends(get_session)) -> dict[s
             corrigidos += 1
     await sess.commit()
     return {"ok": True, "corrigidos": corrigidos}
+
+
+@router.get("/admin/diagnostico-mismatches", dependencies=[Depends(_exigir_admin)])
+async def diagnostico_mismatches(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Lista TODOS os sq_candidato que aparecem em snapshots mas não
+    existem em `candidatos` (órfãos). Esses viram 'nome: null' na UI
+    porque o join falha.
+
+    Causa típica: TSE devolveu um candidato que o sync via Termux ainda
+    não importou. Fix: rodar scripts/importar_termux.py novamente.
+    """
+    # Todos os sq_candidato distintos vistos em snapshots
+    q_snap = select(SnapshotCandidato.sq_candidato).distinct()
+    sqs_snap = {r[0] for r in (await sess.execute(q_snap)).all()}
+    if not sqs_snap:
+        return {"ok": True, "orfaos": [], "total_snapshots": 0}
+    # Quais estão em Candidato
+    q_cand = select(Candidato.sq_candidato).where(
+        Candidato.sq_candidato.in_(sqs_snap)
+    )
+    sqs_cand = {r[0] for r in (await sess.execute(q_cand)).all()}
+    orfaos = sorted(sqs_snap - sqs_cand)
+    return {
+        "ok": True,
+        "total_em_snapshots": len(sqs_snap),
+        "total_em_candidatos": len(sqs_cand),
+        "orfaos": orfaos,
+        "diagnostico": (
+            "Lista de sq_candidato que o TSE devolveu mas nosso sync "
+            "não tem metadado. Rode scripts/importar_termux.py ou "
+            "POST /api/admin/importar-candidatos para resolver."
+        ) if orfaos else "tudo em dia",
+    }
 
 
 @router.get("/admin/diagnostico-ids", dependencies=[Depends(_exigir_admin)])

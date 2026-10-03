@@ -197,7 +197,21 @@
         ordenados, % apurado, hash SHA-256 do JSON bruto do TSE para
         verificação. Troque <code>cargo</code> e <code>abrangencia</code>
         para outros cortes (ex.: <code>cargo=3&amp;abrangencia=SP</code>
-        pra governador de SP).
+        pra governador de SP). Passe
+        <code>&amp;inflate=true</code> pra receber nome, número,
+        partido e situação de cada candidato embutidos no JSON — útil
+        pra auditoria direta sem precisar cruzar com <code>/api/candidatos</code>.</div>
+    </div>
+
+    <div class="verif-card">
+      <div class="verif-card-topo">
+        <span class="verif-metodo">GET</span>
+        <a class="verif-card-url" href="/api/apuracao/atual?cargo=1&amp;abrangencia=BR&amp;inflate=true" target="_blank" rel="noopener">/api/apuracao/atual?cargo=1&amp;abrangencia=BR&amp;inflate=true</a>
+      </div>
+      <div class="verif-card-desc">
+        Versão com nomes inline — cada candidato traz
+        <code>nome_urna</code>, <code>numero</code>, <code>partido</code>,
+        <code>situacao</code> e <code>uf</code>.
       </div>
     </div>
 

@@ -1126,6 +1126,18 @@ async function refreshApuracao() {
       state.snapshotAnterior = state.ultimoSnapshot;
     }
     state.ultimoSnapshot = novo;
+    // PROTEÇÃO CONTRA MISMATCH: se o backend reporta sq_candidato
+    // órfão (TSE devolveu alguém que nossa /api/candidatos não tem,
+    // ex.: candidato acabou de ser importado via Termux), refetcha a
+    // ficha pra evitar mostrar 'sq_candidato: 2800...' como nome.
+    // Também loga pra diagnóstico.
+    if (novo?.disponivel && novo.orfaos?.length) {
+      console.warn("snapshot tem sq_candidato órfão(s):", novo.orfaos,
+                   "— refetchando /api/candidatos");
+      try {
+        await carregarCandidatos();
+      } catch (e) { /* se falhar, seguimos com a ficha que tem */ }
+    }
   } catch (e) {
     state.ultimoSnapshot = { disponivel: false };
   }
