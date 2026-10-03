@@ -8,85 +8,169 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<title>Verificação por seção · Apuração 2026</title>
+<title>Verifique sua seção · Apuração 2026</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css">
 <style>
-.urna-wrap{max-width:900px;margin:0 auto;padding:24px 20px 80px}
-.urna-back{color:var(--muted);text-decoration:none;font-size:14px}
+.urna-wrap{max-width:720px;margin:0 auto;padding:24px 18px 100px}
+.urna-back{color:var(--muted);text-decoration:none;font-size:14px;display:inline-flex;align-items:center;gap:6px}
 .urna-back:hover{color:var(--brand)}
-.urna-head{margin:24px 0 8px;font-size:clamp(26px,5vw,36px);font-weight:800;letter-spacing:-.03em}
-.urna-sub{color:var(--muted);margin-bottom:28px;max-width:620px;line-height:1.5}
-.urna-form{background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:20px;margin-bottom:20px}
-.urna-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:16px}
-.urna-grid label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
-.urna-grid input,.urna-grid select{width:100%;box-sizing:border-box;background:var(--surface-3);color:var(--fg);border:1px solid var(--line-2);border-radius:8px;padding:10px 12px;font:inherit}
-.urna-grid input:focus,.urna-grid select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px rgba(240,180,41,.25)}
-.urna-btn{background:var(--brand);color:#17130b;border:none;border-radius:10px;padding:12px 20px;font-weight:700;font:inherit;cursor:pointer;width:100%}
-.urna-btn:hover{opacity:.9}
-.urna-btn:disabled{opacity:.5;cursor:wait}
-.urna-resp{background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:20px;margin-top:20px;display:none}
+.urna-head{margin:22px 0 10px;font-size:clamp(26px,6vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1.1}
+.urna-sub{color:var(--fg-2);margin-bottom:28px;line-height:1.5;font-size:15px}
+
+/* Steps verticais — guia o usuário passo a passo, sem jogar 6 campos de uma vez */
+.urna-step{background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:18px;margin-bottom:12px;transition:border-color .2s,background .2s}
+.urna-step.ativa{border-color:var(--brand);background:var(--surface-3)}
+.urna-step.pronta{border-color:color-mix(in srgb,var(--ok) 40%,var(--line-2))}
+.urna-step-topo{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.urna-step-n{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--surface-3);color:var(--muted);font:800 13px 'JetBrains Mono',monospace;flex-shrink:0}
+.urna-step.ativa .urna-step-n{background:var(--brand);color:#17130b}
+.urna-step.pronta .urna-step-n{background:var(--ok);color:#001a0a}
+.urna-step-titulo{font-size:15px;font-weight:700;flex:1}
+.urna-step-valor{font-size:13px;color:var(--brand);font-weight:600;font-family:'JetBrains Mono',monospace}
+.urna-step-corpo{display:none}
+.urna-step.ativa .urna-step-corpo{display:block}
+.urna-step label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;font-weight:600}
+
+/* Botões UF estilo pills */
+.urna-ufs{display:flex;flex-wrap:wrap;gap:6px}
+.urna-uf-btn{background:var(--surface-3);border:1px solid var(--line-2);color:var(--fg);border-radius:999px;padding:8px 14px;font:600 13px 'JetBrains Mono',monospace;cursor:pointer;transition:all .15s}
+.urna-uf-btn:hover{border-color:var(--brand)}
+.urna-uf-btn.ativo{background:var(--brand);color:#17130b;border-color:var(--brand)}
+
+.urna-input,.urna-select{width:100%;box-sizing:border-box;background:var(--surface-3);color:var(--fg);border:1px solid var(--line-2);border-radius:10px;padding:12px 14px;font:600 15px inherit;min-height:48px}
+.urna-input:focus,.urna-select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(240,180,41,.2)}
+.urna-input::placeholder{color:var(--muted);font-weight:400}
+.urna-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.urna-hint{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.4}
+.urna-hint a{color:var(--brand)}
+.urna-help-box{background:rgba(240,180,41,.05);border:1px solid rgba(240,180,41,.2);border-radius:10px;padding:14px;margin-top:10px;font-size:13px;line-height:1.5;color:var(--fg-2)}
+.urna-help-box strong{color:var(--fg)}
+
+.urna-btn-primario{background:var(--brand);color:#17130b;border:none;border-radius:12px;padding:16px;width:100%;font:800 16px inherit;cursor:pointer;margin-top:8px;transition:opacity .15s}
+.urna-btn-primario:hover{opacity:.9}
+.urna-btn-primario:disabled{opacity:.4;cursor:not-allowed}
+
+/* Resposta */
+.urna-resp{background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:22px;margin-top:24px;display:none}
 .urna-resp.visivel{display:block}
-.urna-resp h2{font-size:18px;margin:0 0 14px}
-.urna-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:14px 0}
+.urna-resp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.urna-resp h2{font-size:18px;margin:0 0 4px}
+.urna-resp-sub{color:var(--muted);font-size:13px;font-family:'JetBrains Mono',monospace}
+.urna-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:10px}
 .urna-stat{background:var(--surface-3);border-radius:10px;padding:12px}
 .urna-stat-lab{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
 .urna-stat-val{font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px}
-.urna-cands{margin-top:16px}
-.urna-cand{display:grid;grid-template-columns:50px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-2);font-size:14px}
-.urna-cand:last-child{border-bottom:0}
-.urna-cand-num{font:800 15px 'JetBrains Mono',monospace;color:var(--brand)}
-.urna-cand-nome{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.urna-cand-votos{font-family:'JetBrains Mono',monospace;font-weight:700}
-.urna-img-link{display:inline-flex;align-items:center;gap:6px;color:var(--brand);text-decoration:none;font-size:13px;margin-top:14px;padding:10px 14px;background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.3);border-radius:8px}
-.urna-img-link:hover{background:rgba(240,180,41,.18)}
-.urna-erro{color:var(--danger);padding:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px}
-.urna-help{color:var(--muted);font-size:12px;line-height:1.5;margin-top:16px}
-.urna-help code{background:var(--surface-3);padding:2px 5px;border-radius:3px;font-size:11px}
+.urna-cands{margin-top:18px}
+.urna-cands h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px}
+.urna-cand{display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2);font-size:14px}
+.urna-cand-sq{font:600 12px 'JetBrains Mono',monospace;color:var(--muted);word-break:break-all}
+.urna-cand-votos{font:800 15px 'JetBrains Mono',monospace;text-align:right;white-space:nowrap}
+.urna-img-link{display:inline-flex;align-items:center;gap:8px;color:var(--brand);text-decoration:none;font-weight:600;margin-top:16px;padding:12px 16px;background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.3);border-radius:10px;font-size:13px}
+.urna-img-link:hover{background:rgba(240,180,41,.15)}
+
+.urna-erro{color:#fff;padding:14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:10px;line-height:1.5}
+.urna-erro strong{display:block;margin-bottom:4px}
+
+@media(min-width:640px){.urna-row{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <main class="urna-wrap">
 <a class="urna-back" href="/">← Voltar para o placar</a>
-<h1 class="urna-head">Verificação por seção eleitoral</h1>
-<p class="urna-sub">Consulte o Boletim de Urna (BU) de qualquer seção. Os dados vêm direto do TSE, com link para a imagem assinada digitalmente do BU original — útil pra verificar a totalização da sua própria seção.</p>
+<h1 class="urna-head">Verifique sua seção</h1>
+<p class="urna-sub">Consulte o Boletim de Urna (BU) da sua seção eleitoral e veja a imagem assinada digitalmente pelo TSE — a prova original dos votos daquela urna.</p>
 
-<form class="urna-form" id="form-urna">
-  <div class="urna-grid">
-    <div><label for="uf">UF</label><select id="uf" required>
-      <option value="">—</option>
-      <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
-      <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
-      <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
-      <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
-      <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
-      <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
-      <option>SP</option><option>SE</option><option>TO</option>
-    </select></div>
-    <div><label for="municipio">Município (código TSE)</label><input id="municipio" type="text" inputmode="numeric" placeholder="ex: 71099" required></div>
-    <div><label for="zona">Zona</label><input id="zona" type="text" inputmode="numeric" placeholder="ex: 1" required></div>
-    <div><label for="secao">Seção</label><input id="secao" type="text" inputmode="numeric" placeholder="ex: 1" required></div>
-    <div><label for="cargo">Cargo</label><select id="cargo">
-      <option value="1">Presidente</option>
-      <option value="3">Governador</option>
-      <option value="5">Senador</option>
-      <option value="6">Deputado Federal</option>
-      <option value="7">Deputado Estadual</option>
-    </select></div>
-    <div><label for="turno">Turno</label><select id="turno">
-      <option value="1">1º</option><option value="2">2º</option>
-    </select></div>
+<form id="form-urna">
+  <!-- Step 1: UF -->
+  <div class="urna-step ativa" id="s1" data-step="1">
+    <div class="urna-step-topo">
+      <span class="urna-step-n">1</span>
+      <span class="urna-step-titulo">Em qual estado você vota?</span>
+      <span class="urna-step-valor" id="v-uf"></span>
+    </div>
+    <div class="urna-step-corpo">
+      <div class="urna-ufs" id="ufs"></div>
+      <div class="urna-hint">Exterior ("ZZ") disponível só para presidente.</div>
+    </div>
   </div>
-  <button type="submit" class="urna-btn" id="btn-buscar">Buscar BU</button>
+
+  <!-- Step 2: Município -->
+  <div class="urna-step" id="s2" data-step="2">
+    <div class="urna-step-topo">
+      <span class="urna-step-n">2</span>
+      <span class="urna-step-titulo">Município onde você vota</span>
+      <span class="urna-step-valor" id="v-mu"></span>
+    </div>
+    <div class="urna-step-corpo">
+      <label for="municipio">Comece a digitar o nome</label>
+      <input id="municipio" class="urna-input" type="text" list="mu-opts" placeholder="ex: São Paulo" autocomplete="off">
+      <datalist id="mu-opts"></datalist>
+      <div class="urna-hint" id="mu-hint">Selecione o estado primeiro.</div>
+    </div>
+  </div>
+
+  <!-- Step 3: Zona + Seção -->
+  <div class="urna-step" id="s3" data-step="3">
+    <div class="urna-step-topo">
+      <span class="urna-step-n">3</span>
+      <span class="urna-step-titulo">Zona e seção eleitoral</span>
+      <span class="urna-step-valor" id="v-zs"></span>
+    </div>
+    <div class="urna-step-corpo">
+      <div class="urna-row">
+        <div>
+          <label for="zona">Zona</label>
+          <input id="zona" class="urna-input" type="text" inputmode="numeric" placeholder="ex: 1" maxlength="4">
+        </div>
+        <div>
+          <label for="secao">Seção</label>
+          <input id="secao" class="urna-input" type="text" inputmode="numeric" placeholder="ex: 42" maxlength="4">
+        </div>
+      </div>
+      <div class="urna-help-box">
+        <strong>Onde encontrar sua zona e seção?</strong>
+        No seu título de eleitor, no app <em>e-Título</em>, ou em
+        <a href="https://www.tse.jus.br/eleitor/onde-votar" target="_blank" rel="noopener">tse.jus.br/eleitor/onde-votar</a>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Cargo + Turno -->
+  <div class="urna-step" id="s4" data-step="4">
+    <div class="urna-step-topo">
+      <span class="urna-step-n">4</span>
+      <span class="urna-step-titulo">O que você quer conferir?</span>
+      <span class="urna-step-valor" id="v-ct"></span>
+    </div>
+    <div class="urna-step-corpo">
+      <div class="urna-row">
+        <div>
+          <label for="cargo">Cargo</label>
+          <select id="cargo" class="urna-select">
+            <option value="1">Presidente</option>
+            <option value="3">Governador</option>
+            <option value="5">Senador</option>
+            <option value="6">Deputado Federal</option>
+            <option value="7">Deputado Estadual</option>
+          </select>
+        </div>
+        <div>
+          <label for="turno">Turno</label>
+          <select id="turno" class="urna-select">
+            <option value="1">1º turno</option>
+            <option value="2">2º turno</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button type="submit" id="btn-buscar" class="urna-btn-primario" disabled>Buscar boletim</button>
 </form>
 
 <div class="urna-resp" id="resp"></div>
-
-<div class="urna-help">
-  Onde achar seu <strong>código de município TSE</strong>, zona e seção? Confira em
-  <a href="https://www.tse.jus.br/eleitor/titulo-eleitoral/consulta-por-nome" target="_blank" rel="noopener">tse.jus.br/eleitor/titulo-eleitoral</a>.
-  O número não é o CEP e também não é o código IBGE — é o código que o TSE usa internamente (geralmente 5 dígitos).
-</div>
 </main>
 <script src="/static/urna.js"></script>
 </body>

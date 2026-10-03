@@ -1,48 +1,176 @@
-// Verificação por seção eleitoral (BU). Faz GET em /api/apuracao/bu
-// e renderiza o resultado inline. Sem framework — vanilla, 60 linhas.
+// Wizard de verificação por seção. 4 passos:
+//   1. UF (chips) → 2. Município (autocomplete) → 3. Zona/Seção → 4. Cargo/Turno
+// A ideia é guiar o usuário em vez de pedir 6 campos de uma vez.
+
 const $ = id => document.getElementById(id);
 const fmt = new Intl.NumberFormat("pt-BR").format;
 
-async function buscar(e) {
+const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO","ZZ"];
+
+const state = {
+  uf: null,
+  municipio: null,  // { codigo, nome }
+  zona: null,
+  secao: null,
+  cargo: "1",
+  turno: "1",
+  cidades: [],  // lista completa da UF selecionada
+};
+
+// ============ Steps ============
+function marcarStep(n, status /* 'ativa' | 'pronta' | 'inativa' */) {
+  const s = $(`s${n}`);
+  s.classList.remove("ativa", "pronta");
+  if (status === "ativa") s.classList.add("ativa");
+  if (status === "pronta") s.classList.add("pronta");
+}
+
+function atualizarUI() {
+  // Valores resumo nos cabeçalhos
+  $("v-uf").textContent = state.uf || "";
+  $("v-mu").textContent = state.municipio?.nome || "";
+  $("v-zs").textContent = state.zona && state.secao ? `Zona ${state.zona} · Seção ${state.secao}` : "";
+  $("v-ct").textContent = `${nomeCargo(state.cargo)} · ${state.turno}º turno`;
+
+  // Qual é o próximo step a abrir
+  if (!state.uf) {
+    [1,2,3,4].forEach(n => marcarStep(n, n === 1 ? "ativa" : "inativa"));
+  } else if (!state.municipio) {
+    marcarStep(1, "pronta"); marcarStep(2, "ativa"); marcarStep(3, "inativa"); marcarStep(4, "inativa");
+  } else if (!state.zona || !state.secao) {
+    marcarStep(1, "pronta"); marcarStep(2, "pronta"); marcarStep(3, "ativa"); marcarStep(4, "inativa");
+  } else {
+    marcarStep(1, "pronta"); marcarStep(2, "pronta"); marcarStep(3, "pronta"); marcarStep(4, "ativa");
+  }
+  $("btn-buscar").disabled = !(state.uf && state.municipio && state.zona && state.secao);
+}
+
+function nomeCargo(c) {
+  return {1:"Presidente",3:"Governador",5:"Senador",6:"Dep. Federal",7:"Dep. Estadual"}[c] || "?";
+}
+
+// ============ Passo 1: UFs como chips ============
+function renderUFs() {
+  const wrap = $("ufs");
+  wrap.innerHTML = "";
+  for (const uf of UFS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "urna-uf-btn" + (state.uf === uf ? " ativo" : "");
+    b.textContent = uf;
+    b.addEventListener("click", () => selecionarUF(uf));
+    wrap.appendChild(b);
+  }
+}
+
+async function selecionarUF(uf) {
+  state.uf = uf;
+  state.municipio = null;
+  state.cidades = [];
+  $("municipio").value = "";
+  renderUFs();
+  atualizarUI();
+  // Scroll suave pro próximo step
+  $("s2").scrollIntoView({ behavior: "smooth", block: "center" });
+  // Carrega lista de municípios da UF
+  if (uf === "ZZ") {
+    // Exterior: TSE agrupa por zona consular, não há município — campo
+    // vira input manual simples.
+    $("mu-hint").textContent = "Para o exterior, informe o nome do consulado onde votou.";
+    return;
+  }
+  $("mu-hint").textContent = "Carregando municípios...";
+  try {
+    const r = await fetch(`/api/municipios?uf=${uf}`);
+    const j = await r.json();
+    state.cidades = j.municipios || [];
+    const dl = $("mu-opts");
+    dl.innerHTML = "";
+    state.cidades.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.nome;
+      opt.dataset.codigo = c.codigo;
+      dl.appendChild(opt);
+    });
+    $("mu-hint").textContent = state.cidades.length
+      ? `${state.cidades.length} municípios disponíveis em ${uf}. Comece a digitar.`
+      : "TSE ainda não publicou a lista dessa UF. Digite o código TSE do município.";
+  } catch (e) {
+    $("mu-hint").textContent = "Não foi possível carregar a lista. Digite o código TSE manualmente.";
+  }
+}
+
+// ============ Passo 2: município com datalist ============
+$("municipio").addEventListener("input", (e) => {
+  const texto = e.target.value.trim();
+  // Procura pelo nome exato na lista
+  const bate = state.cidades.find(c =>
+    c.nome.toLocaleLowerCase("pt-BR") === texto.toLocaleLowerCase("pt-BR"));
+  if (bate) {
+    state.municipio = bate;
+  } else if (/^\d+$/.test(texto)) {
+    // Usuário digitou código TSE direto (fallback)
+    state.municipio = { codigo: texto, nome: `Código ${texto}` };
+  } else {
+    state.municipio = null;
+  }
+  atualizarUI();
+});
+
+$("municipio").addEventListener("change", () => {
+  if (state.municipio) $("s3").scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
+// ============ Passo 3: zona + seção ============
+["zona", "secao"].forEach(id => {
+  $(id).addEventListener("input", (e) => {
+    const v = e.target.value.replace(/\D/g, "");
+    e.target.value = v;
+    state[id] = v || null;
+    atualizarUI();
+  });
+});
+
+// ============ Passo 4: cargo + turno ============
+$("cargo").addEventListener("change", (e) => { state.cargo = e.target.value; atualizarUI(); });
+$("turno").addEventListener("change", (e) => { state.turno = e.target.value; atualizarUI(); });
+
+// ============ Submit ============
+$("form-urna").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = $("btn-buscar");
   const resp = $("resp");
-  const uf = $("uf").value;
-  const mu = $("municipio").value.trim();
-  const zn = $("zona").value.trim();
-  const se = $("secao").value.trim();
-  const cargo = $("cargo").value;
-  const turno = $("turno").value;
-  if (!uf || !mu || !zn || !se) return;
   btn.disabled = true;
-  btn.textContent = "Buscando...";
+  btn.textContent = "Buscando no TSE...";
   resp.classList.remove("visivel");
   try {
-    const url = `/api/apuracao/bu?uf=${encodeURIComponent(uf)}&municipio=${encodeURIComponent(mu)}&zona=${encodeURIComponent(zn)}&secao=${encodeURIComponent(se)}&cargo=${cargo}&turno=${turno}`;
-    const r = await fetch(url, { headers: { Accept: "application/json" } });
+    const url = `/api/apuracao/bu?uf=${state.uf}&municipio=${state.municipio.codigo}&zona=${state.zona}&secao=${state.secao}&cargo=${state.cargo}&turno=${state.turno}`;
+    const r = await fetch(url);
     const d = await r.json();
     render(d);
     resp.classList.add("visivel");
+    resp.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
-    resp.innerHTML = `<div class="urna-erro">Erro ao buscar: ${err.message}</div>`;
+    resp.innerHTML = `<div class="urna-erro"><strong>Erro</strong>${err.message}</div>`;
     resp.classList.add("visivel");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Buscar BU";
+    btn.textContent = "Buscar boletim";
   }
-}
+});
 
 function render(d) {
   const resp = $("resp");
   if (!d.disponivel) {
     resp.innerHTML = `<div class="urna-erro">
-      <strong>Não encontrado.</strong> ${d.motivo || "A seção pode não ter sido totalizada ainda, ou os códigos estão incorretos."}
-      ${d.url_imagem_bu ? `<br><br><a class="urna-img-link" href="${d.url_imagem_bu}" target="_blank" rel="noopener">Tentar imagem do BU direto no TSE →</a>` : ""}
+      <strong>Não encontrado</strong>
+      ${d.motivo || "A seção pode não ter sido totalizada ainda, ou os códigos estão incorretos."}
+      ${d.url_imagem_bu ? `<br><br><a class="urna-img-link" href="${d.url_imagem_bu}" target="_blank" rel="noopener">Tentar a imagem direto no TSE →</a>` : ""}
     </div>`;
     return;
   }
   const t = d.totais || {};
-  const cards = [
+  const stats = [
     ["Eleitorado apto", t.eleitorado_apto],
     ["Comparecimento", t.comparecimento],
     ["Abstenções", t.abstencoes],
@@ -54,19 +182,25 @@ function render(d) {
   ).join("");
   const cands = (d.candidatos || []).slice(0, 20).map(c =>
     `<div class="urna-cand">
-      <span class="urna-cand-num">${c.sq_candidato || "—"}</span>
-      <span class="urna-cand-nome">${c.sq_candidato}</span>
-      <span class="urna-cand-votos">${fmt(c.votos)} · ${c.pct_validos.toFixed(2)}%</span>
+      <span class="urna-cand-sq">${c.sq_candidato}</span>
+      <span class="urna-cand-votos">${fmt(c.votos)} · ${c.pct_validos.toFixed(1)}%</span>
     </div>`
   ).join("");
   resp.innerHTML = `
-    <h2>Seção ${d.secao} · Zona ${d.zona} · ${d.uf} · Município ${d.municipio}</h2>
-    <div class="urna-stats">${cards}</div>
-    ${cands ? `<div class="urna-cands"><h3 style="font-size:14px;margin:16px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Candidatos</h3>${cands}</div>` : ""}
+    <div class="urna-resp-head">
+      <div>
+        <h2>Seção ${d.secao} · Zona ${d.zona}</h2>
+        <div class="urna-resp-sub">${state.municipio.nome} — ${d.uf} · ${nomeCargo(d.cargo)}</div>
+      </div>
+    </div>
+    <div class="urna-stats">${stats}</div>
+    ${cands ? `<div class="urna-cands"><h3>Votos por candidato</h3>${cands}</div>` : ""}
     <a class="urna-img-link" href="${d.url_imagem_bu}" target="_blank" rel="noopener">
-      Ver imagem assinada do BU original (JPEG do TSE) →
+      Ver a imagem assinada do BU original (JPEG do TSE) →
     </a>
   `;
 }
 
-$("form-urna").addEventListener("submit", buscar);
+// ============ Boot ============
+renderUFs();
+atualizarUI();

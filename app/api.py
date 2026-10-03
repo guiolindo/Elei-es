@@ -1103,6 +1103,57 @@ async def apuracao_zona(
     return body
 
 
+# ============ Lista de municípios por UF (TSE) ============
+# Mapeia nome do município → código TSE. Usado pela página /urna pra
+# evitar que o usuário tenha que decorar o código numérico (ninguém
+# sabe que São Paulo = 71099, ex.).
+_CACHE_MUN_LIST: dict[str, tuple[float, list]] = {}
+_CACHE_MUN_LIST_TTL = 24 * 3600  # 24h — a lista raramente muda
+
+
+@router.get("/municipios")
+async def listar_municipios(uf: str = Query(..., min_length=2, max_length=2)) -> dict[str, Any]:
+    """Lista oficial de municípios da UF (código TSE + nome). Vem do
+    config público do TSE, cacheada 24h. Usado por /urna pra permitir
+    dropdown com nome em vez de forçar o usuário a saber o código TSE.
+    """
+    from app.config import get_settings
+    from time import monotonic
+    uf = uf.lower()
+    agora = monotonic()
+    hit = _CACHE_MUN_LIST.get(uf)
+    if hit and (agora - hit[0]) < _CACHE_MUN_LIST_TTL:
+        return {"cache_hit": True, "municipios": hit[1]}
+
+    settings = get_settings()
+    base = settings.tse_cdn_base.rstrip("/").rsplit("/", 1)[0]
+    cod = settings.eleicao_cod_1t  # usa o da presidencial, serve pra todas
+    # TSE publica config dos municípios por UF nesse padrão:
+    url = f"{base}/comum/config/mun-e{cod:06d}-{uf}.json"
+    j = await _fetch_tse_json(url)
+    if not j:
+        # Fallback: tenta sem o -e{cod}
+        url2 = f"{base}/comum/config/mun-{uf}.json"
+        j = await _fetch_tse_json(url2)
+    if not j:
+        return {"municipios": [], "erro": "TSE não publicou lista pra esta UF ainda"}
+
+    # Formato típico: {"mu": [{"cd": "71099", "nm": "SÃO PAULO"}, ...]}
+    # Mas pode variar — tenta várias chaves.
+    raw = j.get("mu") or j.get("municipios") or j.get("abr") or []
+    municipios: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        cd = item.get("cd") or item.get("cod") or item.get("codigo")
+        nm = item.get("nm") or item.get("nome") or item.get("nmTse")
+        if cd and nm:
+            municipios.append({"codigo": str(cd), "nome": str(nm).title()})
+    municipios.sort(key=lambda m: m["nome"])
+    _CACHE_MUN_LIST[uf] = (agora, municipios)
+    return {"municipios": municipios}
+
+
 # ============ Boletim de Urna (BU) — verificação por seção ============
 # TSE publica BU por seção eleitoral individual. Formato:
 #   https://resultados.tse.jus.br/oficial/{cod}/dados/{uf}/{uf}{mun}/{zona}/{secao}/o{cod_padded}-{mun}{zona}{secao}.json
