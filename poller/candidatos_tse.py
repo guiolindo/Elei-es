@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import unicodedata
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -120,20 +121,23 @@ def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoT
     # dia D) mas marcados pra motor excluí-los do cálculo de "eleito".
     # Lei 9.504/97 art. 175 §3º: votos considerados nulos na apuração
     # oficial final.
-    sit_raw = (_pick(
+    sit_raw_bruta = (_pick(
         payload,
         "descricaoSituacao", "descricaoTotalizacao",
         "descricaoSituacaoCandidato", "descricaoSituacaoTotalizacao",
         "ds_sit_tot_turno", "ds_situacao_candidatura",
         "situacao",
-    ) or "").lower()
-    # "inapto" aparece na listagem TSE pra candidatos que perderam direitos
-    # políticos ou cujo registro foi indeferido pela JE. Caso 2026: Leonardo
-    # Avalanche e Pablo Marçal (PRTB). Pelo art. 175 §3º da Lei 9.504/97,
-    # votos neles são nulos — motor exclui situacao != 'ativo'.
+    ) or "")
+    # Normaliza acentos — TSE devolve "Renúncia", "Inelegível", "Não eleito",
+    # etc. Match sem acento evita bug silencioso onde "renunc" não casa com
+    # "renúncia" (caso real: Avalanche virou 'ativo' por isso).
+    sit_raw = unicodedata.normalize("NFKD", sit_raw_bruta).encode("ascii", "ignore").decode().lower()
+    # "inapto"/"inelegivel" → registro indeferido. "renuncia" → renunciou.
+    # Pelo art. 175 §3º da Lei 9.504/97, votos em qualquer caso != 'ativo'
+    # são considerados nulos — motor exclui do cálculo de eleito.
     if "indeferido" in sit_raw and "recurso" not in sit_raw:
         situacao = "indeferido_sem_recurso"
-    elif "inapto" in sit_raw or "inelegível" in sit_raw or "inelegivel" in sit_raw:
+    elif "inapto" in sit_raw or "inelegivel" in sit_raw:
         situacao = "indeferido_sem_recurso"
     elif "renunc" in sit_raw:
         situacao = "renunciou"
