@@ -1225,6 +1225,7 @@ function conectarWS() {
     const msg = JSON.parse(m.data);
     if (msg.type === "snapshot") {
       await refreshApuracao();
+      atualizarMapa();  // sem await — não bloqueia os toasts de evento
       if (state.selecionados.length >= 2) await inicializarGraficos();
       for (const ev of msg.eventos || []) {
         _absorverEventoNoState(ev);
