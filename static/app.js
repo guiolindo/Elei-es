@@ -207,19 +207,15 @@ function ajustarUFParaCargo() {
   const selUF = $("sel-uf");
   selUF.disabled = false;
   // Exterior ("ZZ") só vota em Presidente (CF art. 14 §1º + LC 44/82).
-  // Adiciona/remove a opção conforme o cargo pra evitar seleção inválida.
-  const temZZ = Array.from(selUF.options).some(o => o.value === "ZZ");
+  // A opção é adicionada em preencherUFs() uma vez e aqui só escondemos
+  // (hidden + disabled) quando cargo != 1 — mais robusto contra timing
+  // issues que add/remove dinâmico.
+  const optZZ = Array.from(selUF.options).find(o => o.value === "ZZ");
   if (state.cargo === 1) {
-    if (!temZZ) {
-      const opt = document.createElement("option");
-      opt.value = "ZZ"; opt.textContent = "ZZ — Exterior";
-      selUF.appendChild(opt);
-    }
+    if (optZZ) { optZZ.hidden = false; optZZ.disabled = false; }
     if (!state.abrangencia) { state.abrangencia = "BR"; selUF.value = "BR"; }
   } else {
-    if (temZZ) {
-      Array.from(selUF.options).find(o => o.value === "ZZ")?.remove();
-    }
+    if (optZZ) { optZZ.hidden = true; optZZ.disabled = true; }
     if (state.abrangencia === "BR" || state.abrangencia === "ZZ") {
       state.abrangencia = "SP";
       selUF.value = "SP";
@@ -1562,9 +1558,11 @@ function bootMobile() {
 
   // Chip UF → bottom sheet em grade 3 colunas
   $("m-chip-uf")?.addEventListener("click", () => {
-    const opts = Array.from($("sel-uf").options).map(o => ({
-      label: o.value, value: o.value, ativo: o.value === state.abrangencia,
-    }));
+    const opts = Array.from($("sel-uf").options)
+      .filter(o => !o.hidden && !o.disabled)
+      .map(o => ({
+        label: o.value, value: o.value, ativo: o.value === state.abrangencia,
+      }));
     abrirBottomSheet("Escolher local", opts, (v) => {
       state.abrangencia = v;
       $("sel-uf").value = v;
@@ -1715,6 +1713,13 @@ async function boot() {
       const opt = document.createElement("option");
       opt.value = u.sigla; opt.textContent = `${u.sigla} — ${u.nome}`;
       selUF.appendChild(opt);
+    }
+    // Opção fixa: voto do exterior (ZZ). Só vota presidente — a função
+    // ajustarUFParaCargo() esconde/mostra conforme o cargo escolhido.
+    if (!Array.from(selUF.options).some(o => o.value === "ZZ")) {
+      const optZZ = document.createElement("option");
+      optZZ.value = "ZZ"; optZZ.textContent = "ZZ — Exterior (brasileiros no exterior)";
+      selUF.appendChild(optZZ);
     }
   } catch (e) { /* ok */ }
 
