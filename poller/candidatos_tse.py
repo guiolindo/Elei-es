@@ -100,14 +100,18 @@ def parse_candidato(payload: dict, cod_cargo: int, uf: str | None) -> CandidatoT
     # existe como partido → candidatos ficavam sem logo.
     partido_num = _to_int(_pick(partido, "numero", "numeroPartido", "nr_partido"))
     num_cand = _to_int(_pick(payload, "numero", "numeroCandidato", "nr_candidato"))
-    if not partido_num and num_cand:
-        if cod_cargo in (1, 3):
-            # 2 dígitos exatos = número do partido
-            partido_num = num_cand
-        elif cod_cargo in (5, 6, 7):
-            # 2 primeiros dígitos = partido (senador 3d, dep 4/5d)
-            s = str(num_cand)
-            partido_num = int(s[:2]) if len(s) >= 2 else 0
+    if cod_cargo in (5, 6, 7) and num_cand:
+        # Pra senador/deputado SEMPRE deriva pelos 2 primeiros dígitos do
+        # numero. O TSE 2026 às vezes manda partido.numero=130 (igual ao
+        # numero do candidato) em vez de 13 — se confiarmos no payload,
+        # a FK quebra ou o logo não aparece. Os 2 primeiros dígitos do
+        # numero são padrão TSE e sempre corretos.
+        s = str(num_cand)
+        if len(s) >= 2:
+            partido_num = int(s[:2])
+    elif not partido_num and num_cand and cod_cargo in (1, 3):
+        # Presidente/Governador: 2 dígitos exatos = número do partido
+        partido_num = num_cand
     coligacao = _pick(payload, "nomeColigacao", "nm_coligacao", "coligacao")
     vice = payload.get("vice") or payload.get("candidatoVice") or {}
     foto_url = _pick(payload, "fotoUrl", "foto_url", "urlFoto")
@@ -303,14 +307,23 @@ async def corrigir_partidos_orfaos(sess: AsyncSession | None = None) -> int:
         )
         corrigidos = 0
         for c in r.scalars():
-            if c.partido_numero in partidos_ok and c.partido_numero != 0:
-                continue
             num = str(c.numero or "")
             if len(num) < 2:
                 continue
-            novo = int(num[:2])
-            if novo in partidos_ok and novo != c.partido_numero:
-                c.partido_numero = novo
+            esperado = int(num[:2])
+            # Se já bate com os 2 primeiros dígitos, OK
+            if c.partido_numero == esperado:
+                continue
+            # Sempre que o partido_numero atual NÃO bate com os 2 primeiros
+            # dígitos do numero (padrão TSE pra cargos 5/6/7), tenta corrigir.
+            # Isso cobre:
+            #   - 130 (TSE mandou errado) → 13
+            #   - 0 (stub FK dummy) → derivado
+            #   - partido real mas desatualizado (ex.: 25 era União → virou PRD,
+            #     mas o numero segue com [:2]=25, então 25 continua certo
+            #     — a sigla/nome é que mudou, e isso é job do seed/upsert)
+            if esperado in partidos_ok:
+                c.partido_numero = esperado
                 corrigidos += 1
         if corrigidos:
             await sess.commit()

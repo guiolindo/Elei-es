@@ -1103,6 +1103,98 @@ async def apuracao_zona(
     return body
 
 
+# ============ Boletim de Urna (BU) — verificação por seção ============
+# TSE publica BU por seção eleitoral individual. Formato:
+#   https://resultados.tse.jus.br/oficial/{cod}/dados/{uf}/{uf}{mun}/{zona}/{secao}/o{cod_padded}-{mun}{zona}{secao}.json
+# Cache 5min pq BU muda só na hora da totalização de cada seção.
+_CACHE_BU: dict[str, tuple[float, dict]] = {}
+_CACHE_BU_TTL = 300.0
+
+
+@router.get("/apuracao/bu")
+async def apuracao_bu(
+    uf: str = Query(..., min_length=2, max_length=2),
+    municipio: str = Query(..., min_length=1, max_length=6),
+    zona: str = Query(..., min_length=1, max_length=5),
+    secao: str = Query(..., min_length=1, max_length=5),
+    cargo: int = Query(1, ge=1, le=7),
+    turno: int = Query(1, ge=1, le=2),
+) -> dict[str, Any]:
+    """Boletim de Urna de uma seção específica — baixa direto do TSE,
+    sem persistir. Útil pra verificação: 'confere com a minha seção?'.
+
+    Retorna totais nominais da seção, candidatos com votos, URL da
+    imagem assinada do BU (JPEG original do TSE) pra download/verificação.
+    """
+    from app.config import get_settings
+    from time import monotonic
+    uf = uf.lower()
+    mu = str(int(municipio)).zfill(5)
+    zn = str(int(zona)).zfill(4)
+    se = str(int(secao)).zfill(4)
+    settings = get_settings()
+    if cargo == 1:
+        cod = settings.eleicao_cod_1t if turno == 1 else settings.eleicao_cod_2t
+    else:
+        cod = settings.eleicao_cod_1t_estadual if turno == 1 else settings.eleicao_cod_2t_estadual
+    cod_pad = str(cod).zfill(5)
+    chave = f"bu:{uf}:{mu}:{zn}:{se}:{cargo}:{cod}"
+    agora = monotonic()
+    hit = _CACHE_BU.get(chave)
+    if hit and (agora - hit[0]) < _CACHE_BU_TTL:
+        return {"cache_hit": True, **hit[1]}
+
+    base = settings.tse_cdn_base.rstrip("/").rsplit("/", 1)[0]
+    # JSON do BU: /dados/{uf}/{uf}{mun}/{zona}/{secao}/o{cod}-{mun}{zona}{secao}.json
+    url_json = f"{base}/{cod}/dados/{uf}/{uf}{mu}/{zn}/{se}/o{cod_pad}-{mu}{zn}{se}.json"
+    # Imagem assinada do BU: /dados_bu_imgbu/{uf}/{mun}/{zona}/{secao}/o{cod}-{mun}{zona}{secao}-bu.jpeg
+    url_bu_img = f"{base}/{cod}/dados_bu_imgbu/{uf}/{uf}{mu}/{zn}/{se}/o{cod_pad}-{mu}{zn}{se}-bu.jpeg"
+
+    j = await _fetch_tse_json(url_json)
+    if not j:
+        return {
+            "disponivel": False,
+            "motivo": "BU não encontrado ou seção ainda não totalizada",
+            "url_tentada": url_json,
+            "url_imagem_bu": url_bu_img,
+        }
+
+    # TSE devolve estrutura específica pro BU com cargos agrupados.
+    # Minimamente útil: totais da seção + candidatos com votos pro cargo pedido.
+    try:
+        from poller.parser import parse_snapshot
+        parsed = parse_snapshot(j)
+    except Exception:
+        return {"disponivel": False, "erro": "parse_bu", "url_imagem_bu": url_bu_img}
+    tot = parsed.totais if parsed else None
+    body = {
+        "disponivel": True,
+        "uf": uf.upper(),
+        "municipio": mu.lstrip("0") or "0",
+        "zona": zn.lstrip("0") or "0",
+        "secao": se.lstrip("0") or "0",
+        "cargo": cargo,
+        "turno": turno,
+        "url_imagem_bu": url_bu_img,
+        "url_json_bu": url_json,
+        "totais": {
+            "eleitorado_apto": tot.qt_eleitorado_apto if tot else 0,
+            "comparecimento": tot.qt_comparecimento if tot else 0,
+            "abstencoes": tot.qt_abstencoes if tot else 0,
+            "votos_validos": tot.qt_votos_validos if tot else 0,
+            "votos_brancos": tot.qt_votos_brancos if tot else 0,
+            "votos_nulos": tot.qt_votos_nulos if tot else 0,
+        } if tot else None,
+        "candidatos": [
+            {"sq_candidato": c.sq_candidato, "votos": c.votos,
+             "pct_validos": float(c.pct_validos)}
+            for c in (parsed.candidatos if parsed else [])
+        ],
+    }
+    _CACHE_BU[chave] = (agora, body)
+    return body
+
+
 ws_router = APIRouter()
 
 

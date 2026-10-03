@@ -927,8 +927,18 @@ async function atualizarPainelTotais() {
   $("pct-comparecimento").textContent = `${pctCompar}% dos aptos`;
   $("pct-abstencoes").textContent = `${pctAbst}% dos aptos`;
   $("brancos-nulos").textContent = `${fmtNum(t.votos_brancos)} · ${fmtNum(t.votos_nulos)}`;
-  $("ultimo").textContent = fmtHora(dados.coletado_em);
-  $("ultimo").dataset.iso = dados.coletado_em;
+  // "Último dado" mostra a hora em que o TSE GEROU o arquivo (fonte da
+  // verdade pro cross-check), caindo pra "coletado_em" (quando a gente
+  // baixou) quando o TSE não envia gerado_em_tse. Tooltip explica
+  // divergência entre níveis (BR × UF × município têm timestamps
+  // distintos — é operação normal do TSE).
+  const ts = dados.gerado_em_tse || dados.coletado_em;
+  const el = $("ultimo");
+  el.textContent = fmtHora(ts);
+  el.dataset.iso = ts;
+  el.title = dados.gerado_em_tse
+    ? `Gerado pelo TSE às ${fmtHora(dados.gerado_em_tse)} · Coletado por nós às ${fmtHora(dados.coletado_em)}`
+    : `Coletado às ${fmtHora(dados.coletado_em)} (TSE não informou hora de geração)`;
 
   // atualiza cards da lista
   const maxV = Math.max(1, ...dados.candidatos.map(c => c.votos));

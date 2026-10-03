@@ -204,7 +204,7 @@ def create_app() -> FastAPI:
             with open(caminho, "r", encoding="utf-8") as f:
                 html = f.read()
             versoes = {}
-            for arq in ("app.js", "app.css", "partidos.js", "verificacao.js"):
+            for arq in ("app.js", "app.css", "partidos.js", "verificacao.js", "urna.js"):
                 p = os.path.join("static", arq)
                 if os.path.exists(p):
                     versoes[arq] = int(os.path.getmtime(p))
@@ -249,6 +249,10 @@ def create_app() -> FastAPI:
     @app.get("/cola")
     async def cola_page():
         return _servir_html_com_versao("static/cola.html")
+
+    @app.get("/urna")
+    async def urna_page():
+        return _servir_html_com_versao("static/urna.html")
 
     return app
 

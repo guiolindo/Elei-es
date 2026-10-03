@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy"
+ content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://resultados.tse.jus.br; connect-src 'self';">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<title>Verificação por seção · Apuração 2026</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+.urna-wrap{max-width:900px;margin:0 auto;padding:24px 20px 80px}
+.urna-back{color:var(--muted);text-decoration:none;font-size:14px}
+.urna-back:hover{color:var(--brand)}
+.urna-head{margin:24px 0 8px;font-size:clamp(26px,5vw,36px);font-weight:800;letter-spacing:-.03em}
+.urna-sub{color:var(--muted);margin-bottom:28px;max-width:620px;line-height:1.5}
+.urna-form{background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:20px;margin-bottom:20px}
+.urna-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:16px}
+.urna-grid label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.urna-grid input,.urna-grid select{width:100%;box-sizing:border-box;background:var(--surface-3);color:var(--fg);border:1px solid var(--line-2);border-radius:8px;padding:10px 12px;font:inherit}
+.urna-grid input:focus,.urna-grid select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px rgba(240,180,41,.25)}
+.urna-btn{background:var(--brand);color:#17130b;border:none;border-radius:10px;padding:12px 20px;font-weight:700;font:inherit;cursor:pointer;width:100%}
+.urna-btn:hover{opacity:.9}
+.urna-btn:disabled{opacity:.5;cursor:wait}
+.urna-resp{background:var(--surface-2);border:1px solid var(--line-2);border-radius:14px;padding:20px;margin-top:20px;display:none}
+.urna-resp.visivel{display:block}
+.urna-resp h2{font-size:18px;margin:0 0 14px}
+.urna-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:14px 0}
+.urna-stat{background:var(--surface-3);border-radius:10px;padding:12px}
+.urna-stat-lab{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.urna-stat-val{font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px}
+.urna-cands{margin-top:16px}
+.urna-cand{display:grid;grid-template-columns:50px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-2);font-size:14px}
+.urna-cand:last-child{border-bottom:0}
+.urna-cand-num{font:800 15px 'JetBrains Mono',monospace;color:var(--brand)}
+.urna-cand-nome{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.urna-cand-votos{font-family:'JetBrains Mono',monospace;font-weight:700}
+.urna-img-link{display:inline-flex;align-items:center;gap:6px;color:var(--brand);text-decoration:none;font-size:13px;margin-top:14px;padding:10px 14px;background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.3);border-radius:8px}
+.urna-img-link:hover{background:rgba(240,180,41,.18)}
+.urna-erro{color:var(--danger);padding:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px}
+.urna-help{color:var(--muted);font-size:12px;line-height:1.5;margin-top:16px}
+.urna-help code{background:var(--surface-3);padding:2px 5px;border-radius:3px;font-size:11px}
+</style>
+</head>
+<body>
+<main class="urna-wrap">
+<a class="urna-back" href="/">← Voltar para o placar</a>
+<h1 class="urna-head">Verificação por seção eleitoral</h1>
+<p class="urna-sub">Consulte o Boletim de Urna (BU) de qualquer seção. Os dados vêm direto do TSE, com link para a imagem assinada digitalmente do BU original — útil pra verificar a totalização da sua própria seção.</p>
+
+<form class="urna-form" id="form-urna">
+  <div class="urna-grid">
+    <div><label for="uf">UF</label><select id="uf" required>
+      <option value="">—</option>
+      <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+      <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+      <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+      <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+      <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+      <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+      <option>SP</option><option>SE</option><option>TO</option>
+    </select></div>
+    <div><label for="municipio">Município (código TSE)</label><input id="municipio" type="text" inputmode="numeric" placeholder="ex: 71099" required></div>
+    <div><label for="zona">Zona</label><input id="zona" type="text" inputmode="numeric" placeholder="ex: 1" required></div>
+    <div><label for="secao">Seção</label><input id="secao" type="text" inputmode="numeric" placeholder="ex: 1" required></div>
+    <div><label for="cargo">Cargo</label><select id="cargo">
+      <option value="1">Presidente</option>
+      <option value="3">Governador</option>
+      <option value="5">Senador</option>
+      <option value="6">Deputado Federal</option>
+      <option value="7">Deputado Estadual</option>
+    </select></div>
+    <div><label for="turno">Turno</label><select id="turno">
+      <option value="1">1º</option><option value="2">2º</option>
+    </select></div>
+  </div>
+  <button type="submit" class="urna-btn" id="btn-buscar">Buscar BU</button>
+</form>
+
+<div class="urna-resp" id="resp"></div>
+
+<div class="urna-help">
+  Onde achar seu <strong>código de município TSE</strong>, zona e seção? Confira em
+  <a href="https://www.tse.jus.br/eleitor/titulo-eleitoral/consulta-por-nome" target="_blank" rel="noopener">tse.jus.br/eleitor/titulo-eleitoral</a>.
+  O número não é o CEP e também não é o código IBGE — é o código que o TSE usa internamente (geralmente 5 dígitos).
+</div>
+</main>
+<script src="/static/urna.js"></script>
+</body>
+</html>
