@@ -1290,8 +1290,18 @@ function atualizarContagemRegressiva() {
       <b>${String(min).padStart(2,"0")}</b>m
       <b>${String(seg).padStart(2,"0")}</b>s
     </span>
-    <span class="cd-sub">· 5/10 17h BRT</span>
+    <span class="cd-sub">· 4/10 17h BRT</span>
   `;
+}
+
+// Esconde o CTA "Montar minha cola eleitoral" (e variantes no header)
+// depois do fechamento das urnas — não faz sentido fazer cola depois que
+// votou. Chamado no boot e também pelo tick da contagem regressiva.
+function esconderColaSeFechado() {
+  if (Date.now() < DIA_D.getTime()) return;
+  document.querySelectorAll(
+    ".cta-brand, .m-icon-cta, .d-topnav-cta, #btn-cola-cta"
+  ).forEach(el => el.classList.add("oculto"));
 }
 
 // ============ UX: título dinâmico da aba ============
@@ -1651,8 +1661,9 @@ async function boot() {
   $("btn-ajuda")?.addEventListener("click", abrirAjuda);
 
   // Countdown regressivo enquanto TSE não abre a apuração
-  setInterval(atualizarContagemRegressiva, 1000);
+  setInterval(() => { atualizarContagemRegressiva(); esconderColaSeFechado(); }, 1000);
   atualizarContagemRegressiva();
+  esconderColaSeFechado();
 
   // Atualiza "há X segundos" no elemento #ultimo a cada 5s
   setInterval(() => {
