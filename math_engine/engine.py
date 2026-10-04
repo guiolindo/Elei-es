@@ -569,29 +569,47 @@ def avaliar_apuracao(
 
     # MATEMATICAMENTE_ELIMINADO — pos_relevantes é o tamanho do grupo
     # de "vagas de continuidade":
-    #   - Presidente + Governador (2 turnos): top 2 continua
-    #   - Senador 2026 (2 vagas): top 2 são eleitos
-    #   - Senador 2018/2022 (1 vaga): só o líder
-    if not eventos:
-        if exige_ma and vagas == 1:
-            pos_relevantes = 2   # Presidente e Governador — top 2 vai pra 2T
-        else:
-            pos_relevantes = vagas
-        # Avalia TODOS os candidatos abaixo das posições relevantes, não
-        # só os 3º-5º. Bug detectado 05/10/2026 em DF Senador: engine só
-        # emitia MATEMATICAMENTE_ELIMINADO pros top-5, mesmo os candidatos
-        # das posições 6-11 (com <0.5% dos votos e sem chance aritmética
-        # alguma) ficavam sem tarja. O custo é O(n) por candidato × n
-        # candidatos restantes = O(n²), mas com n < 50 por cargo/UF o
-        # overhead é desprezível.
-        for c in ordenados[pos_relevantes:]:
-            if matematicamente_eliminado(c, ordenados, totais, pos_relevantes):
-                eventos.append({
-                    "tipo": "MATEMATICAMENTE_ELIMINADO",
-                    "sq_candidato_a": c.sq_candidato,
-                    "detalhes": {
-                        "votos_max": c.votos + votos_restantes_max(totais),
-                        "alvo_top": pos_relevantes,
-                    },
-                })
+    #   - ELEITO_1T/MAJORITARIO (1 vaga): só o eleito continua
+    #   - SEGUNDO_TURNO_DEFINIDO: top 2 continua pro 2T
+    #   - Senador multivaga: top N são eleitos
+    #   - Sem evento ainda: usa pos_relevantes do cargo
+    #
+    # Bug detectado 20:50 BRT em PR Governador 99.89%: Sérgio Moro foi
+    # marcado ELEITO MATEMATICAMENTE mas o 2º colocado (Sandro Alex) e
+    # o 3º (Requião Filho) ficavam sem tarja de eliminado — causa: o
+    # loop estava dentro de `if not eventos`, pulava quando ELEITO era
+    # emitido. Agora o loop roda SEMPRE, só muda pos_relevantes baseado
+    # em qual evento majoritário foi emitido.
+    tipos_eleito = {"ELEITO_1T", "ELEITO_MAJORITARIO"}
+    emitiu_eleito = any(e["tipo"] in tipos_eleito for e in eventos)
+    emitiu_2t = any(e["tipo"] == "SEGUNDO_TURNO_DEFINIDO" for e in eventos)
+    if emitiu_eleito:
+        # Eleição definida — todo mundo abaixo da(s) vaga(s) é eliminado
+        pos_relevantes = vagas
+    elif emitiu_2t:
+        # 2T definido — só os 2 de cima continuam
+        pos_relevantes = 2
+    elif exige_ma and vagas == 1:
+        # Pres/Gov sem evento ainda: top 2 pode continuar (via 2T futuro)
+        pos_relevantes = 2
+    else:
+        # Majoritário multivaga sem eleito ainda, ou cargo com simples maioria
+        pos_relevantes = vagas
+    # Avalia TODOS os candidatos abaixo das posições relevantes, não
+    # só os 3º-5º. Bug detectado 05/10/2026 em DF Senador: engine só
+    # emitia MATEMATICAMENTE_ELIMINADO pros top-5, mesmo os candidatos
+    # das posições 6-11 (com <0.5% dos votos e sem chance aritmética
+    # alguma) ficavam sem tarja. O custo é O(n) por candidato × n
+    # candidatos restantes = O(n²), mas com n < 50 por cargo/UF o
+    # overhead é desprezível.
+    for c in ordenados[pos_relevantes:]:
+        if matematicamente_eliminado(c, ordenados, totais, pos_relevantes):
+            eventos.append({
+                "tipo": "MATEMATICAMENTE_ELIMINADO",
+                "sq_candidato_a": c.sq_candidato,
+                "detalhes": {
+                    "votos_max": c.votos + votos_restantes_max(totais),
+                    "alvo_top": pos_relevantes,
+                },
+            })
     return eventos

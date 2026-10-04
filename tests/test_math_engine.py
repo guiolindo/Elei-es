@@ -330,6 +330,10 @@ def test_eleito_majoritario_no_fio_nao_eleito():
 
 
 def test_avaliar_apuracao_gera_evento_eleito_1t():
+    # Após o fix 05/10/2026 20:50 BRT em PR Governador: eliminação roda
+    # SEMPRE, não só quando não tem ELEITO. Quando o 1º é eleito 1T, o
+    # 2º e 3º colocados viram MATEMATICAMENTE_ELIMINADO porque não têm
+    # mais onde chegar. Agora o motor emite ELEITO_1T + eliminados.
     t = totais(100, 80, 1000, 800, 800)
     cands = [
         CandidatoResumo("a", 600),
@@ -337,23 +341,30 @@ def test_avaliar_apuracao_gera_evento_eleito_1t():
         CandidatoResumo("c", 50),
     ]
     ev = avaliar_apuracao(cands, t, cod_cargo=1)
-    assert len(ev) == 1
-    assert ev[0]["tipo"] == "ELEITO_1T"
-    assert ev[0]["sq_candidato_a"] == "a"
+    eleito = [e for e in ev if e["tipo"] == "ELEITO_1T"]
+    assert len(eleito) == 1
+    assert eleito[0]["sq_candidato_a"] == "a"
+    # 2º e 3º colocados viram eliminados (não têm como virar vaga única)
+    eliminados = {e["sq_candidato_a"] for e in ev if e["tipo"] == "MATEMATICAMENTE_ELIMINADO"}
+    assert "b" in eliminados and "c" in eliminados
 
 
 def test_avaliar_apuracao_governador():
+    # Mesma lógica: 1 vaga, Gov eleito → 2º colocado eliminado.
     t = totais(100, 85, 1000, 850, 850)
     cands = [
         CandidatoResumo("a", 600),
         CandidatoResumo("b", 200),
     ]
     ev = avaliar_apuracao(cands, t, cod_cargo=3)
-    assert len(ev) == 1
-    assert ev[0]["tipo"] == "ELEITO_MAJORITARIO"
+    tipos = [e["tipo"] for e in ev]
+    assert "ELEITO_MAJORITARIO" in tipos
+    assert "MATEMATICAMENTE_ELIMINADO" in tipos
 
 
 def test_avaliar_apuracao_segundo_turno():
+    # 2T definido → 3º colocado em diante vira eliminado (só top 2
+    # continuam disputando no 2º turno).
     t = totais(100, 90, 1000, 900, 900)
     cands = [
         CandidatoResumo("a", 400),
@@ -361,10 +372,14 @@ def test_avaliar_apuracao_segundo_turno():
         CandidatoResumo("c", 100),
     ]
     ev = avaliar_apuracao(cands, t, cod_cargo=1)
-    assert len(ev) == 1
-    assert ev[0]["tipo"] == "SEGUNDO_TURNO_DEFINIDO"
-    assert ev[0]["sq_candidato_a"] == "a"
-    assert ev[0]["sq_candidato_b"] == "b"
+    turno_defs = [e for e in ev if e["tipo"] == "SEGUNDO_TURNO_DEFINIDO"]
+    assert len(turno_defs) == 1
+    assert turno_defs[0]["sq_candidato_a"] == "a"
+    assert turno_defs[0]["sq_candidato_b"] == "b"
+    # Com só 3 candidatos e 2T definido, o 3º (c) está matematicamente
+    # eliminado pela própria condição que acionou o SEGUNDO_TURNO
+    eliminados = {e["sq_candidato_a"] for e in ev if e["tipo"] == "MATEMATICAMENTE_ELIMINADO"}
+    assert "c" in eliminados
 
 
 def test_matematicamente_eliminado_top2():
