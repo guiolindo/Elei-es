@@ -1796,9 +1796,12 @@ body.is-tv .timeline li {
   flex: 0 0 auto; border-bottom: none;
 }
 
-/* BOTÃO SAIR DO MODO TV — fixo top-right, GRANDE e dourado */
+/* BOTÃO SAIR DO MODO TV — fixo bottom-right pra não colidir com o
+   relógio BRT que fica no header. Aquela área (canto inferior direito)
+   é "zona morta" do layout (eventos ocupam row inteira na parte de
+   baixo mas o botão flutua acima com z-index alto). */
 body.is-tv .rodape-tv {
-  position: fixed; top: 14px; right: 20px;
+  position: fixed; bottom: 14px; right: 20px;
   z-index: 9999; margin: 0; padding: 0;
   background: transparent; border: none; display: block;
 }
