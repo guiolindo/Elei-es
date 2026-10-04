@@ -96,7 +96,14 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
     mapKey = "brasil";
     url = "/static/br-ufs.geojson";
     nameProperty = "sigla";
-    labelFormatter = (p) => p.name;
+    // Rotulamos cada UF com "SIGLA\nPARTIDO" quando houver líder — assim
+    // dois UFs ganhos por partidos diferentes com cores parecidas (PT ×
+    // PDT, PL × PSDB, etc.) ficam distinguíveis a olho nu, sem precisar
+    // só do tooltip.
+    labelFormatter = (p) => {
+      const sig = p.data?._extra?.partido_sigla;
+      return sig ? `${p.name}\n${sig}` : p.name;
+    };
     roam = false;
     zoom = 1.2;
   } else {
@@ -155,9 +162,13 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
       label: {
         show: abrangencia === "BR",
         color: "#ffffff", fontSize: 11, fontWeight: 700,
+        lineHeight: 13,
         formatter: labelFormatter,
         textShadowColor: "#000",           // legibilidade em cima de qualquer cor
         textShadowBlur: 3,
+        // Partido vem em fonte menor e levemente mais clara pra
+        // hierarquia visual (sigla UF em cima, partido em baixo).
+        rich: {},
       },
       itemStyle: {
         areaColor: "#2a3242",           // 3.1:1 vs fundo — visível

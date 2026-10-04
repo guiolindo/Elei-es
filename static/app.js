@@ -1213,9 +1213,11 @@ async function atualizarMapa() {
       if (r.ok) {
         const j = await r.json();
         for (const [uf, d] of Object.entries(j.ufs || {})) {
+          const partidoNum = state.ficha?.[d.sq_candidato]?.partido;
           dadosPorUF[uf] = {
             valor: d.votos || 0,
             cor: corDoCandidato(d.sq_candidato, d.cor_idx),
+            partido_sigla: partidoNum ? siglaDoPartido(partidoNum) : "",
             nome_lider: d.nome_lider,
             votos: d.votos,
           };
