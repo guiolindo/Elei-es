@@ -46,11 +46,13 @@ async function init(container, abrangencia) {
     ? (isMobile ? 1.0 : 0.88)
     : 1.0;  // UF: bounding box varia, quadrado é razoável
   // Em TV o container tem altura imposta pelo grid (viewport fixo).
-  // Respeita essa altura; só força pixel quando o pai não constrange.
+  // NÃO forçamos pixel height — o flex do pai decide. Se vier 0 no boot
+  // inicial, usamos fallback mínimo pra ECharts ter algo pra desenhar;
+  // ResizeObserver abaixo corrige quando o layout estabilizar.
   if (isTV) {
     const hCell = container.clientHeight || container.parentElement?.clientHeight || 0;
-    const h = hCell > 100 ? hCell : Math.min(640, Math.max(340, w * aspect));
-    container.style.height = h + "px";
+    if (hCell < 80) container.style.height = "260px";
+    else container.style.removeProperty("height");
   } else {
     container.style.height = Math.min(640, Math.max(340, w * aspect)) + "px";
   }
@@ -61,11 +63,21 @@ async function init(container, abrangencia) {
         const w2 = container.clientWidth || 800;
         const isMob2 = w2 < 500;
         const asp2 = abrangencia === "BR" ? (isMob2 ? 1.0 : 0.88) : 1.0;
-        container.style.height = Math.min(640, Math.max(340, w2 * asp2)) + "px";
+        if (document.body.classList.contains("is-tv")) {
+          container.style.removeProperty("height");
+        } else {
+          container.style.height = Math.min(640, Math.max(340, w2 * asp2)) + "px";
+        }
         _chart.resize();
       }
     });
     init._resize = true;
+  }
+  // ResizeObserver dedicado pro container: pega mudanças de layout
+  // (toggle TV, troca de aba, etc.) sem depender de window resize.
+  if (!init._obs && window.ResizeObserver) {
+    init._obs = new ResizeObserver(() => { if (_chart) _chart.resize(); });
+    init._obs.observe(container);
   }
   return _chart;
 }

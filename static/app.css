@@ -1644,29 +1644,29 @@ body.is-tv .stat-mini .stat-value { font-size: 15px; margin: 0; line-height: 1; 
 body.is-tv .stat-mini .stat-label { font-size: 10px; margin: 0; }
 body.is-tv .stat-mini .stat-sub { font-size: 10px; margin: 0; }
 
-/* MAIN: dashboard em grid, FILLS o resto da viewport (sem max-width!) */
+/* MAIN: dashboard em grid 3-col, FILLS a viewport (sem max-width!) */
 body.is-tv main.page {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(380px, 1fr) minmax(540px, 2fr);
-  grid-template-rows: auto minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.2fr) minmax(360px, 1.2fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    "pagehead pagehead"
-    "lista mapa"
-    "lista grafico"
-    "eventos eventos";
+    "pagehead pagehead pagehead"
+    "lista    mapa     grafico"
+    "eventos  eventos  eventos";
   gap: 10px;
-  padding: 10px 16px 10px;
+  padding: 8px 14px 8px;
   max-width: none !important;
   width: 100%;
   margin: 0;
   box-sizing: border-box;
 }
-body.is-tv main.page > .page-header { grid-area: pagehead; margin: 0; }
-body.is-tv .page-header h2 { font-size: 20px; }
-body.is-tv .page-header .sub { font-size: 13px; }
+body.is-tv main.page > .page-header {
+  grid-area: pagehead; margin: 0; padding: 0 2px;
+}
+body.is-tv .page-header h2 { font-size: 16px; margin: 0; }
 
 /* Lista scrollável internamente — flex coluna pra cards NÃO serem espremidos */
 body.is-tv main.page > .grid-candidatos {
@@ -1681,54 +1681,62 @@ body.is-tv main.page > .grid-candidatos {
 body.is-tv main.page > .grid-candidatos > .candidato {
   flex: 0 0 auto;
 }
-body.is-tv .candidato { padding: 10px 14px; }
-body.is-tv .cand-foto { width: 56px; height: 56px; }
-body.is-tv .cand-nome { font-size: 17px; }
-body.is-tv .cand-numero-tag { font-size: 13px; padding: 2px 6px; }
-body.is-tv .cand-uf-tag { font-size: 11px; }
-body.is-tv .pill-partido { font-size: 11px; }
-body.is-tv .cand-votos { font-size: 26px; margin-top: 2px; }
-body.is-tv .cand-pct { font-size: 13px; }
-body.is-tv .cand-delta { font-size: 12px; padding: 2px 6px; }
-body.is-tv .cand-barra { height: 5px; margin-top: 4px; }
-body.is-tv .cand-tarja { font-size: 12px; padding: 6px 10px; }
-body.is-tv .cand-proj { font-size: 11px; }
-body.is-tv .badge-prop { font-size: 10px; padding: 2px 6px; }
+body.is-tv .candidato {
+  padding: 6px 10px !important;
+  gap: 4px !important;
+  min-height: 0 !important;
+}
+body.is-tv .cand-foto { width: 40px !important; height: 40px !important; flex: 0 0 40px; }
+body.is-tv .cand-cabecalho { gap: 8px; }
+body.is-tv .cand-nome { font-size: 13px; line-height: 1.15; }
+body.is-tv .cand-numero-tag { font-size: 11px; padding: 1px 5px; }
+body.is-tv .cand-uf-tag { font-size: 10px; }
+body.is-tv .pill-partido { font-size: 10px; padding: 1px 5px; }
+body.is-tv .cand-votos { font-size: 18px !important; margin: 0 !important; line-height: 1.1; }
+body.is-tv .cand-pct { font-size: 11px; }
+body.is-tv .cand-delta { font-size: 10px; padding: 1px 5px; }
+body.is-tv .cand-barra { height: 3px; margin-top: 2px; }
+body.is-tv .cand-tarja { font-size: 10px; padding: 3px 6px; }
+body.is-tv .cand-proj { font-size: 10px; }
+body.is-tv .badge-prop { font-size: 9px; padding: 1px 4px; }
+body.is-tv .cand-subcabecalho { gap: 4px; }
 
 /* Mapa fills seu espaço do grid */
 body.is-tv .mapa-secao {
   grid-area: mapa; margin: 0;
   display: flex; flex-direction: column;
-  overflow: hidden; min-height: 0;
+  overflow: hidden; min-height: 0; height: 100%;
 }
 body.is-tv .mapa-secao .page-header { display: none; }
 body.is-tv .mapa-wrap {
   flex: 1 1 0; min-height: 0;
   display: flex; flex-direction: column;
-  padding: 10px;
+  padding: 6px;
 }
 body.is-tv #mapa-brasil {
-  flex: 1 1 0; min-height: 0; height: 100% !important;
+  flex: 1 1 0; min-height: 100px;
+  width: 100% !important;
 }
 body.is-tv .mapa-legenda {
-  flex: 0 0 auto; max-height: 60px; overflow-y: auto;
-  font-size: 12px; padding: 6px 10px;
+  flex: 0 0 auto; max-height: 48px; overflow-y: auto;
+  font-size: 11px; padding: 4px 8px;
 }
 
 /* Gráfico home fills seu espaço */
 body.is-tv .home-graf-secao {
   grid-area: grafico; margin: 0;
   display: flex; flex-direction: column;
-  overflow: hidden; min-height: 0;
+  overflow: hidden; min-height: 0; height: 100%;
 }
 body.is-tv .home-graf-secao .page-header { display: none; }
 body.is-tv .home-graf-wrap {
-  flex: 1 1 0; min-height: 0; padding: 10px;
-  display: flex;
+  flex: 1 1 0; min-height: 0; padding: 6px;
+  display: flex; position: relative;
 }
 body.is-tv #graf-home {
-  flex: 1 1 0; min-height: 0; height: 100% !important; width: 100% !important;
+  flex: 1 1 0; min-height: 100px; width: 100% !important; height: 100% !important;
 }
+body.is-tv .home-graf-vazio { font-size: 12px; }
 
 /* Eventos — barra horizontal compacta no fim */
 body.is-tv .timeline-secao {
