@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261004f";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004f";
+import { renderMapa } from "/static/mapa-br.js?v=20261004g";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004g";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1446,6 +1446,16 @@ async function carregarEventos() {
   state.eleitos.clear();
   state.segundoTurno.clear();
   evs.forEach(_absorverEventoNoState);
+  // CRÍTICO: re-renderiza os cards agora que state.eleitos/eliminados/
+  // segundoTurno estão populados. Sem isso, se carregarEventos rodar
+  // DEPOIS de refreshApuracao (que é a ordem padrão em onFiltroChange),
+  // as tarjas "Eleito matematicamente" / "Sem chance" / "Vai pro 2º
+  // turno" ficam invisíveis até o próximo snapshot pelo WS. Bug
+  // detectado no dia D (05/10/2026) — MS Gov tinha ELEITO_MAJORITARIO
+  // emitido às 18:32 BRT mas nenhuma tarja aparecia nos cards.
+  if (document.getElementById("lista-candidatos")?.children.length) {
+    renderLista();
+  }
   const ul = $("lista-eventos");
   if (evs.length === 0) {
     ul.innerHTML = `<li class="vazio">Nenhum evento ainda. Aguardando apuração começar.</li>`;
