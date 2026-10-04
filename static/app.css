@@ -499,6 +499,31 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   font-size: 12px; color: var(--fg-2);
   white-space: nowrap;
 }
+/* Projeção ao final da apuração — discreta, não compete com o número real.
+   Some automaticamente ao chegar 100% (controlado em JS). */
+.cand-proj {
+  opacity: 0.55;
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 2px;
+  cursor: help;
+}
+
+/* ============ Gráfico único da home (evolução ao vivo) ============ */
+.home-graf-secao { margin: 24px 0; }
+.home-graf-wrap {
+  position: relative;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px;
+  min-height: 280px;
+}
+#graf-home { width: 100%; height: 300px; }
+.home-graf-vazio {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 14px;
+}
+.home-graf-vazio.oculto { display: none !important; }
 
 /* ============ Tarja de status matemático ============
    Marca visual quando o candidato:
@@ -1400,7 +1425,8 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
   main.page.m-tab-placar > .grid-candidatos,
   main.page.m-tab-placar > .prop-info { display: block; }
   main.page.m-tab-placar > .filtro-lista { display: flex; }
-  main.page.m-tab-mapa > .mapa-secao { display: block; }
+  main.page.m-tab-mapa > .mapa-secao,
+  main.page.m-tab-mapa > .home-graf-secao { display: block; }
   main.page.m-tab-comparar > .comparacao { display: block; }
   main.page.m-tab-eventos > .timeline-secao { display: block; }
   main.page.m-tab-mais > .rodape { display: block; }

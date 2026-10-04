@@ -262,6 +262,35 @@ VAGAS_DEP_FEDERAL = {
 - Se `df ≤ 12` → `est = 3 × df`
 - Se `df > 12` → `est = 36 + (df − 12)`
 
+## 8. Projeções
+
+Duas projeções do total final por candidato são expostas em `/api/apuracao/atual`. **Nenhuma é predição eleitoral** — ambas são extrapolações aritméticas com disclaimer visual (opacidade reduzida, prefixo `~`) e somem automaticamente ao atingir 100% apurado.
+
+### 8.1. Projeção linear
+```
+proj = votos_atual × secoes_total ÷ secoes_apuradas
+```
+Assume que o restante das urnas vai votar com a mesma proporção das já apuradas. É sempre calculada após qualquer apuração começar.
+
+### 8.2. Projeção por tendência (janela móvel)
+Problema que resolve: no Brasil, Sul/Sudeste historicamente apura antes do Nordeste. A projeção linear subestima/superestima candidatos cujo perfil regional difere das urnas já apuradas.
+
+Fórmula:
+```
+taxa_recente = (votos_atual - votos_15_atrás) ÷ (pct_apurado_atual - pct_apurado_15_atrás)
+proj         = votos_atual + taxa_recente × (100 - pct_apurado)
+```
+
+Guardas pra evitar ruído:
+- Só roda após `pct_apurado >= 30%`.
+- Janela precisa de pelo menos 10 snapshots não-suspeitos.
+- Delta de % apurado na janela precisa ser `>= 1%` (evita divisão por quase-zero).
+- Resultado clipado entre `votos_atual` e `2 × projecao_linear`.
+
+Quando qualquer guarda falha, o campo `projecao_tendencia` fica `null` — o frontend cai pra `projecao_linear`.
+
+Fonte: `app/api.py:_calcular_projecao_tendencia`.
+
 ## Auditoria
 
 Cada snapshot armazena o **hash SHA-256 do JSON bruto do TSE** no campo `snapshots.hash_conteudo`. O endpoint `/api/apuracao/atual` expõe esse hash junto dos resultados.

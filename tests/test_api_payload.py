@@ -26,8 +26,10 @@ def test_payload_sem_inflate_enxuto():
     """Default: só sq/votos/pct/posicao/projecao — payload leve pro WS."""
     out = _candidato_payload(_sc(), _tot(), _ficha(), inflate=False)
     assert set(out.keys()) == {"sq_candidato", "votos", "pct_validos",
-                                "posicao", "projecao_linear"}
+                                "posicao", "projecao_linear",
+                                "projecao_tendencia"}
     assert "nome_urna" not in out
+    assert out["projecao_tendencia"] is None  # sem janela: motor silencioso
 
 
 def test_payload_com_inflate_tem_tudo():

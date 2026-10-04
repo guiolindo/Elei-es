@@ -49,12 +49,14 @@ Ficha completa. Campos:
   "hash_conteudo": "abc...",
   "totais": {"secoes_total": 499248, "secoes_totalizadas": 100000, ...},
   "candidatos": [{"sq_candidato", "votos", "pct_validos", "posicao",
-                   "projecao_linear"}],
+                   "projecao_linear", "projecao_tendencia"}],
   "orfaos": []
 }
 ```
 - `orfaos`: lista de `sq_candidato` presentes no snapshot mas **sem registro em `candidatos`** (importação pendente via Termux). Frontend usa isso pra re-fetchar `/api/candidatos` sem recarregar.
 - `inflate=true` adiciona `nome_urna`, `numero`, `partido`, `situacao`, `uf` em cada candidato (payload mais pesado, útil pra evitar join no cliente).
+- `projecao_linear`: extrapolação aritmética simples (`votos_atual × secoes_total ÷ secoes_apuradas`). Sempre presente.
+- `projecao_tendencia`: estimativa pelo ritmo das últimas 15 snapshots. `null` antes de 30% apurado, após 100%, ou sem histórico suficiente (<10 snapshots na janela). Mais responsiva quando o perfil regional das urnas que faltam difere das já apuradas (ex.: Sul/Sudeste apura primeiro). Clipada entre `votos_atual` e `2 × projecao_linear`.
 - `gerado_em_tse` vem em BRT (`-03:00`); demais datas em UTC.
 
 ### `GET /api/apuracao/historico?cargo={n}&abrangencia={...}[&desde=ISO8601]`

@@ -221,6 +221,97 @@ async def _ultimo_snapshot(sess: AsyncSession, cargo: int, abr: str) -> Snapshot
     return r.scalar_one_or_none()
 
 
+async def _calcular_projecao_tendencia(
+    sess: AsyncSession, cargo: int, abrangencia: str,
+    snap_atual, tot_atual, cands_atual: list,
+) -> dict[str, int]:
+    """Projeção por tendência da JANELA MÓVEL das últimas N snapshots.
+
+    Problema que resolve: projeção linear simples assume que as urnas
+    faltantes vão votar como as já apuradas. No Brasil isso é falso —
+    historicamente, Sul/Sudeste apuram primeiro e tendem a direita,
+    Nordeste depois e tende a esquerda. Projeção linear enganaria no
+    começo da apuração.
+
+    Solução pragmática (sem modelagem regional pseudocientífica): usa a
+    taxa de votos ganhos POR % APURADO nas últimas N snapshots. Se o
+    candidato está acelerando nas últimas urnas (ganhando mais por %),
+    a projeção reflete. Se desacelerou, idem.
+
+    Fórmula:
+        taxa_recente = (votos_atual - votos_N_atras) / (pct_atual - pct_N_atras)
+        projecao     = votos_atual + taxa_recente * (100 - pct_atual)
+
+    Guardas (silêncio é melhor que ruído):
+    - Só roda após >= 30% apurado (abaixo disso a extrapolação é absurda).
+    - Precisa de pelo menos 10 snapshots na janela.
+    - Delta de % apurado tem que ser >= 1% (evita divisão por quase-zero).
+    - Projeção clipada entre `votos_atual` e `2 * projecao_linear`
+      pra evitar valores negativos ou absurdos.
+    """
+    JANELA = 15        # últimas N snapshots consideradas
+    MIN_SNAPS = 10     # mínimo pra estimativa confiável
+    MIN_PCT_APUR = 30.0
+    MIN_DELTA_PCT = 1.0
+
+    if not tot_atual.qt_secoes_total:
+        return {}
+    pct_apurado_atual = (tot_atual.qt_secoes_totalizadas or 0) * 100.0 / tot_atual.qt_secoes_total
+    if pct_apurado_atual < MIN_PCT_APUR or pct_apurado_atual >= 100.0:
+        return {}
+
+    # Pega as JANELA últimas snapshots da mesma (cargo, abr) INCLUSIVE a atual
+    snaps_rows = (await sess.execute(
+        select(Snapshot.id, SnapshotTotais.qt_secoes_totalizadas,
+                SnapshotTotais.qt_secoes_total)
+        .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
+        .where(and_(
+            Snapshot.cod_cargo == cargo,
+            Snapshot.abrangencia == abrangencia,
+            Snapshot.suspeito.is_(False),
+            Snapshot.id <= snap_atual.id,
+        ))
+        .order_by(Snapshot.coletado_em.desc())
+        .limit(JANELA)
+    )).all()
+    if len(snaps_rows) < MIN_SNAPS:
+        return {}
+
+    # Snapshot mais antigo da janela — base pro cálculo de delta
+    snap_base_id, apur_base, total_base = snaps_rows[-1]
+    if not total_base or total_base <= 0:
+        return {}
+    pct_apurado_base = (apur_base or 0) * 100.0 / total_base
+    delta_pct = pct_apurado_atual - pct_apurado_base
+    if delta_pct < MIN_DELTA_PCT:
+        return {}
+
+    # Votos de cada candidato no snapshot base
+    votos_base_rows = (await sess.execute(
+        select(SnapshotCandidato.sq_candidato, SnapshotCandidato.votos)
+        .where(SnapshotCandidato.snapshot_id == snap_base_id)
+    )).all()
+    votos_base = {sq: v for sq, v in votos_base_rows}
+
+    pct_faltante = 100.0 - pct_apurado_atual
+    out: dict[str, int] = {}
+    for c in cands_atual:
+        v_base = votos_base.get(c.sq_candidato, 0)
+        delta_votos = c.votos - v_base
+        if delta_votos < 0:
+            continue  # inconsistência (TSE reprocessou) — pula
+        taxa = delta_votos / delta_pct  # votos ganhos por % apurado
+        proj = int(c.votos + taxa * pct_faltante)
+        # Clipa entre votos atuais e 2x da projeção linear pra evitar
+        # extrapolações absurdas (ex.: candidato que acabou de "disparar")
+        if tot_atual.qt_secoes_totalizadas and tot_atual.qt_secoes_total:
+            proj_linear = int(c.votos * tot_atual.qt_secoes_total /
+                               tot_atual.qt_secoes_totalizadas)
+            proj = max(c.votos, min(proj, 2 * proj_linear))
+        out[c.sq_candidato] = proj
+    return out
+
+
 @router.get("/apuracao/atual")
 async def apuracao_atual(
     cargo: int = Query(...),
@@ -251,6 +342,15 @@ async def apuracao_atual(
         .where(Candidato.sq_candidato.in_(sqs_snap))
     )).all() if sqs_snap else []
     ficha_map = {r.sq_candidato: r for r in ficha_rows}
+
+    # Projeção por tendência: pega as últimas N snapshots pra calcular a
+    # taxa recente de voto por % apurado de cada candidato. Mais responsiva
+    # que projeção linear estática quando o perfil regional das urnas que
+    # faltam é diferente das já apuradas (ex.: SE/SU apura antes do NE).
+    # Guardas: só calcula após 30% apurado e com pelo menos 10 snapshots.
+    proj_tendencia_map = await _calcular_projecao_tendencia(
+        sess, cargo, abrangencia, snap, tot, cands
+    )
     # Órfãos: sq_candidato no snapshot sem metadado — bug grave,
     # frontend vai mostrar "sq 2800..." em vez de nome. Expor na
     # resposta pra facilitar diagnóstico via /verificacao.
@@ -281,7 +381,8 @@ async def apuracao_atual(
         # como "projecao_linear" pra deixar claro que é estimativa,
         # não predição do vencedor.
         "candidatos": [
-            _candidato_payload(c, tot, ficha_map.get(c.sq_candidato), inflate)
+            _candidato_payload(c, tot, ficha_map.get(c.sq_candidato), inflate,
+                                proj_tendencia_map.get(c.sq_candidato))
             for c in cands
         ],
         # Órfãos (sq_candidato sem metadado em `candidatos` table).
@@ -292,7 +393,8 @@ async def apuracao_atual(
     }
 
 
-def _candidato_payload(sc, tot, ficha, inflate: bool) -> dict:
+def _candidato_payload(sc, tot, ficha, inflate: bool,
+                        projecao_tendencia: int | None = None) -> dict:
     """Monta a linha de candidato. Com inflate=True, inclui
     nome/numero/partido/situacao pra o payload ser auditável sozinho
     (sem precisar cruzar com /api/candidatos). Default enxuto."""
@@ -303,6 +405,9 @@ def _candidato_payload(sc, tot, ficha, inflate: bool) -> dict:
         "posicao": sc.posicao,
         "projecao_linear": int(sc.votos / (tot.qt_secoes_totalizadas / tot.qt_secoes_total))
             if tot.qt_secoes_total and tot.qt_secoes_totalizadas else sc.votos,
+        # Projeção por tendência das últimas N snapshots. None antes de
+        # 30% apurado (sem dados suficientes) ou se não houver histórico.
+        "projecao_tendencia": projecao_tendencia,
     }
     if inflate and ficha:
         base["nome_urna"] = ficha.nome_urna

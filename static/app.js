@@ -986,13 +986,17 @@ async function atualizarPainelTotais() {
     const delta = document.querySelector(`[data-sq-delta="${c.sq_candidato}"]`);
     if (votos) animarNumero(votos, c.votos, 400);
     if (pct) {
-      const proj = c.projecao_linear;
       const pctApur = dados.totais?.pct_apurado || 0;
-      // Só mostra projeção depois de 30% apurado (antes é ruído)
-      const projTxt = (proj && pctApur >= 30)
-        ? ` · proj. ${fmtNum(proj)}`
-        : "";
-      pct.textContent = c.pct_validos.toFixed(2) + "% dos válidos" + projTxt;
+      // Projeção: prefere tendência (ajustada pelas últimas N snapshots)
+      // sobre linear simples. Some ao chegar em 100% (resultado final).
+      // Antes de 30% apurado o motor devolve null em tendência; não
+      // mostra nada mesmo se linear existir (pouco confiável).
+      const proj = c.projecao_tendencia ?? c.projecao_linear;
+      const mostraProj = proj && pctApur >= 30 && pctApur < 100;
+      const marca = c.projecao_tendencia != null ? "~" : "~";
+      const projTxt = mostraProj ? ` · ${marca} ${fmtNum(proj)} proj.` : "";
+      pct.innerHTML = `${c.pct_validos.toFixed(2)}% dos válidos`
+        + (projTxt ? `<span class="cand-proj" title="Projeção baseada no ritmo das últimas atualizações. Some ao atingir 100%.">${projTxt}</span>` : "");
     }
     if (barra) barra.style.width = (c.votos / maxV * 100) + "%";
     if (delta) {
@@ -1071,6 +1075,75 @@ async function atualizarMapa() {
     tituloVazio: `Municípios de ${state.abrangencia}`,
     tituloCheio: `Líderes por município (${state.abrangencia})`,
     dica: "Cada município colorido pelo candidato líder. Volte para 'Brasil' para ver o mapa nacional.",
+  });
+}
+
+// ============ Gráfico único da home ============
+let _grafHome = null;
+async function atualizarGrafHome() {
+  const container = $("graf-home");
+  const vazio = $("home-graf-vazio");
+  if (!container) return;
+  const snap = state.ultimoSnapshot;
+  const pctApur = snap?.totais?.pct_apurado || 0;
+  // Antes de 1% apurado, não há dados reais ainda
+  if (!snap?.disponivel || pctApur < 0.5) {
+    vazio?.classList.remove("oculto");
+    if (_grafHome) { _grafHome.clear(); }
+    return;
+  }
+  // Top 5 do snapshot atual (só ativos, não retirados — já ordenados por posicao)
+  const topSqs = (snap.candidatos || [])
+    .filter(c => (state.ficha[c.sq_candidato]?.situacao || "ativo") === "ativo")
+    .slice(0, 5)
+    .map(c => c.sq_candidato);
+  if (!topSqs.length) {
+    vazio?.classList.remove("oculto");
+    return;
+  }
+  let data;
+  try {
+    const r = await fetch(`/api/apuracao/historico?cargo=${state.cargo}&abrangencia=${state.abrangencia}&candidatos=${topSqs.join(",")}`);
+    if (!r.ok) throw 0;
+    data = await r.json();
+  } catch (e) {
+    vazio?.classList.remove("oculto");
+    return;
+  }
+  const temDados = Object.values(data.series || {}).some(a => a.length > 1);
+  if (!temDados) {
+    vazio?.classList.remove("oculto");
+    return;
+  }
+  vazio?.classList.add("oculto");
+  if (!_grafHome) _grafHome = echarts.init(container, null, { renderer: "canvas" });
+  const series = topSqs.map(sq => {
+    const ficha = state.ficha[sq] || {};
+    const nome = ficha.nome_urna || sq;
+    const cor = ficha.partido != null ? corDoPartido(ficha.partido) : "#f0b429";
+    return {
+      name: nome, type: "line", smooth: true, symbol: "none",
+      lineStyle: { width: 2.5, color: cor },
+      itemStyle: { color: cor },
+      data: (data.series[sq] || []).map(p => [p.t, p.pct]),
+    };
+  });
+  _grafHome.setOption({
+    backgroundColor: "transparent",
+    tooltip: { trigger: "axis", formatter: tooltipHoraBRT,
+                backgroundColor: "#161b24", borderColor: "#303a4d",
+                textStyle: { color: "#ecf0f7" } },
+    legend: { textStyle: { color: "#94a1b8" }, top: 0 },
+    grid: { left: 48, right: 16, top: 36, bottom: 32 },
+    xAxis: {
+      type: "time",
+      axisLabel: { color: "#94a1b8",
+        formatter: (val) => new Date(val).toLocaleTimeString("pt-BR",
+          { timeZone: TZ, hour: "2-digit", minute: "2-digit" }) },
+    },
+    yAxis: { type: "value", axisLabel: { color: "#94a1b8", formatter: "{value}%" },
+             splitLine: { lineStyle: { color: "#2a3242" } } },
+    series,
   });
 }
 
@@ -1258,6 +1331,7 @@ function conectarWS() {
     if (msg.type === "snapshot") {
       await refreshApuracao();
       atualizarMapa();  // sem await — não bloqueia os toasts de evento
+      atualizarGrafHome();
       if (state.selecionados.length >= 2) await inicializarGraficos();
       for (const ev of msg.eventos || []) {
         _absorverEventoNoState(ev);
@@ -1297,6 +1371,7 @@ async function onFiltroChange() {
   await refreshApuracao();
   await carregarEventos();
   atualizarMapa();
+  atualizarGrafHome();
   conectarWS();
 }
 
@@ -1761,10 +1836,13 @@ async function boot() {
   try {
     const cfg = await get("/api/config-publica");
     if (cfg?.telegram_bot) {
-      const a = $("btn-telegram");
-      if (a) {
-        a.href = `https://t.me/${cfg.telegram_bot}`;
-        a.classList.remove("oculto");
+      const url = `https://t.me/${cfg.telegram_bot}`;
+      for (const id of ["btn-telegram", "m-btn-telegram"]) {
+        const a = $(id);
+        if (a) {
+          a.href = url;
+          a.classList.remove("oculto");
+        }
       }
     }
   } catch(e) { /* ok */ }
@@ -1810,6 +1888,7 @@ async function boot() {
   await refreshApuracao();
   await carregarEventos();
   atualizarMapa();
+  atualizarGrafHome();
   conectarWS();
   bootMobile();
 }
