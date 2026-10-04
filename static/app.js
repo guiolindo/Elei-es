@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261004d";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004d";
+import { renderMapa } from "/static/mapa-br.js?v=20261004e";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004e";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1317,10 +1317,13 @@ async function atualizarGrafHome() {
     if (_grafHome) { _grafHome.clear(); }
     return;
   }
-  // Top 5 do snapshot atual (só ativos, não retirados — já ordenados por posicao)
+  // Top N do snapshot (só ativos, não retirados — já ordenados por posicao).
+  // No mobile, 3 em vez de 5 — legenda com 5 nomes atropela o eixo Y
+  // em viewports estreitos.
+  const topN = window.innerWidth < 640 ? 3 : 5;
   const topSqs = (snap.candidatos || [])
     .filter(c => (state.ficha[c.sq_candidato]?.situacao || "ativo") === "ativo")
-    .slice(0, 5)
+    .slice(0, topN)
     .map(c => c.sq_candidato);
   if (!topSqs.length) {
     vazio?.classList.remove("oculto");
@@ -1353,21 +1356,40 @@ async function atualizarGrafHome() {
       data: (data.series[sq] || []).map(p => [p.t, p.pct]),
     };
   });
+  // Layout responsivo: no mobile a legenda vai pra parte de baixo com
+  // scroll horizontal (muitos nomes atropelavam o eixo Y + se sobrepunham
+  // entre si), fontes menores, grid com mais margem embaixo pra caber a
+  // legenda. Desktop/TV mantêm legenda no topo.
+  const estreito = window.innerWidth < 640;
   _grafHome.setOption({
     backgroundColor: "transparent",
     tooltip: { trigger: "axis", formatter: tooltipHoraBRT,
                 backgroundColor: "#161b24", borderColor: "#303a4d",
                 textStyle: { color: "#ecf0f7" } },
-    legend: { textStyle: { color: "#94a1b8" }, top: 0 },
-    grid: { left: 48, right: 16, top: 36, bottom: 32 },
+    legend: estreito
+      ? { textStyle: { color: "#94a1b8", fontSize: 10 }, bottom: 0,
+          type: "scroll", icon: "circle", itemGap: 8,
+          itemWidth: 10, itemHeight: 10 }
+      : { textStyle: { color: "#94a1b8" }, top: 0, type: "scroll" },
+    grid: estreito
+      ? { left: 40, right: 10, top: 10, bottom: 44, containLabel: true }
+      : { left: 48, right: 16, top: 36, bottom: 32 },
     xAxis: {
       type: "time",
-      axisLabel: { color: "#94a1b8",
+      axisLabel: {
+        color: "#94a1b8",
+        fontSize: estreito ? 10 : 12,
+        hideOverlap: true,
         formatter: (val) => new Date(val).toLocaleTimeString("pt-BR",
-          { timeZone: TZ, hour: "2-digit", minute: "2-digit" }) },
+          { timeZone: TZ, hour: "2-digit", minute: "2-digit" }),
+      },
     },
-    yAxis: { type: "value", axisLabel: { color: "#94a1b8", formatter: "{value}%" },
-             splitLine: { lineStyle: { color: "#2a3242" } } },
+    yAxis: {
+      type: "value",
+      axisLabel: { color: "#94a1b8", fontSize: estreito ? 10 : 12,
+                   formatter: "{value}%" },
+      splitLine: { lineStyle: { color: "#2a3242" } },
+    },
     series,
   });
 }
