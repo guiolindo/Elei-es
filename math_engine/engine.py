@@ -562,7 +562,14 @@ def avaliar_apuracao(
             pos_relevantes = 2   # Presidente e Governador — top 2 vai pra 2T
         else:
             pos_relevantes = vagas
-        for c in ordenados[pos_relevantes:5]:
+        # Avalia TODOS os candidatos abaixo das posições relevantes, não
+        # só os 3º-5º. Bug detectado 05/10/2026 em DF Senador: engine só
+        # emitia MATEMATICAMENTE_ELIMINADO pros top-5, mesmo os candidatos
+        # das posições 6-11 (com <0.5% dos votos e sem chance aritmética
+        # alguma) ficavam sem tarja. O custo é O(n) por candidato × n
+        # candidatos restantes = O(n²), mas com n < 50 por cargo/UF o
+        # overhead é desprezível.
+        for c in ordenados[pos_relevantes:]:
             if matematicamente_eliminado(c, ordenados, totais, pos_relevantes):
                 eventos.append({
                     "tipo": "MATEMATICAMENTE_ELIMINADO",
