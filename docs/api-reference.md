@@ -155,3 +155,11 @@ Cliente deve reconectar com backoff exponencial. Frontend usa 1s → 15s teto + 
 
 ### `GET /health`
 `SELECT 1` + 200 OK se banco responde; 503 caso contrário.
+
+## Modos de visualização do frontend
+
+A mesma URL (`/`) adapta o layout automaticamente ao dispositivo:
+
+- **Mobile** (≤768px): tabs de bottom nav (Placar/Mapa/Comparar/Eventos/Mais), stats sticky encolhendo ao scroll, chrome compacto.
+- **Desktop** (769px+): layout clássico com hero + conteúdo em coluna.
+- **TV / 10-foot UI**: ativado quando `navigator.userAgent` casa SmartTV/Tizen/WebOS/AndroidTV/Roku/consoles, OU manualmente via `?tv=1`. Dashboard com lista de candidatos à esquerda e mapa + gráfico + eventos à direita (todos visíveis ao mesmo tempo), fontes maiores, navegação por setas do controle remoto (Home/End/←→↑↓), sem elementos que exigem toque ou mouse (botões "comparar", filtros, CTAs). Testável em qualquer browser via `?tv=1`.

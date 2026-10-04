@@ -71,6 +71,48 @@ function carregarPrefs() {
 
 const REDUCED_MOTION = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+// ============ Detecção de TV (SmartTV, consoles, Chromecast etc) ============
+// Ativa layout "10-foot UI" quando o visitante abre o site pela TV. A UI
+// nessa modo é dashboard (lista + mapa + gráfico + eventos visíveis ao
+// mesmo tempo), fontes maiores, sem elementos que exigem touch/mouse.
+// Pode ser forçado via ?tv=1 pra teste no desktop.
+function detectarTV() {
+  try {
+    if (new URLSearchParams(location.search).get("tv") === "1") return true;
+  } catch(e) {}
+  const ua = navigator.userAgent || "";
+  // UAs comuns: Samsung Tizen, LG WebOS, Android TV, Google TV, Apple TV,
+  // Roku, HbbTV genérico, PlayStation, Xbox, Chromecast, Vidaa, Vewd
+  return /SmartTV|SMART-TV|GoogleTV|AppleTV|LGSmartTV|LGE WebOS|Tizen|Web0?OS|WebOS|Roku|PlayStation|Xbox|HbbTV|NetCast|BRAVIA|SmartHub|CrKey|Vidaa|VIDAA|Vewd|Opera TV/i.test(ua);
+}
+if (detectarTV()) document.body.classList.add("is-tv");
+
+// Navegação por setas do controle remoto em modo TV. Os cards de
+// candidato ganham tabindex=0; setas movem o foco visível pro próximo/
+// anterior card da lista. Enter abre a ficha (reaproveita o click handler
+// existente). Esc fecha modais abertos (ESC existe no controle como "back"
+// na maioria das SmartTVs).
+function navTVPorSetas() {
+  if (!document.body.classList.contains("is-tv")) return;
+  document.addEventListener("keydown", (e) => {
+    const alvo = document.activeElement;
+    const cards = Array.from(document.querySelectorAll(".grid-candidatos .candidato"));
+    if (!cards.length) return;
+    const idx = cards.indexOf(alvo);
+    let proximo = null;
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") proximo = cards[Math.min(cards.length - 1, (idx < 0 ? 0 : idx + 1))];
+    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") proximo = cards[Math.max(0, (idx < 0 ? 0 : idx - 1))];
+    else if (e.key === "Home") proximo = cards[0];
+    else if (e.key === "End") proximo = cards[cards.length - 1];
+    else return;
+    e.preventDefault();
+    if (proximo) {
+      proximo.focus();
+      proximo.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  });
+}
+
 /**
  * Ripple visual no ponto de clique. Container precisa ter
  * `class="ripple-container"` (position:relative + overflow:hidden).
@@ -442,6 +484,8 @@ function renderLista() {
       + (eliminado ? " eliminado" : "")
       + (eleito ? " eleito" : "");
     div.dataset.sqCard = c.sq_candidato;
+    // Modo TV: card recebe tabindex pra receber foco via setas do controle
+    if (document.body.classList.contains("is-tv")) div.tabIndex = 0;
     div.style.setProperty("--sel-cor", sel >= 0 ? PALETA[sel] : "");
     if (sel >= 0) {
       div.style.borderColor = PALETA[sel];
@@ -1964,6 +2008,7 @@ async function boot() {
   atualizarGrafHome();
   conectarWS();
   bootMobile();
+  navTVPorSetas();  // só ativa se body.is-tv
 }
 
 boot().catch(e => { console.error(e); toast("Erro: " + e.message, "danger"); });

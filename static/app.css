@@ -1557,6 +1557,152 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
   .m-top, .m-chips, .m-stats, .m-nav, .m-fab, .m-sheet { display: none !important; }
 }
 
+/* ============ TV mode (SmartTV, consoles, "10-foot UI") ============
+   Ativado por detecção de UA (SmartTV/Tizen/WebOS/Roku/console) ou via
+   ?tv=1 pra teste no desktop. Objetivo: dashboard denso onde tudo
+   (candidatos, mapa, gráfico, eventos) fica visível ao mesmo tempo,
+   legível de 2-3m, nav por setas do controle, sem hover, sem toque. */
+
+body.is-tv { font-size: 20px; }
+
+/* Chrome mobile some */
+body.is-tv .m-top, body.is-tv .m-chips, body.is-tv .m-stats,
+body.is-tv .m-nav, body.is-tv .m-fab, body.is-tv .m-sheet,
+body.is-tv .d-topnav,
+body.is-tv .cta-strip, body.is-tv .filtro-lista,
+body.is-tv .comparacao, body.is-tv .rodape,
+body.is-tv .cand-rodape, body.is-tv .cand-check-vazio,
+body.is-tv .btn-ghost, body.is-tv .btn-primary,
+body.is-tv #btn-topo, body.is-tv #toasts {
+  display: none !important;
+}
+
+/* Hero compacto no topo — só stats grandes + filtros desktop */
+body.is-tv .hero { padding: 20px 40px 24px; }
+body.is-tv .nav { padding: 0 0 20px; }
+body.is-tv .brand-title { font-size: 36px; letter-spacing: -0.04em; }
+body.is-tv .brand-sub { font-size: 15px; }
+body.is-tv .logo { width: 56px !important; height: 56px !important; }
+body.is-tv .filtros { gap: 16px; }
+body.is-tv .filtro-grupo label { font-size: 14px; }
+body.is-tv .filtro-grupo select {
+  padding: 14px 18px; font-size: 20px; min-width: 240px;
+}
+
+/* Stats em escala TV: % apurado gigante */
+body.is-tv .stats {
+  grid-template-columns: 1.4fr 2.6fr; gap: 20px; padding: 0;
+}
+body.is-tv .stat-hero { padding: 24px 28px; }
+body.is-tv .stat-hero .stat-value { font-size: 88px; margin-top: 4px; }
+body.is-tv .stat-hero .stat-label { font-size: 16px; letter-spacing: 1.2px; }
+body.is-tv .stat-hero .stat-progress { height: 12px; margin-top: 16px; }
+body.is-tv .stat-hero .stat-sub { font-size: 18px; margin-top: 12px; }
+body.is-tv .stat-mini { padding: 18px 20px; }
+body.is-tv .stat-mini .stat-value { font-size: 36px; }
+body.is-tv .stat-mini .stat-label { font-size: 13px; }
+body.is-tv .stat-mini .stat-sub { font-size: 13px; }
+
+/* MAIN em grid dashboard: lista fixa à esquerda; direita rola as
+   outras seções. Tudo cabe sem rolagem global quando 1920x1080. */
+body.is-tv main.page {
+  display: grid;
+  grid-template-columns: minmax(560px, 1.1fr) minmax(640px, 1.5fr);
+  grid-template-areas:
+    "header header"
+    "lista mapa"
+    "lista grafico"
+    "lista eventos";
+  gap: 24px;
+  padding: 24px 40px 40px;
+  max-width: 100%;
+}
+body.is-tv .page-header { grid-area: header; margin-bottom: 0; }
+body.is-tv .page-header h2 { font-size: 32px; }
+body.is-tv .page-header .sub { font-size: 17px; }
+body.is-tv main.page > .grid-candidatos { grid-area: lista; }
+body.is-tv .mapa-secao { grid-area: mapa; margin: 0; }
+body.is-tv .home-graf-secao { grid-area: grafico; margin: 0; }
+body.is-tv .timeline-secao { grid-area: eventos; margin: 0; }
+
+/* Lista de candidatos — 1 coluna, cards grandes, scroll interno */
+body.is-tv .grid-candidatos {
+  grid-template-columns: 1fr;
+  max-height: calc(100vh - 420px);
+  overflow-y: auto;
+  padding-right: 10px;
+  gap: 12px;
+}
+body.is-tv .candidato {
+  padding: 20px 22px;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  cursor: default;
+}
+body.is-tv .cand-foto { width: 88px; height: 88px; }
+body.is-tv .cand-nome { font-size: 24px; }
+body.is-tv .cand-numero-tag { font-size: 18px; padding: 4px 10px; }
+body.is-tv .cand-uf-tag { font-size: 15px; }
+body.is-tv .pill-partido { font-size: 15px; }
+body.is-tv .cand-votos { font-size: 44px; margin-top: 8px; }
+body.is-tv .cand-pct { font-size: 18px; }
+body.is-tv .cand-delta { font-size: 16px; padding: 4px 10px; }
+body.is-tv .cand-barra { height: 10px; margin-top: 10px; }
+body.is-tv .cand-tarja { font-size: 15px; padding: 10px 14px; }
+body.is-tv .cand-proj { font-size: 15px; }
+body.is-tv .badge-prop { font-size: 13px; padding: 5px 12px; }
+
+/* Mapa maior */
+body.is-tv #mapa-brasil { height: 540px !important; min-height: 540px; }
+body.is-tv .mapa-wrap { padding: 20px; }
+body.is-tv .mapa-legenda { font-size: 16px; padding: 16px 20px; }
+
+/* Gráfico home ampliado */
+body.is-tv #graf-home { height: 400px !important; }
+body.is-tv .home-graf-wrap { padding: 24px; min-height: 440px; }
+
+/* Timeline de eventos — maior */
+body.is-tv .timeline-secao { max-height: 380px; overflow-y: auto; }
+body.is-tv .timeline li { font-size: 18px; padding: 18px 22px; }
+
+/* Countdown (quando pré-apuração) — bem visível */
+body.is-tv .countdown {
+  padding: 16px 24px; font-size: 18px; gap: 14px;
+}
+body.is-tv .cd-nums { font-size: 22px; }
+body.is-tv .cd-titulo { font-size: 15px; }
+
+/* Scrollbar discreta no modo TV (sem interação de mouse real) */
+body.is-tv ::-webkit-scrollbar { width: 10px; height: 10px; }
+body.is-tv ::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.18); border-radius: 5px;
+}
+body.is-tv ::-webkit-scrollbar-track { background: transparent; }
+
+/* Foco visível pra navegação por setas do controle */
+body.is-tv *:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+body.is-tv .candidato:focus-visible,
+body.is-tv .candidato.tv-focus {
+  outline-color: var(--brand);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 3px rgba(240,180,41,.55), 0 16px 40px rgba(0,0,0,.55);
+}
+
+/* Em telas ultra-largas (1920+), aumenta ainda mais o conforto */
+@media (min-width: 1920px) {
+  body.is-tv { font-size: 22px; }
+  body.is-tv main.page { padding: 32px 56px 48px; }
+  body.is-tv .stat-hero .stat-value { font-size: 104px; }
+  body.is-tv .cand-votos { font-size: 50px; }
+  body.is-tv .cand-nome { font-size: 28px; }
+  body.is-tv #mapa-brasil { height: 620px !important; }
+  body.is-tv #graf-home { height: 460px !important; }
+}
+
 /* ============ Rodapé legal ============ */
 .rodape {
   margin: 60px auto 20px;
