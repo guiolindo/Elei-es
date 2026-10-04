@@ -1,6 +1,17 @@
 import { renderMapa } from "/static/mapa-br.js";
 import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js";
 
+// Resolve a cor "oficial" de um candidato = cor do seu partido.
+// Usada no mapa (pintar UF/município pelo líder) e no card (barra de
+// votos + accent da esquerda). Fallback pra paleta genérica quando o
+// candidato ainda não foi importado (ficha ausente).
+function corDoCandidato(sq_candidato, fallbackIdx = 0) {
+  const f = state.ficha?.[sq_candidato];
+  const partidoNumero = f?.partido;
+  if (partidoNumero) return corDoPartido(partidoNumero);
+  return PALETA[fallbackIdx % PALETA.length] || "#f0b429";
+}
+
 const PALETA = ["#f0b429", "#3b82f6", "#ec4899", "#10b981", "#a855f7", "#f97316"];
 const TZ = "America/Sao_Paulo";
 const MAX_SEL = 4;
@@ -535,6 +546,10 @@ function renderLista() {
       + (eliminado ? " eliminado" : "")
       + (eleito ? " eleito" : "");
     div.dataset.sqCard = c.sq_candidato;
+    // Cor do partido como accent do card — a mesma usada pra pintar o
+    // mapa quando o candidato é líder de UF/município. Casando o visual
+    // o usuário identifica "aquela cor do mapa é esse candidato".
+    div.style.setProperty("--cor-partido", corPartido(c.partido));
     // Modo TV: card recebe tabindex pra receber foco via setas do controle
     if (document.body.classList.contains("is-tv")) div.tabIndex = 0;
     div.style.setProperty("--sel-cor", sel >= 0 ? PALETA[sel] : "");
@@ -1200,7 +1215,7 @@ async function atualizarMapa() {
         for (const [uf, d] of Object.entries(j.ufs || {})) {
           dadosPorUF[uf] = {
             valor: d.votos || 0,
-            cor: PALETA[d.cor_idx % PALETA.length] || "#f0b429",
+            cor: corDoCandidato(d.sq_candidato, d.cor_idx),
             nome_lider: d.nome_lider,
             votos: d.votos,
           };
@@ -1231,7 +1246,7 @@ async function atualizarMapa() {
       for (const [mun, d] of Object.entries(j.municipios || {})) {
         dadosPorMun[mun] = {
           valor: d.votos || 0,
-          cor: PALETA[(d.cor_idx || 0) % PALETA.length],
+          cor: corDoCandidato(d.sq_candidato, d.cor_idx),
           nome_lider: d.nome_lider,
           votos: d.votos,
         };

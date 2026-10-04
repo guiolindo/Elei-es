@@ -398,9 +398,11 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 }
 .candidato {
   --card-glow: transparent;
+  --cor-partido: #475569;  /* fallback cinza quando partido não resolvido */
   position: relative;
   background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
   border: 1px solid var(--line);
+  border-left: 4px solid var(--cor-partido);
   border-radius: var(--radius);
   padding: 14px 16px;
   cursor: pointer;
@@ -410,6 +412,11 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
               background var(--dur-fast);
   display: flex; flex-direction: column; gap: 12px;
   overflow: hidden;
+}
+/* Barra de votos usa cor do partido em vez do gradiente dourado padrão
+   — assim o visual do card bate com a cor que pinta o UF no mapa. */
+.candidato .cand-barra > div {
+  background: var(--cor-partido) !important;
 }
 .candidato::before {
   content: ""; position: absolute; inset: 0;
