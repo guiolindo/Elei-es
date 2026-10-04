@@ -1014,11 +1014,19 @@ async def enviar_notificacoes(eventos: list[dict], cargo: int, uf: str) -> None:
             select(TelegramChatConfig).where(TelegramChatConfig.chat_id.in_(chats))
         )).scalars().all()
         cfg_map = {c.chat_id: c for c in cfgs}
-        # Pré-formata mensagens (uma vez cada tipo)
-        mensagens: dict[str, str] = {}
+        # Pré-formata mensagens — chave inclui sq_candidato_a + _b porque
+        # mesmo TIPO (ex.: MATEMATICAMENTE_ELIMINADO) pode disparar várias
+        # vezes num snapshot com candidatos DIFERENTES. Bug detectado dia D
+        # (05/10/2026 20:18): 4 eliminados simultâneos no 1º turno Pres BR
+        # mandaram 4x o nome do primeiro (Augusto Cury) em vez de um nome
+        # diferente por evento.
+        def _ev_key(ev):
+            return (ev["tipo"], ev.get("sq_candidato_a"), ev.get("sq_candidato_b"))
+        mensagens: dict[tuple, str] = {}
         for ev in eventos:
-            if ev["tipo"] not in mensagens:
-                mensagens[ev["tipo"]] = await _formatar_mensagem(sess, ev, cargo, uf)
+            k = _ev_key(ev)
+            if k not in mensagens:
+                mensagens[k] = await _formatar_mensagem(sess, ev, cargo, uf)
     # Bot API do Telegram tem limite de 30 msgs/s pra bots. Enviar
     # serial pra 1000+ chats travaria o poller por dezenas de segundos.
     # Paralelismo com semáforo controla concorrência sem estourar rate.
@@ -1036,7 +1044,7 @@ async def enviar_notificacoes(eventos: list[dict], cargo: int, uf: str) -> None:
 
     async with httpx.AsyncClient() as client:
         for ev in eventos:
-            texto = mensagens[ev["tipo"]]
+            texto = mensagens[_ev_key(ev)]
             tarefas = []
             for s in subs:
                 if ev["tipo"] not in (s.tipos_evento or []):
