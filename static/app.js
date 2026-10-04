@@ -379,6 +379,24 @@ function renderLista() {
   const el = $("lista-candidatos");
   el.innerHTML = "";
   const filtrados = candidatosFiltrados();
+  // Detecta candidatos "em conflito": mesmo (uf, numero) com >1 ativo.
+  // Caso real 2026: Guto Schiavetto SP-144 tem 2 sq_candidato ambos
+  // ativos (TSE deixou dois registros). Nenhum de nós sabe qual é o
+  // "real" — os votos no dia D revelam. Marcamos visualmente pra
+  // deixar explícito que não é bug de renderização.
+  const ctConflito = new Map();
+  for (const c of state.candidatos) {
+    if (c.situacao && c.situacao !== "ativo") continue;
+    const k = `${c.uf || "BR"}|${c.numero}`;
+    ctConflito.set(k, (ctConflito.get(k) || 0) + 1);
+  }
+  const emConflito = new Set();
+  for (const c of state.candidatos) {
+    if (c.situacao && c.situacao !== "ativo") continue;
+    const k = `${c.uf || "BR"}|${c.numero}`;
+    if ((ctConflito.get(k) || 0) > 1) emConflito.add(c.sq_candidato);
+  }
+  state._emConflito = emConflito;
   $("chip-total").textContent =
     filtrados.length === state.candidatos.length
       ? `${state.candidatos.length} candidatos`
@@ -487,6 +505,16 @@ function renderLista() {
         <svg width="14" height="14" aria-hidden="true"><use href="#i-x"/></svg>
         <span>${frase}</span>
       </div>`;
+    }
+    // Conflito de duplicata ativa no TSE: dois cadastros, mesmo (uf, nº),
+    // ambos ativos. Mostramos os dois (não cabe a nós escolher), mas
+    // sinalizamos pra não parecer bug.
+    const conflito = state._emConflito?.has(c.sq_candidato);
+    if (conflito && !retirado) {
+      tarja = `<div class="cand-tarja tarja-conflito">
+        <svg width="14" height="14" aria-hidden="true"><use href="#i-info"/></svg>
+        <span>TSE tem 2 registros ativos neste número — só um receberá votos</span>
+      </div>` + tarja;
     }
     // Layout redesenhado: header (foto + nome/partido) → métricas
     // (votos + %/delta + barra) → footer (botão "ver ficha" integrado).

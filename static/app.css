@@ -551,6 +551,13 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   color: color-mix(in srgb, var(--danger) 85%, #fff 15%);
   border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
 }
+/* Conflito de duplicata ativa — TSE tem 2 registros ativos pro mesmo
+   (uf, nº). Tom amarelo pra deixar claro que é aviso, não erro. */
+.tarja-conflito {
+  background: rgba(240,180,41,.10);
+  color: #f0b429;
+  border: 1px solid rgba(240,180,41,.35);
+}
 /* Candidato retirado/cassado — vermelho mais forte que o "eliminado
    matemático" porque é condição jurídica, não aritmética. */
 .tarja-retirado {
