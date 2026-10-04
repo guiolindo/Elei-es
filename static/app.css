@@ -1703,6 +1703,38 @@ body.is-tv .candidato.tv-focus {
   body.is-tv #graf-home { height: 460px !important; }
 }
 
+/* ============ Toggle de modo TV no rodapé ============ */
+.rodape-tv {
+  display: flex; gap: 14px; align-items: center;
+  padding: 14px 18px; margin-bottom: 20px;
+  background: rgba(240,180,41,.06);
+  border: 1px solid rgba(240,180,41,.2);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+.rodape-tv .btn-ghost {
+  font-size: 15px; padding: 10px 16px;
+}
+.rodape-tv-dica {
+  font-size: 13px; color: var(--muted);
+  flex: 1; min-width: 200px;
+}
+body.is-tv .rodape-tv .btn-ghost {
+  background: var(--brand); color: #17130b; border-color: var(--brand);
+}
+/* No modo TV, o botao fica VISÍVEL ainda — pra permitir desligar.
+   Flutua no canto superior direito pra nao ocupar o grid. */
+body.is-tv .rodape { display: block !important; margin: 0; padding: 0; }
+body.is-tv .rodape .rodape-linha, body.is-tv .rodape .rodape-aviso,
+body.is-tv .rodape .rodape-legal { display: none; }
+body.is-tv .rodape-tv {
+  position: fixed; top: 20px; right: 20px;
+  z-index: 100; margin: 0;
+  background: rgba(23,19,11,.85);
+  backdrop-filter: blur(8px);
+}
+body.is-tv .rodape-tv-dica { display: none; }
+
 /* ============ Rodapé legal ============ */
 .rodape {
   margin: 60px auto 20px;

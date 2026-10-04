@@ -76,9 +76,18 @@ const REDUCED_MOTION = window.matchMedia?.("(prefers-reduced-motion: reduce)").m
 // nessa modo é dashboard (lista + mapa + gráfico + eventos visíveis ao
 // mesmo tempo), fontes maiores, sem elementos que exigem touch/mouse.
 // Pode ser forçado via ?tv=1 pra teste no desktop.
+const TV_KEY = "elei-es:tv";
 function detectarTV() {
   try {
-    if (new URLSearchParams(location.search).get("tv") === "1") return true;
+    const forcado = new URLSearchParams(location.search).get("tv");
+    if (forcado === "1") return true;
+    if (forcado === "0") return false;
+    // Preferência manual salva (botão no rodapé). Precede detecção de UA
+    // — útil quando o navegador da TV se identifica como mobile (caso
+    // comum em Android TV com browsers de terceiros).
+    const salvo = localStorage.getItem(TV_KEY);
+    if (salvo === "1") return true;
+    if (salvo === "0") return false;
   } catch(e) {}
   const ua = navigator.userAgent || "";
   // UAs comuns: Samsung Tizen, LG WebOS, Android TV, Google TV, Apple TV,
@@ -87,13 +96,43 @@ function detectarTV() {
 }
 if (detectarTV()) document.body.classList.add("is-tv");
 
+// Toggle manual do modo TV (botão no rodapé).
+function alternarModoTV() {
+  const ativar = !document.body.classList.contains("is-tv");
+  document.body.classList.toggle("is-tv", ativar);
+  try { localStorage.setItem(TV_KEY, ativar ? "1" : "0"); } catch(e) {}
+  atualizarBotaoTV();
+  // Re-renderiza mapa e gráfico home pros novos tamanhos do modo TV
+  try { atualizarMapa(); } catch(e) {}
+  try { atualizarGrafHome(); } catch(e) {}
+  // Em modo TV, aplica tabindex nos cards já renderizados pra receber foco
+  if (ativar) {
+    document.querySelectorAll(".grid-candidatos .candidato").forEach(c => c.tabIndex = 0);
+    navTVPorSetas();
+    // Foca o primeiro card pra feedback imediato
+    const primeiro = document.querySelector(".grid-candidatos .candidato");
+    primeiro?.focus();
+  } else {
+    document.querySelectorAll(".grid-candidatos .candidato").forEach(c => c.removeAttribute("tabindex"));
+  }
+}
+function atualizarBotaoTV() {
+  const b = document.getElementById("btn-tv");
+  if (!b) return;
+  const ativo = document.body.classList.contains("is-tv");
+  b.setAttribute("aria-pressed", ativo ? "true" : "false");
+  b.textContent = ativo ? "📺 Sair do modo TV" : "📺 Modo TV";
+}
+
 // Navegação por setas do controle remoto em modo TV. Os cards de
 // candidato ganham tabindex=0; setas movem o foco visível pro próximo/
 // anterior card da lista. Enter abre a ficha (reaproveita o click handler
 // existente). Esc fecha modais abertos (ESC existe no controle como "back"
 // na maioria das SmartTVs).
+let _navTVInstalado = false;
 function navTVPorSetas() {
-  if (!document.body.classList.contains("is-tv")) return;
+  if (!document.body.classList.contains("is-tv") || _navTVInstalado) return;
+  _navTVInstalado = true;
   document.addEventListener("keydown", (e) => {
     const alvo = document.activeElement;
     const cards = Array.from(document.querySelectorAll(".grid-candidatos .candidato"));
@@ -2009,6 +2048,8 @@ async function boot() {
   conectarWS();
   bootMobile();
   navTVPorSetas();  // só ativa se body.is-tv
+  document.getElementById("btn-tv")?.addEventListener("click", alternarModoTV);
+  atualizarBotaoTV();
 }
 
 boot().catch(e => { console.error(e); toast("Erro: " + e.message, "danger"); });
