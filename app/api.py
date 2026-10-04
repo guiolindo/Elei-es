@@ -112,22 +112,35 @@ async def listar_candidatos(
     r = await sess.execute(stmt.order_by(Candidato.numero))
     todos = list(r.scalars())
     # Dedup HONESTO por (uf, numero). O TSE às vezes mantém dois registros
-    # pro mesmo número (substituição por renúncia/indeferimento). Três casos:
+    # pro mesmo número. Quatro casos:
     #
-    #   a) 1 ativo + N inativos  → mostra só o ativo. Padrão legítimo de
-    #                               substituição com baixa do antigo.
+    #   a) 1 ativo + N inativos  → mostra só o ativo. Substituição com
+    #                               baixa do antigo.
     #   b) 0 ativos               → mostra TODOS. Ex.: PRTB-28 em 2026 teve
     #                               Avalanche (renunciou) e Marçal
-    #                               (indeferido) — são pessoas distintas,
-    #                               esconder um seria mentir.
-    #   c) 2+ ativos              → mostra TODOS. Não sabemos qual é o
-    #                               "real" (nem o TSE marcou um como
-    #                               cancelado). Os votos no snapshot do
-    #                               dia D vão revelar: só um recebe votos,
-    #                               o outro fica em zero.
+    #                               (indeferido) — pessoas distintas, não
+    #                               cabe esconder nenhum.
+    #   c) 2+ ativos COM MESMO nome_urna → MESMA pessoa reregistrada sem
+    #                               TSE dar baixa no antigo (Guto Schiavetto
+    #                               SP-144, Josiel Machado MS-29029 em 2026).
+    #                               Dedup — mantém o sq_candidato maior
+    #                               (reregistro mais recente, provavelmente
+    #                               o canônico pro TSE).
+    #   d) 2+ ativos COM nomes DIFERENTES → pessoas diferentes concorrendo
+    #                               ao mesmo número (Laira×Noely DF-3535,
+    #                               Amanda×Gringo RS-4567 em 2026). Mostra
+    #                               TODOS — só o TSE sabe qual é oficial;
+    #                               votos no dia D revelam.
     #
     # Candidatos sem numero (ex.: 0, lixo) nunca são deduped.
     from collections import defaultdict
+    import unicodedata
+    def _norm_nome(s: str | None) -> str:
+        """Normaliza nome pra comparação: minúsculo, sem acento, trim."""
+        if not s: return ""
+        s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
+        return s.strip().lower()
+
     grupos: dict[tuple, list[Candidato]] = defaultdict(list)
     extras: list[Candidato] = []
     for c in todos:
@@ -141,6 +154,17 @@ async def listar_candidatos(
         ativos = [c for c in cands_do_grupo if c.situacao == "ativo"]
         if len(ativos) == 1 and len(cands_do_grupo) > 1:
             final.append(ativos[0])  # caso (a): dedup limpo
+            continue
+        if len(ativos) >= 2:
+            # Caso (c) vs (d): mesmo nome ou nomes diferentes?
+            nomes = {_norm_nome(c.nome_urna) for c in ativos}
+            if len(nomes) == 1:
+                # (c) MESMA pessoa — mantém o sq_candidato maior (mais recente).
+                # Inativos homônimos ficam de fora também (não interessam).
+                canonico = max(ativos, key=lambda c: str(c.sq_candidato))
+                final.append(canonico)
+                continue
+            # (d) nomes diferentes → mostra todos (fluxo abaixo)
         else:
             final.extend(cands_do_grupo)  # casos (b) e (c): mostra todos
     final.extend(extras)

@@ -21,6 +21,11 @@ def _cand(sq, nome, numero, uf="SP", cargo=5, situacao="ativo", partido=22):
 def _rodar_dedup(todos):
     """Replica a lógica de dedup do endpoint pra testar isoladamente."""
     from collections import defaultdict
+    import unicodedata
+    def _norm(s):
+        if not s: return ""
+        return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().strip().lower()
+
     grupos = defaultdict(list)
     extras = []
     for c in todos:
@@ -34,8 +39,14 @@ def _rodar_dedup(todos):
         ativos = [c for c in cands_do_grupo if c.situacao == "ativo"]
         if len(ativos) == 1 and len(cands_do_grupo) > 1:
             final.append(ativos[0])
-        else:
-            final.extend(cands_do_grupo)
+            continue
+        if len(ativos) >= 2:
+            nomes = {_norm(c.nome_urna) for c in ativos}
+            if len(nomes) == 1:
+                canonico = max(ativos, key=lambda c: str(c.sq_candidato))
+                final.append(canonico)
+                continue
+        final.extend(cands_do_grupo)
     final.extend(extras)
     final.sort(key=lambda x: (x.numero or 0, str(x.sq_candidato)))
     return final
@@ -63,15 +74,36 @@ def test_todos_inativos_mostra_todos_avalanche_e_marcal():
     assert sqs == ["AVAL", "MARC"]
 
 
-def test_multiplos_ativos_mostra_todos_guto_x2():
-    """SP Senador nº144: dois sq_candidato ambos 'ativo' (bug do TSE).
-    Mostramos os dois — votos no dia D revelam quem é o real."""
+def test_multiplos_ativos_mesmo_nome_vira_um_so():
+    """SP Senador nº144: dois sq_candidato ambos 'ativo' com MESMO nome
+    (Guto Schiavetto × 2). É a mesma pessoa — TSE não deu baixa no
+    reregistro. Dedup: mantém o sq maior (reregistro mais recente)."""
     r = _rodar_dedup([
         _cand("GUTO_A", "GUTO SCHIAVETTO", 144, uf="SP", cargo=5, situacao="ativo"),
         _cand("GUTO_B", "GUTO SCHIAVETTO", 144, uf="SP", cargo=5, situacao="ativo"),
     ])
+    sqs = [c.sq_candidato for c in r]
+    assert sqs == ["GUTO_B"]  # sq lexicograficamente maior
+
+
+def test_multiplos_ativos_nomes_diferentes_mostra_todos():
+    """DF Dep. Fed nº3535: dois sq ambos ativos com nomes DIFERENTES
+    (Laira × Noely). Pessoas distintas — não cabe esconder nenhuma."""
+    r = _rodar_dedup([
+        _cand("A", "LAIRA INACIO", 3535, uf="DF", cargo=6, situacao="ativo"),
+        _cand("B", "NOELY COLETIVO CORAGEM", 3535, uf="DF", cargo=6, situacao="ativo"),
+    ])
     sqs = sorted(c.sq_candidato for c in r)
-    assert sqs == ["GUTO_A", "GUTO_B"]
+    assert sqs == ["A", "B"]
+
+
+def test_multiplos_ativos_nome_so_difere_em_acento_ainda_dedup():
+    """Comparação de nome ignora acento (TSE varia 'MARÇAL' vs 'MARCAL')."""
+    r = _rodar_dedup([
+        _cand("A", "JOSE MARCAL", 100, situacao="ativo"),
+        _cand("B", "JOSE MARÇAL", 100, situacao="ativo"),
+    ])
+    assert len(r) == 1
 
 
 def test_candidato_unico_nao_e_afetado():
