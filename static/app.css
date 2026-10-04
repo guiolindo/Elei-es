@@ -1591,42 +1591,54 @@ body.is-tv .rodape {
   flex: 0 0 auto;
 }
 
-/* Hero compacto no topo (flex-shrink) */
+/* Hero ULTRA compacto: UMA barra só com brand+filtros+stats inline */
 body.is-tv .hero {
   flex: 0 0 auto;
   padding: 0;
   background: linear-gradient(180deg, rgba(17,23,36,0.95), rgba(11,17,32,0.95));
 }
 body.is-tv .nav {
-  padding: 12px 24px;
-  display: flex; align-items: center; gap: 16px;
+  padding: 6px 20px;
+  display: flex; align-items: center; gap: 14px;
+  min-height: 0;
 }
-body.is-tv .brand { gap: 10px; }
-body.is-tv .brand-title { font-size: 24px; }
-body.is-tv .brand-sub { font-size: 12px; }
-body.is-tv .logo { width: 40px !important; height: 40px !important; }
-body.is-tv .filtros { gap: 10px; margin-left: auto; }
-body.is-tv .filtro-grupo label { font-size: 11px; }
+body.is-tv .brand { gap: 8px; }
+body.is-tv .brand-title { font-size: 18px; line-height: 1.1; }
+body.is-tv .brand-sub { display: none; }
+body.is-tv .logo { width: 32px !important; height: 32px !important; }
+body.is-tv .filtros { gap: 8px; margin-left: 12px; }
+body.is-tv .filtro-grupo { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+body.is-tv .filtro-grupo label { font-size: 11px; margin: 0; }
 body.is-tv .filtro-grupo select {
-  padding: 8px 12px; font-size: 15px; min-width: 160px;
+  padding: 4px 8px; font-size: 13px; min-width: 120px;
 }
 
-/* Stats: tudo em UMA linha, bem compacto */
+/* Stats: TUDO em UMA linha horizontal compacta, no mesmo bloco do nav */
 body.is-tv .stats {
-  grid-template-columns: 1.4fr 2.6fr;
-  padding: 0 24px 10px;
-  gap: 12px;
+  display: flex !important;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 20px 8px;
+  gap: 10px;
 }
-body.is-tv .stat-hero { padding: 10px 16px; }
-body.is-tv .stat-hero .stat-value { font-size: 48px; margin-top: 0; }
-body.is-tv .stat-hero .stat-label { font-size: 11px; }
-body.is-tv .stat-hero .stat-progress { height: 6px; margin-top: 6px; }
-body.is-tv .stat-hero .stat-sub { font-size: 12px; margin-top: 6px; }
-body.is-tv .stat-secundarias { gap: 8px; }
-body.is-tv .stat-mini { padding: 8px 12px; }
-body.is-tv .stat-mini .stat-value { font-size: 20px; margin-top: 0; }
-body.is-tv .stat-mini .stat-label { font-size: 10px; }
-body.is-tv .stat-mini .stat-sub { font-size: 10px; }
+body.is-tv .stat-hero {
+  padding: 6px 14px; flex: 0 0 auto;
+  display: flex; flex-direction: row; align-items: center; gap: 12px;
+}
+body.is-tv .stat-hero .stat-value { font-size: 28px; margin-top: 0; line-height: 1; }
+body.is-tv .stat-hero .stat-label { font-size: 10px; margin: 0; }
+body.is-tv .stat-hero .stat-progress { height: 4px; margin: 0; width: 100px; }
+body.is-tv .stat-hero .stat-sub { font-size: 11px; margin: 0; }
+body.is-tv .stat-secundarias {
+  display: flex; flex-direction: row; gap: 6px; flex: 1 1 auto;
+}
+body.is-tv .stat-mini {
+  padding: 4px 10px;
+  display: flex; flex-direction: row; align-items: baseline; gap: 6px;
+}
+body.is-tv .stat-mini .stat-value { font-size: 15px; margin: 0; line-height: 1; }
+body.is-tv .stat-mini .stat-label { font-size: 10px; margin: 0; }
+body.is-tv .stat-mini .stat-sub { font-size: 10px; margin: 0; }
 
 /* MAIN: dashboard em grid, FILLS o resto da viewport */
 body.is-tv main.page {
@@ -1649,14 +1661,18 @@ body.is-tv main.page > .page-header { grid-area: pagehead; margin: 0; }
 body.is-tv .page-header h2 { font-size: 20px; }
 body.is-tv .page-header .sub { font-size: 13px; }
 
-/* Lista scrollável internamente */
+/* Lista scrollável internamente — flex coluna pra cards NÃO serem espremidos */
 body.is-tv main.page > .grid-candidatos {
   grid-area: lista;
-  grid-template-columns: 1fr;
+  display: flex !important;
+  flex-direction: column;
   overflow-y: auto;
   min-height: 0;
   padding-right: 8px;
   gap: 8px;
+}
+body.is-tv main.page > .grid-candidatos > .candidato {
+  flex: 0 0 auto;
 }
 body.is-tv .candidato { padding: 10px 14px; }
 body.is-tv .cand-foto { width: 56px; height: 56px; }
@@ -1783,18 +1799,7 @@ body.is-tv ::-webkit-scrollbar-track { background: transparent; }
 body.is-tv .rodape-tv .btn-ghost {
   background: var(--brand); color: #17130b; border-color: var(--brand);
 }
-/* No modo TV, o botao fica VISÍVEL ainda — pra permitir desligar.
-   Flutua no canto superior direito pra nao ocupar o grid. */
-body.is-tv .rodape { display: block !important; margin: 0; padding: 0; }
-body.is-tv .rodape .rodape-linha, body.is-tv .rodape .rodape-aviso,
-body.is-tv .rodape .rodape-legal { display: none; }
-body.is-tv .rodape-tv {
-  position: fixed; top: 20px; right: 20px;
-  z-index: 100; margin: 0;
-  background: rgba(23,19,11,.85);
-  backdrop-filter: blur(8px);
-}
-body.is-tv .rodape-tv-dica { display: none; }
+/* (regras duplicadas de rodape-tv removidas — bloco oficial fica mais acima) */
 
 /* ============ Rodapé legal ============ */
 .rodape {
@@ -1815,17 +1820,4 @@ body.is-tv .rodape-tv-dica { display: none; }
 .rodape-legal { max-width: 720px; margin: 0 auto; font-size: 11px; opacity: .7; line-height: 1.5; }
 .rodape-legal a { color: inherit; text-decoration: underline; }
 
-/* ============ UX: modo TV (foco no líder) ============ */
-body.modo-tv .filtro-lista,
-body.modo-tv .mapa-secao,
-body.modo-tv .timeline-secao,
-body.modo-tv .prop-info,
-body.modo-tv .page-header .acoes,
-body.modo-tv .filtros,
-body.modo-tv .stats .stat:not(:first-child):not(:nth-child(6)) {
-  display: none !important;
-}
-body.modo-tv .grid-candidatos { grid-template-columns: 1fr; max-width: 900px; margin: 0 auto; }
-body.modo-tv .candidato { transform: scale(1.05); transform-origin: top center;
-  padding: 24px; margin-bottom: 20px; }
-body.modo-tv .hero { padding: 12px; }
+/* (bloco antigo "body.modo-tv" removido — era de iteração abandonada) */
