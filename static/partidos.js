@@ -16,7 +16,7 @@ export const PARTIDOS = {
   11: { sigla: "PP",           cor: "#002F70" },
   12: { sigla: "PDT",          cor: "#C8102E" },
   13: { sigla: "PT",           cor: "#C4171E" },
-  14: { sigla: "MISSÃO",       cor: "#2B7A4B" },
+  14: { sigla: "MISSÃO",       cor: "#F58220" },
   15: { sigla: "MDB",          cor: "#1B5E20" },
   16: { sigla: "PSTU",         cor: "#E30613" },
   18: { sigla: "REDE",         cor: "#35A751" },
