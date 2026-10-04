@@ -28,6 +28,9 @@ const state = {
   eliminados: new Set(),
   // Candidatos eleitos matematicamente (majoritário ou proporcional).
   eleitos: new Set(),
+  // Dupla do 2º turno em majoritários — populado via SEGUNDO_TURNO_DEFINIDO.
+  // Visual claro no card ("Vai pro 2º turno") quando esse estado existe.
+  segundoTurno: new Set(),
 };
 
 // ============ persistência de preferências ============
@@ -520,6 +523,7 @@ function renderLista() {
     const div = document.createElement("div");
     const eliminado = state.eliminados.has(c.sq_candidato);
     const eleito = state.eleitos.has(c.sq_candidato);
+    const segundoTurno = state.segundoTurno.has(c.sq_candidato);
     // Situação jurídica — se o candidato renunciou/foi cassado, votos
     // são nulos por lei (Lei 9.504/97 art. 175 §3º). Prioridade visual
     // acima de eleito/eliminado matemático.
@@ -593,6 +597,11 @@ function renderLista() {
       tarja = `<div class="cand-tarja tarja-eleito">
         <svg width="14" height="14" aria-hidden="true"><use href="#i-trophy"/></svg>
         <span>Eleito(a) matematicamente</span>
+      </div>`;
+    } else if (segundoTurno) {
+      tarja = `<div class="cand-tarja tarja-segundo-turno">
+        <svg width="14" height="14" aria-hidden="true"><use href="#i-bolt"/></svg>
+        <span>Vai pro 2º turno</span>
       </div>`;
     } else if (eliminado) {
       const frase = cargoMaj
@@ -1346,6 +1355,9 @@ function _absorverEventoNoState(ev) {
   } else if ((ev.tipo === "ELEITO_1T" || ev.tipo === "ELEITO_MAJORITARIO")
              && ev.sq_candidato_a) {
     state.eleitos.add(ev.sq_candidato_a);
+  } else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
+    if (ev.sq_candidato_a) state.segundoTurno.add(ev.sq_candidato_a);
+    if (ev.sq_candidato_b) state.segundoTurno.add(ev.sq_candidato_b);
   }
 }
 
@@ -1355,6 +1367,7 @@ async function carregarEventos() {
   // Reseta os sets — cargo/UF podem ter mudado e temos que zerar
   state.eliminados.clear();
   state.eleitos.clear();
+  state.segundoTurno.clear();
   evs.forEach(_absorverEventoNoState);
   const ul = $("lista-eventos");
   if (evs.length === 0) {

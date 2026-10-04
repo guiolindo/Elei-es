@@ -551,6 +551,13 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   color: color-mix(in srgb, var(--danger) 85%, #fff 15%);
   border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
 }
+/* Vai pro 2º turno — tom laranja/âmbar, destaque menor que "eleito"
+   (ainda não ganhou) e sem o vermelho de eliminado. */
+.tarja-segundo-turno {
+  background: rgba(240,120,41,.14);
+  color: #ffb37a;
+  border: 1px solid rgba(240,120,41,.4);
+}
 /* Conflito de duplicata ativa — TSE tem 2 registros ativos pro mesmo
    (uf, nº). Tom amarelo pra deixar claro que é aviso, não erro. */
 .tarja-conflito {
@@ -1718,8 +1725,7 @@ body.is-tv #mapa-brasil {
   width: 100% !important;
 }
 body.is-tv .mapa-legenda {
-  flex: 0 0 auto; max-height: 48px; overflow-y: auto;
-  font-size: 11px; padding: 4px 8px;
+  display: none !important;
 }
 
 /* Gráfico home fills seu espaço */
@@ -1738,14 +1744,21 @@ body.is-tv #graf-home {
 }
 body.is-tv .home-graf-vazio { font-size: 12px; }
 
-/* Eventos — barra horizontal compacta no fim */
+/* Eventos — barra horizontal compacta no fim, altura FIXA */
 body.is-tv .timeline-secao {
   grid-area: eventos; margin: 0;
-  max-height: 110px; overflow-y: auto;
+  height: 44px; max-height: 44px; overflow: hidden;
 }
 body.is-tv .timeline-secao .page-header { display: none; }
-body.is-tv .timeline { padding: 6px 10px; }
-body.is-tv .timeline li { font-size: 13px; padding: 6px 10px; }
+body.is-tv .timeline {
+  padding: 4px 10px; display: flex; gap: 12px;
+  overflow-x: auto; overflow-y: hidden;
+  white-space: nowrap; height: 100%;
+}
+body.is-tv .timeline li {
+  font-size: 12px; padding: 4px 10px;
+  flex: 0 0 auto; border-bottom: none;
+}
 
 /* BOTÃO SAIR DO MODO TV — fixo top-right, GRANDE e dourado */
 body.is-tv .rodape-tv {
