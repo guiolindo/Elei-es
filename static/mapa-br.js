@@ -123,10 +123,15 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
     return;
   }
 
+  // ECharts map series usa `areaColor` pra fill da UF/município, NÃO
+  // `color`. Com `color` o item só colore marker/line, mas o polígono
+  // continua com o areaColor default da série (#2a3242 cinza). Bug só
+  // notado no dia D (05/10/2026): labels "SP\nPL" apareciam corretos
+  // mas todos os UFs ficavam cinza como se não tivessem dado.
   const seriesData = Object.entries(dadosPorArea).map(([nome, d]) => ({
     name: nome,
     value: d.valor ?? 0,
-    itemStyle: d.cor ? { color: d.cor } : undefined,
+    itemStyle: d.cor ? { areaColor: d.cor } : undefined,
     _extra: d,
   }));
 
