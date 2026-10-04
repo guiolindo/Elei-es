@@ -37,10 +37,16 @@ const state = {
 const PREFS_KEY = "elei-es:prefs:v1";
 function salvarPrefs() {
   try {
+    // texto da busca NÃO é salvo entre sessões — é consulta de momento
+    // ("fulano") que não faz sentido manter quando o user volta mais tarde.
+    // partido/ordenar são preferências estáveis, essas sim ficam.
     localStorage.setItem(PREFS_KEY, JSON.stringify({
       cargo: state.cargo,
       abrangencia: state.abrangencia,
-      filtro: state.filtro,
+      filtro: {
+        partido: state.filtro.partido || "",
+        ordenar: state.filtro.ordenar || "votos",
+      },
     }));
   } catch(e) {}
 }
@@ -52,7 +58,7 @@ function carregarPrefs() {
     if (typeof p.cargo === "number") state.cargo = p.cargo;
     if (typeof p.abrangencia === "string") state.abrangencia = p.abrangencia;
     if (p.filtro && typeof p.filtro === "object") state.filtro = {
-      texto: p.filtro.texto || "",
+      texto: "",  // sempre reseta — não restaura busca velha
       partido: p.filtro.partido || "",
       ordenar: p.filtro.ordenar || "votos",
     };
@@ -1935,11 +1941,14 @@ async function boot() {
   document.querySelectorAll(".btn-ghost, .btn-primary, .d-topnav-link").forEach(addRipple);
 
   aplicarEstadoDaURL();
-  // Reflete no <select> antes do primeiro carregamento
+  // Reflete no <select> antes do primeiro carregamento. ajustarUFParaCargo
+  // pode mudar state.abrangencia (ex.: cargo=5 obriga UF, muda BR→SP), então
+  // só sincronizamos os selects DEPOIS dele pra evitar valor desatualizado.
   const selCargo = $("sel-cargo"); if (selCargo) selCargo.value = state.cargo;
   ajustarUFParaCargo();
-  // Restaura filtros nos inputs (localStorage → UI)
-  const bn = $("busca-nome"); if (bn && state.filtro.texto) bn.value = state.filtro.texto;
+  const selUF = $("sel-uf"); if (selUF) selUF.value = state.abrangencia;
+  // Restaura filtros nos inputs (localStorage → UI). filtro.texto é
+  // sempre resetado em carregarPrefs — campo de busca abre vazio.
   const fp = $("filtro-partido"); if (fp && state.filtro.partido) fp.value = state.filtro.partido;
   const ord = $("ordenar"); if (ord && state.filtro.ordenar) ord.value = state.filtro.ordenar;
 
