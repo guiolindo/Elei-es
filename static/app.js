@@ -587,20 +587,31 @@ function renderLista() {
     const prop = statusProporcionalDe(c.sq_candidato);
     let badgeProp = "";
     if (prop) {
+      // Em proporcional, "eleito" é resultado do motor QE/QP/sobras
+      // sobre a foto ATUAL da apuração. Com 4% apurado o cálculo é
+      // matematicamente correto mas o resultado VAI MUDAR conforme
+      // chegam mais votos (QE sobe, barreiras recalculam, D'Hondt
+      // redistribui sobras). Pra evitar induzir o usuário a erro,
+      // só diz "ELEITO" quando >= 90% apurado — abaixo mostra
+      // "LIDERANDO VAGA" (ou "VAGA PROVÁVEL") com visual mais sóbrio.
+      const pctApurProp = state.ultimoSnapshot?.totais?.pct_apurado || 0;
+      const alta = pctApurProp >= 90;
       const cls = {
-        eleito: "badge-eleito",
+        eleito: alta ? "badge-eleito" : "badge-liderando",
         suplente: "badge-suplente",
         nao_atingiu_barreira: "badge-barreira",
         partido_sem_vaga: "badge-sem-vaga",
       }[prop.status] || "";
       const label = {
-        eleito: "✓ ELEITO",
-        suplente: "SUPLENTE",
+        eleito: alta ? "✓ ELEITO" : "LIDERANDO VAGA",
+        suplente: alta ? "SUPLENTE" : "SUPLENTE (parcial)",
         nao_atingiu_barreira: "S/ BARREIRA",
         partido_sem_vaga: "PARTIDO S/ VAGA",
       }[prop.status] || "";
       const fed = prop.federacao ? ` · Fed.` : "";
-      badgeProp = `<div class="badge-prop ${cls}" title="${prop.status}">${label}${fed}</div>`;
+      const title = alta ? prop.status
+                         : `${prop.status} — cálculo baseado em ${pctApurProp.toFixed(1)}% apurado; muda conforme chegam mais votos`;
+      badgeProp = `<div class="badge-prop ${cls}" title="${title}">${label}${fed}</div>`;
       // Status projetado — só mostra quando difere do atual. Útil pra
       // proporcional: candidato ainda não está eleito, mas se o ritmo
       // recente continuar, estaria. Visual bem discreto.

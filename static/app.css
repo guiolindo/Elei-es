@@ -779,6 +779,10 @@ body.is-tv .relogio {
 }
 .badge-eleito     { background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid #10b981; }
 .badge-suplente   { background: rgba(148,161,184,0.15); color: #b6c0d4; border: 1px solid #94a1b8; }
+/* Visual intermediário entre eleito e suplente — usado em proporcional
+   quando o pct_apurado ainda não permite afirmar "eleito" com segurança.
+   Mesma informação, mas sem a confiança visual do verde cheio. */
+.badge-liderando  { background: rgba(240,180,41,0.12); color: #f0b429; border: 1px dashed rgba(240,180,41,0.55); }
 .badge-barreira   { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid #ef4444; }
 .badge-sem-vaga   { background: rgba(245,158,11,0.15); color: #f0b429; border: 1px solid #f0b429; }
 /* Status projetado — bem discreto, tracejado, pra não confundir com dado real */
