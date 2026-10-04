@@ -1577,9 +1577,13 @@ html:has(body.is-tv) { height: 100vh; overflow: hidden; }
 /* Esconde o que não serve pra TV */
 body.is-tv .m-top, body.is-tv .m-chips, body.is-tv .m-stats,
 body.is-tv .m-nav, body.is-tv .m-fab, body.is-tv .m-sheet,
+body.is-tv .m-tab-titulo, body.is-tv #m-tab-titulo,
 body.is-tv .d-topnav, body.is-tv .cta-strip, body.is-tv .filtro-lista,
 body.is-tv .comparacao, body.is-tv .cand-rodape,
 body.is-tv .cand-check-vazio, body.is-tv .btn-primary,
+body.is-tv .comparacao-cta, body.is-tv .btn-comparar,
+body.is-tv .page-header .sub, body.is-tv .page-header .acoes,
+body.is-tv .prop-info,
 body.is-tv #btn-topo, body.is-tv #toasts,
 body.is-tv .rodape-linha, body.is-tv .rodape-aviso,
 body.is-tv .rodape-legal, body.is-tv .countdown {
@@ -1640,22 +1644,25 @@ body.is-tv .stat-mini .stat-value { font-size: 15px; margin: 0; line-height: 1; 
 body.is-tv .stat-mini .stat-label { font-size: 10px; margin: 0; }
 body.is-tv .stat-mini .stat-sub { font-size: 10px; margin: 0; }
 
-/* MAIN: dashboard em grid, FILLS o resto da viewport */
+/* MAIN: dashboard em grid, FILLS o resto da viewport (sem max-width!) */
 body.is-tv main.page {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(440px, 1fr) minmax(540px, 1.4fr);
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 0.8fr) auto;
+  grid-template-columns: minmax(380px, 1fr) minmax(540px, 2fr);
+  grid-template-rows: auto minmax(0, 1.2fr) minmax(0, 1fr) auto;
   grid-template-areas:
     "pagehead pagehead"
     "lista mapa"
     "lista grafico"
     "eventos eventos";
-  gap: 12px;
-  padding: 12px 24px 12px;
-  max-width: 100%;
+  gap: 10px;
+  padding: 10px 16px 10px;
+  max-width: none !important;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
 }
 body.is-tv main.page > .page-header { grid-area: pagehead; margin: 0; }
 body.is-tv .page-header h2 { font-size: 20px; }

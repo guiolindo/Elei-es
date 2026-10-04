@@ -103,11 +103,16 @@ function alternarModoTV() {
   try { localStorage.setItem(TV_KEY, ativar ? "1" : "0"); } catch(e) {}
   atualizarBotaoTV();
   // CSS do grid demora alguns ms pra aplicar; re-renderiza ECharts
-  // depois pra pegarem os novos tamanhos dos containers.
-  setTimeout(() => {
-    try { atualizarMapa(); } catch(e) {}
-    try { atualizarGrafHome(); } catch(e) {}
-  }, 80);
+  // depois pra pegarem os novos tamanhos dos containers. 2 passes:
+  // primeiro force resize dos existentes, depois re-render completo.
+  requestAnimationFrame(() => {
+    window.dispatchEvent(new Event("resize"));
+    setTimeout(() => {
+      try { atualizarMapa(); } catch(e) {}
+      try { atualizarGrafHome(); } catch(e) {}
+      window.dispatchEvent(new Event("resize"));
+    }, 120);
+  });
   // Em modo TV, aplica tabindex nos cards já renderizados pra receber foco
   if (ativar) {
     document.querySelectorAll(".grid-candidatos .candidato").forEach(c => c.tabIndex = 0);

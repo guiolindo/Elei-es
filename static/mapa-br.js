@@ -41,11 +41,19 @@ async function init(container, abrangencia) {
   // pra ainda mostrar o país inteiro.
   const w = container.clientWidth || 800;
   const isMobile = w < 500;
+  const isTV = document.body.classList.contains("is-tv");
   const aspect = abrangencia === "BR"
     ? (isMobile ? 1.0 : 0.88)
     : 1.0;  // UF: bounding box varia, quadrado é razoável
-  const alturaAlvo = Math.min(640, Math.max(340, w * aspect));
-  container.style.height = alturaAlvo + "px";
+  // Em TV o container tem altura imposta pelo grid (viewport fixo).
+  // Respeita essa altura; só força pixel quando o pai não constrange.
+  if (isTV) {
+    const hCell = container.clientHeight || container.parentElement?.clientHeight || 0;
+    const h = hCell > 100 ? hCell : Math.min(640, Math.max(340, w * aspect));
+    container.style.height = h + "px";
+  } else {
+    container.style.height = Math.min(640, Math.max(340, w * aspect)) + "px";
+  }
   _chart = echarts.init(container, null, { renderer: "canvas" });
   if (!init._resize) {
     window.addEventListener("resize", () => {
