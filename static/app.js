@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261004h";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004h";
+import { renderMapa } from "/static/mapa-br.js?v=20261004i";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004i";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -750,6 +750,15 @@ function renderLista() {
   el.querySelectorAll(".cand-acao").forEach(addRipple);
   // Card inteiro também tem ripple (ação primária = ver ficha)
   cards.forEach(addRipple);
+  // CRÍTICO: todo renderLista reconstrói innerHTML com "0 votos"
+  // placeholder. SEMPRE re-preencher via atualizarPainelTotais logo
+  // depois — senão interações do usuário (buscar, filtrar partido,
+  // reordenar, selecionar comparar) zeram os votos até o próximo WS.
+  // atualizarPainelTotais é no-op se state.ultimoSnapshot ainda não
+  // existe (branch early-return no topo da função).
+  if (state.ultimoSnapshot?.disponivel) {
+    atualizarPainelTotais();
+  }
 }
 
 function toggleSelecionar(sq) {
