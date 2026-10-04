@@ -565,6 +565,35 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   color: #ffb37a;
   border: 1px solid rgba(240,120,41,.4);
 }
+
+/* Relógio BRT no header — útil pra comparar com "ÚLTIMO DADO" e saber
+   defasagem da apuração em tempo real. Monospace pra não "piscar" com
+   mudança de dígito. */
+.relogio {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.4px;
+  color: var(--brand, #f0b429);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(240,180,41,.08);
+  border: 1px solid rgba(240,180,41,.22);
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.relogio::before {
+  content: "🕐 ";
+  margin-right: 2px;
+}
+@media (max-width: 768px) {
+  .relogio { font-size: 13px; padding: 4px 10px; }
+  .relogio::before { display: none; }
+}
+body.is-tv .relogio {
+  font-size: 16px;
+  padding: 6px 14px;
+}
 /* Conflito de duplicata ativa — TSE tem 2 registros ativos pro mesmo
    (uf, nº). Tom amarelo pra deixar claro que é aviso, não erro. */
 .tarja-conflito {

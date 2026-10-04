@@ -146,6 +146,33 @@ function atualizarBotaoTV() {
   b.textContent = ativo ? "📺 Sair do modo TV" : "📺 Modo TV";
 }
 
+// Relógio BRT no topo — formata sempre em America/Sao_Paulo, independente
+// do fuso do navegador do usuário (um brasileiro acessando de Londres
+// ainda vê a hora de Brasília, que é a referência da apuração do TSE).
+// Atualiza a cada segundo. Pausa quando a aba está em background pra
+// economizar bateria em mobile/TV.
+const _fmtRelogio = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  hour: "2-digit", minute: "2-digit", second: "2-digit",
+  hour12: false,
+});
+function tickRelogio() {
+  const el = document.getElementById("relogio-brt");
+  if (!el) return;
+  el.textContent = _fmtRelogio.format(new Date());
+  el.setAttribute("datetime", new Date().toISOString());
+}
+function iniciarRelogio() {
+  tickRelogio();
+  // Alinha pra começar no próximo segundo cheio pra o relógio não
+  // flutuar com drift de hundreds-of-ms. Depois intervalo fixo de 1s.
+  const msAteProximoSegundo = 1000 - (Date.now() % 1000);
+  setTimeout(() => {
+    tickRelogio();
+    setInterval(tickRelogio, 1000);
+  }, msAteProximoSegundo);
+}
+
 // Navegação por setas do controle remoto em modo TV. Os cards de
 // candidato ganham tabindex=0; setas movem o foco visível pro próximo/
 // anterior card da lista. Enter abre a ficha (reaproveita o click handler
@@ -2061,6 +2088,7 @@ async function boot() {
   // "não vi animação"). Aplica em botões que já existem no DOM inicial.
   document.querySelectorAll(".btn-ghost, .btn-primary, .d-topnav-link").forEach(addRipple);
 
+  iniciarRelogio();
   aplicarEstadoDaURL();
   // Reflete no <select> antes do primeiro carregamento. ajustarUFParaCargo
   // pode mudar state.abrangencia (ex.: cargo=5 obriga UF, muda BR→SP), então
