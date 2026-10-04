@@ -500,11 +500,19 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   line-height: 1.1;
   font-variant-numeric: tabular-nums; color: var(--fg);
 }
-.cand-linha-inf { display: flex; gap: 8px; align-items: baseline; min-height: 16px; }
+.cand-linha-inf {
+  display: flex; gap: 8px; align-items: baseline; min-height: 16px;
+  /* flex-wrap: wrap pra deixar a faixa de projeção descer pra linha
+     seguinte quando o card não comporta tudo em uma linha. Antes o texto
+     passava reto da borda em telas estreitas (mobile vertical, TV
+     3-colunas). */
+  flex-wrap: wrap;
+}
 .cand-pct {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px; color: var(--fg-2);
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 /* Projeção ao final da apuração — discreta, não compete com o número real.
    Some automaticamente ao chegar 100% (controlado em JS). */
@@ -1747,7 +1755,19 @@ body.is-tv .cand-numero-tag { font-size: 11px; padding: 1px 5px; }
 body.is-tv .cand-uf-tag { font-size: 10px; }
 body.is-tv .pill-partido { font-size: 10px; padding: 1px 5px; }
 body.is-tv .cand-votos { font-size: 18px !important; margin: 0 !important; line-height: 1.1; }
-body.is-tv .cand-pct { font-size: 11px; }
+body.is-tv .cand-pct {
+  font-size: 11px;
+  /* Em TV o texto base + faixa de projeção estava passando reto da
+     largura do card porque .cand-pct tem white-space:nowrap por default.
+     Quebra em várias linhas quando necessário, com line-height compacto. */
+  white-space: normal !important;
+  line-height: 1.3;
+  word-break: break-word;
+}
+body.is-tv .cand-linha-inf {
+  flex-wrap: wrap;
+  min-height: 0;
+}
 body.is-tv .cand-delta { font-size: 10px; padding: 1px 5px; }
 body.is-tv .cand-barra { height: 3px; margin-top: 2px; }
 /* Tarjas de eleito/eliminado/retirado + badge-prop: antes estavam

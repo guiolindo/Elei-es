@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261004j";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004j";
+import { renderMapa } from "/static/mapa-br.js?v=20261004k";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004k";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1353,7 +1353,27 @@ async function atualizarGrafHome() {
     return;
   }
   vazio?.classList.add("oculto");
-  if (!_grafHome) _grafHome = echarts.init(container, null, { renderer: "canvas" });
+  if (!_grafHome) {
+    _grafHome = echarts.init(container, null, { renderer: "canvas" });
+    // ECharts captura width/height no init(). Se o container tava escondido
+    // (aba Mapa inativa, modo TV toggled, etc.) o canvas nasce com tamanho
+    // 0 e nunca cresce sozinho. ResizeObserver corrige automaticamente
+    // quando o layout do pai estabiliza — resolve "gráfico só ocupa 50%
+    // da tela" e "TV mostra só até 18h30" (chart não refez quando a
+    // janela mudou).
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => {
+        try { _grafHome?.resize(); } catch(e) {}
+      });
+      ro.observe(container);
+    }
+    window.addEventListener("resize", () => {
+      try { _grafHome?.resize(); } catch(e) {}
+    });
+  } else {
+    // Já existe — garante que está no tamanho certo antes de redesenhar
+    try { _grafHome.resize(); } catch(e) {}
+  }
   const series = topSqs.map(sq => {
     const ficha = state.ficha[sq] || {};
     const nome = ficha.nome_urna || sq;
