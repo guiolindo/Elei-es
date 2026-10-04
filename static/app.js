@@ -506,9 +506,9 @@ function renderLista() {
         <div class="cand-check-vazio" aria-hidden="true"></div>
       </div>
       <div class="cand-metricas">
-        <div class="cand-votos" data-sq="${c.sq_candidato}">—</div>
+        <div class="cand-votos" data-sq="${c.sq_candidato}">0 votos</div>
         <div class="cand-linha-inf">
-          <span class="cand-pct" data-sq-pct="${c.sq_candidato}"></span>
+          <span class="cand-pct" data-sq-pct="${c.sq_candidato}">0,00% dos válidos</span>
           <span class="cand-delta" data-sq-delta="${c.sq_candidato}"></span>
         </div>
         <div class="cand-barra"><div data-sq-barra="${c.sq_candidato}" style="width:0%"></div></div>
