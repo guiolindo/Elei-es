@@ -264,32 +264,35 @@ VAGAS_DEP_FEDERAL = {
 
 ## 8. Projeções
 
-Duas projeções do total final por candidato são expostas em `/api/apuracao/atual`. **Nenhuma é predição eleitoral** — ambas são extrapolações aritméticas com disclaimer visual (opacidade reduzida, prefixo `~`) e somem automaticamente ao atingir 100% apurado.
+Duas estimativas aritméticas do total final por candidato são expostas em `/api/apuracao/atual`. **Nenhuma é predição eleitoral** — ambas são extrapolações matemáticas simples com disclaimer visual (opacidade reduzida, prefixo `~`) que somem automaticamente ao atingir 100% apurado. O frontend exibe as duas como **faixa**: se convergem, mostra um número só; se divergem, a faixa reflete a incerteza real.
 
 ### 8.1. Projeção linear
 ```
 proj = votos_atual × secoes_total ÷ secoes_apuradas
 ```
-Assume que o restante das urnas vai votar com a mesma proporção das já apuradas. É sempre calculada após qualquer apuração começar.
+Assume que o restante das urnas vai votar com a mesma proporção das já apuradas. Sempre calculada após o início da apuração.
 
-### 8.2. Projeção por tendência (janela móvel)
-Problema que resolve: no Brasil, Sul/Sudeste historicamente apura antes do Nordeste. A projeção linear subestima/superestima candidatos cujo perfil regional difere das urnas já apuradas.
-
-Fórmula:
+### 8.2. Projeção por janela móvel
 ```
 taxa_recente = (votos_atual - votos_15_atrás) ÷ (pct_apurado_atual - pct_apurado_15_atrás)
 proj         = votos_atual + taxa_recente × (100 - pct_apurado)
 ```
+Captura o ritmo das últimas 15 snapshots. **Importante: não modela composição regional**. Se as urnas restantes forem de perfil regional muito diferente, essa projeção falha junto com a linear — ela só reage ao que já aconteceu nas últimas atualizações, não antecipa o que vem.
 
 Guardas pra evitar ruído:
 - Só roda após `pct_apurado >= 30%`.
 - Janela precisa de pelo menos 10 snapshots não-suspeitos.
 - Delta de % apurado na janela precisa ser `>= 1%` (evita divisão por quase-zero).
-- Resultado clipado entre `votos_atual` e `2 × projecao_linear`.
+- Resultado clipado entre `votos_atual` e `2 × projecao_linear` (guard de UX pra evitar valor absurdo — não tem base estatística).
 
 Quando qualquer guarda falha, o campo `projecao_tendencia` fica `null` — o frontend cai pra `projecao_linear`.
 
 Fonte: `app/api.py:_calcular_projecao_tendencia`.
+
+### 8.3. Limitações conhecidas (honestas)
+- **Composição regional das urnas faltantes não é modelada**. Modelo mais sofisticado (projeção por UF ponderada por eleitorado, usando os snapshots paralelos de cada UF) está no roadmap pós-eleição.
+- **Sem backtest histórico ainda**. Os parâmetros (janela de 15, mínimo de 30% apurado) são escolhas heurísticas razoáveis mas não validadas contra erro observado em eleições passadas. Validação retroativa com dados 2022/2026 fica pra depois do dia D.
+- **Sem intervalo de incerteza estatístico**. A "faixa" exibida é só a diferença entre as duas métricas aritméticas — informativa mas não é um intervalo de confiança formal.
 
 ## Auditoria
 

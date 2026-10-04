@@ -174,12 +174,18 @@
   <p>Fornecemos o serviço "no estado em que se encontra". Não há garantia de disponibilidade 24/7, precisão instantânea, ou continuidade. Podemos suspender ou encerrar o serviço a qualquer momento, sem aviso prévio.</p>
 
   <h3>4.5. Projeções e estimativas</h3>
-  <p>O site exibe duas projeções do total final por candidato, ambas rotuladas com <code>~</code> e opacidade reduzida pra deixar claro que são <strong>estimativas aritméticas</strong>, não predição do vencedor:</p>
+  <p>O site exibe uma <strong>faixa de projeção</strong> do total final por candidato, rotulada com <code>~</code> e opacidade reduzida pra deixar claro que é <strong>estimativa aritmética</strong>, não predição do resultado:</p>
   <ul>
-    <li><strong>Projeção linear</strong>: extrapola os votos atuais pela porcentagem apurada. Assume que o restante das urnas vai votar como as já apuradas.</li>
-    <li><strong>Projeção por tendência</strong> (default quando disponível): considera o ritmo das últimas 15 atualizações, não só a média total. Mais responsiva a mudanças regionais no perfil das urnas que faltam apurar.</li>
+    <li>Limite 1 — <strong>extrapolação linear</strong>: votos atuais × seções totais ÷ seções apuradas. Assume que o restante das urnas vai votar como as já apuradas.</li>
+    <li>Limite 2 — <strong>janela móvel</strong>: usa o ritmo das últimas 15 atualizações. Reflete o comportamento recente, mas não necessariamente o das urnas que ainda faltam apurar.</li>
   </ul>
-  <p>Ambas somem automaticamente ao atingir 100% apurado (resultado final conhecido). Nenhuma projeção substitui o resultado oficial do TSE. Decisões eleitorais devem se basear nos boletins de urna assinados e no total consolidado publicado pelo Tribunal.</p>
+  <p>Quando as duas convergem, mostramos um número só. Quando divergem, mostramos a faixa — ela reflete a incerteza real do momento (o ritmo mudou nas últimas urnas).</p>
+  <p><strong>Limitações importantes</strong>:</p>
+  <ul>
+    <li>Nenhuma das projeções modela composição regional das urnas que faltam. Se as urnas restantes forem de uma região com perfil muito diferente das já apuradas, as duas projeções podem estar erradas.</li>
+    <li>Só aparecem após 30% apurado (abaixo disso qualquer extrapolação é ruído) e somem automaticamente ao atingir 100% (resultado final conhecido).</li>
+    <li>Não substituem o resultado oficial do TSE. Decisões eleitorais devem se basear nos boletins de urna assinados e no total consolidado publicado pelo Tribunal.</li>
+  </ul>
 
   <h3>4.6. Alterações</h3>
   <p>Estes termos podem ser atualizados a qualquer momento. A versão vigente é sempre a exibida nesta página.</p>

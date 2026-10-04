@@ -987,16 +987,29 @@ async function atualizarPainelTotais() {
     if (votos) animarNumero(votos, c.votos, 400);
     if (pct) {
       const pctApur = dados.totais?.pct_apurado || 0;
-      // Projeção: prefere tendência (ajustada pelas últimas N snapshots)
-      // sobre linear simples. Some ao chegar em 100% (resultado final).
-      // Antes de 30% apurado o motor devolve null em tendência; não
-      // mostra nada mesmo se linear existir (pouco confiável).
-      const proj = c.projecao_tendencia ?? c.projecao_linear;
-      const mostraProj = proj && pctApur >= 30 && pctApur < 100;
-      const marca = c.projecao_tendencia != null ? "~" : "~";
-      const projTxt = mostraProj ? ` · ${marca} ${fmtNum(proj)} proj.` : "";
+      // Projeção como FAIXA entre duas métricas aritméticas simples:
+      //   - linear: votos_atual × secoes_total ÷ secoes_apuradas
+      //   - janela móvel: usa o ritmo das últimas 15 snapshots
+      // Se as duas convergem, a faixa colapsa num número só. Se divergem,
+      // a faixa reflete a incerteza real (ritmo mudou nas urnas recentes).
+      // Nenhuma modela composição regional das urnas faltantes — é só
+      // extrapolação. Some ao atingir 100% apurado.
+      const L = c.projecao_linear, T = c.projecao_tendencia;
+      const mostra = pctApur >= 30 && pctApur < 100 && L;
+      let projTxt = "";
+      if (mostra) {
+        if (T != null && T !== L) {
+          const lo = Math.min(L, T), hi = Math.max(L, T);
+          projTxt = ` · ~ ${fmtNum(lo)}–${fmtNum(hi)} proj.`;
+        } else {
+          projTxt = ` · ~ ${fmtNum(L)} proj.`;
+        }
+      }
+      const tooltip = "Projeção aritmética (faixa entre extrapolação linear e janela "
+        + "móvel das últimas 15 atualizações). Não considera composição regional "
+        + "das urnas faltantes — é só estimativa. Some ao atingir 100%.";
       pct.innerHTML = `${c.pct_validos.toFixed(2)}% dos válidos`
-        + (projTxt ? `<span class="cand-proj" title="Projeção baseada no ritmo das últimas atualizações. Some ao atingir 100%.">${projTxt}</span>` : "");
+        + (projTxt ? `<span class="cand-proj" title="${tooltip}">${projTxt}</span>` : "");
     }
     if (barra) barra.style.width = (c.votos / maxV * 100) + "%";
     if (delta) {
