@@ -1478,6 +1478,15 @@ async function refreshApuracao() {
       if (p.disponivel) state.proporcional = p;
     } catch (e) { /* sem dados ainda */ }
   }
+  // ORDEM IMPORTA: renderLista() faz `el.innerHTML = ""` e reconstrói
+  // os cards a partir do template (que vem com "0 votos" placeholder).
+  // Então ele PRECISA rodar antes de atualizarPainelTotais, que é quem
+  // preenche os votos de verdade via querySelector `[data-sq=...]`.
+  // Até 05/10/2026 estava invertido — votos apareciam por 1ms e eram
+  // sobrescritos pelo renderLista a cada ciclo. Bug invisível em
+  // pré-apuração (todo mundo com 0 mesmo), explodiu quando TSE começou
+  // a publicar números reais no dia D.
+  renderLista();
   atualizarPainelTotais();
   atualizarPainelProporcional();
   atualizarTituloAba(state.ultimoSnapshot);
@@ -1487,7 +1496,14 @@ async function refreshApuracao() {
   if (state.selecionados.length >= 2 && !$("comparacao").classList.contains("oculto")) {
     atualizarComparacao();
   }
-  renderLista();  // re-renderiza para pintar badges de eleito
+  // Mapa + gráfico casam com o snapshot. Antes só o WS puxava eles,
+  // então quem abria a página depois do início da apuração via a lista
+  // atualizar mas o mapa continuava cinza até chegar um snapshot NOVO
+  // pelo WS (podia demorar minutos). Agora refresh já sincroniza tudo.
+  if (state.ultimoSnapshot?.disponivel) {
+    try { atualizarMapa(); } catch(e) {}
+    try { atualizarGrafHome(); } catch(e) {}
+  }
 }
 
 function atualizarPainelProporcional() {
