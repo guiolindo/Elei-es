@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261004g";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004g";
+import { renderMapa } from "/static/mapa-br.js?v=20261004h";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004h";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1447,14 +1447,17 @@ async function carregarEventos() {
   state.segundoTurno.clear();
   evs.forEach(_absorverEventoNoState);
   // CRÍTICO: re-renderiza os cards agora que state.eleitos/eliminados/
-  // segundoTurno estão populados. Sem isso, se carregarEventos rodar
-  // DEPOIS de refreshApuracao (que é a ordem padrão em onFiltroChange),
-  // as tarjas "Eleito matematicamente" / "Sem chance" / "Vai pro 2º
-  // turno" ficam invisíveis até o próximo snapshot pelo WS. Bug
-  // detectado no dia D (05/10/2026) — MS Gov tinha ELEITO_MAJORITARIO
-  // emitido às 18:32 BRT mas nenhuma tarja aparecia nos cards.
+  // segundoTurno estão populados. SEM atualizarPainelTotais na sequência,
+  // os votos ficam zerados: renderLista() reconstrói templates com
+  // "0 votos" placeholder e nada preenche depois. Bug 20:18 BRT em dia
+  // D — a cada snapshot com eventos novos, cards voltavam a 0.
   if (document.getElementById("lista-candidatos")?.children.length) {
     renderLista();
+    // Re-aplica votos imediatamente — senão fica tudo em 0 até o próximo
+    // snapshot (que também vai zerar antes de preencher). atualizarPainelTotais
+    // lê de state.ultimoSnapshot (já populado) e usa querySelector
+    // [data-sq=...], então é no-op se não tiver dados ainda.
+    if (state.ultimoSnapshot?.disponivel) atualizarPainelTotais();
   }
   const ul = $("lista-eventos");
   if (evs.length === 0) {
