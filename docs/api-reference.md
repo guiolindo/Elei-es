@@ -56,7 +56,8 @@ Ficha completa. Campos:
 - `orfaos`: lista de `sq_candidato` presentes no snapshot mas **sem registro em `candidatos`** (importação pendente via Termux). Frontend usa isso pra re-fetchar `/api/candidatos` sem recarregar.
 - `inflate=true` adiciona `nome_urna`, `numero`, `partido`, `situacao`, `uf` em cada candidato (payload mais pesado, útil pra evitar join no cliente).
 - `projecao_linear`: extrapolação aritmética simples (`votos_atual × secoes_total ÷ secoes_apuradas`). Sempre presente.
-- `projecao_tendencia`: estimativa pelo ritmo das últimas 15 snapshots. `null` antes de 30% apurado, após 100%, ou sem histórico suficiente (<10 snapshots na janela). Mais responsiva quando o perfil regional das urnas que faltam difere das já apuradas (ex.: Sul/Sudeste apura primeiro). Clipada entre `votos_atual` e `2 × projecao_linear`.
+- `projecao_tendencia`: estimativa de **votos** pela janela móvel das últimas 15 snapshots. `null` antes de 30% apurado, após 100%, ou sem histórico suficiente (<10 snapshots na janela). Reage ao ritmo recente mas não modela composição regional das urnas faltantes. Clipada entre `votos_atual` e `2 × projecao_linear` (guard de UX).
+- `projecao_pct_tendencia`: estimativa de **% dos válidos** final pela mesma janela. Só presente em cargos majoritários (1=Presidente, 3=Governador, 5=Senador). Em proporcional (6, 7) a % individual não é o KPI que decide eleição — ver `status_projetado` em `/api/apuracao/proporcional`.
 - `gerado_em_tse` vem em BRT (`-03:00`); demais datas em UTC.
 
 ### `GET /api/apuracao/historico?cargo={n}&abrangencia={...}[&desde=ISO8601]`
@@ -64,6 +65,8 @@ Séries temporais dos votos de cada candidato.
 
 ### `GET /api/apuracao/proporcional?cargo={6|7}&uf={UF}`
 Cálculo proporcional completo: QE, barreiras, eleitos/suplentes por status, partidos com vagas ganhas em cada fase. **Candidatos com `situacao != "ativo"` são excluídos antes do cálculo** (Lei 9.504/97 art. 175 §3º). Ver `docs/metodologia.md` seção 7.
+
+Cada candidato também recebe `status_projetado`: resultado do mesmo motor rodado sobre os votos projetados pela janela móvel. Útil pra ver "se o ritmo recente continuar, quem se elege" — frontend mostra isso como badge discreto apenas quando `status_projetado != status` (ex.: candidato ainda não eleito mas projetado como eleito).
 
 ### `GET /api/apuracao/municipio?uf={UF}&cargo={n}[&cod_ibge={7-digits}]`
 Resultados por município (quando TSE inclui breakdown `abr[].mu[]`).

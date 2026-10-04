@@ -263,7 +263,8 @@ async def _calcular_projecao_tendencia(
     # Pega as JANELA últimas snapshots da mesma (cargo, abr) INCLUSIVE a atual
     snaps_rows = (await sess.execute(
         select(Snapshot.id, SnapshotTotais.qt_secoes_totalizadas,
-                SnapshotTotais.qt_secoes_total)
+                SnapshotTotais.qt_secoes_total,
+                SnapshotTotais.qt_votos_validos)
         .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
         .where(and_(
             Snapshot.cod_cargo == cargo,
@@ -278,7 +279,7 @@ async def _calcular_projecao_tendencia(
         return {}
 
     # Snapshot mais antigo da janela — base pro cálculo de delta
-    snap_base_id, apur_base, total_base = snaps_rows[-1]
+    snap_base_id, apur_base, total_base, validos_base = snaps_rows[-1]
     if not total_base or total_base <= 0:
         return {}
     pct_apurado_base = (apur_base or 0) * 100.0 / total_base
@@ -291,24 +292,33 @@ async def _calcular_projecao_tendencia(
         select(SnapshotCandidato.sq_candidato, SnapshotCandidato.votos)
         .where(SnapshotCandidato.snapshot_id == snap_base_id)
     )).all()
-    votos_base = {sq: v for sq, v in votos_base_rows}
+    votos_cand_base = {sq: v for sq, v in votos_base_rows}
 
     pct_faltante = 100.0 - pct_apurado_atual
-    out: dict[str, int] = {}
+    # Projeção dos VÁLIDOS TOTAIS pela mesma lógica da janela móvel —
+    # usada só pra calcular % projetado (nos majoritários onde faz sentido).
+    validos_atual = tot_atual.qt_votos_validos or 0
+    taxa_validos = (validos_atual - (validos_base or 0)) / delta_pct
+    proj_validos = max(validos_atual,
+                        int(validos_atual + taxa_validos * pct_faltante))
+
+    out: dict[str, dict] = {}
     for c in cands_atual:
-        v_base = votos_base.get(c.sq_candidato, 0)
+        v_base = votos_cand_base.get(c.sq_candidato, 0)
         delta_votos = c.votos - v_base
         if delta_votos < 0:
             continue  # inconsistência (TSE reprocessou) — pula
         taxa = delta_votos / delta_pct  # votos ganhos por % apurado
-        proj = int(c.votos + taxa * pct_faltante)
+        proj_votos = int(c.votos + taxa * pct_faltante)
         # Clipa entre votos atuais e 2x da projeção linear pra evitar
-        # extrapolações absurdas (ex.: candidato que acabou de "disparar")
+        # extrapolações absurdas (ex.: candidato que acabou de "disparar").
+        # Guard de UX, não base estatística.
         if tot_atual.qt_secoes_totalizadas and tot_atual.qt_secoes_total:
             proj_linear = int(c.votos * tot_atual.qt_secoes_total /
                                tot_atual.qt_secoes_totalizadas)
-            proj = max(c.votos, min(proj, 2 * proj_linear))
-        out[c.sq_candidato] = proj
+            proj_votos = max(c.votos, min(proj_votos, 2 * proj_linear))
+        proj_pct = (proj_votos / proj_validos * 100.0) if proj_validos > 0 else None
+        out[c.sq_candidato] = {"votos": proj_votos, "pct": proj_pct}
     return out
 
 
@@ -382,7 +392,8 @@ async def apuracao_atual(
         # não predição do vencedor.
         "candidatos": [
             _candidato_payload(c, tot, ficha_map.get(c.sq_candidato), inflate,
-                                proj_tendencia_map.get(c.sq_candidato))
+                                proj_tendencia_map.get(c.sq_candidato),
+                                cod_cargo=cargo)
             for c in cands
         ],
         # Órfãos (sq_candidato sem metadado em `candidatos` table).
@@ -394,10 +405,20 @@ async def apuracao_atual(
 
 
 def _candidato_payload(sc, tot, ficha, inflate: bool,
-                        projecao_tendencia: int | None = None) -> dict:
+                        projecao_tendencia: dict | None = None,
+                        cod_cargo: int | None = None) -> dict:
     """Monta a linha de candidato. Com inflate=True, inclui
     nome/numero/partido/situacao pra o payload ser auditável sozinho
-    (sem precisar cruzar com /api/candidatos). Default enxuto."""
+    (sem precisar cruzar com /api/candidatos). Default enxuto.
+
+    `projecao_tendencia` é dict `{"votos": int, "pct": float|None}` ou None.
+    `projecao_pct_tendencia` só é exposto pra cargos MAJORITÁRIOS (1=Pres,
+    3=Gov, 5=Sen). Em proporcional (6,7) % individual não é o KPI que
+    define eleição — o cálculo proporcional (QE/QP/sobras) é que decide.
+    """
+    MAJORITARIOS = {1, 3, 5}
+    tv = (projecao_tendencia or {}).get("votos")
+    tp = (projecao_tendencia or {}).get("pct")
     base = {
         "sq_candidato": sc.sq_candidato,
         "votos": sc.votos,
@@ -407,8 +428,16 @@ def _candidato_payload(sc, tot, ficha, inflate: bool,
             if tot.qt_secoes_total and tot.qt_secoes_totalizadas else sc.votos,
         # Projeção por tendência das últimas N snapshots. None antes de
         # 30% apurado (sem dados suficientes) ou se não houver histórico.
-        "projecao_tendencia": projecao_tendencia,
+        "projecao_tendencia": tv,
     }
+    # Projeção de % só em majoritários (ver docstring acima).
+    if cod_cargo in MAJORITARIOS:
+        base["projecao_pct_tendencia"] = tp
+    return _finalizar_payload_candidato(base, ficha, inflate)
+
+
+def _finalizar_payload_candidato(base: dict, ficha, inflate: bool) -> dict:
+    """Separado pra manter a assinatura original de _candidato_payload."""
     if inflate and ficha:
         base["nome_urna"] = ficha.nome_urna
         base["numero"] = ficha.numero
@@ -548,6 +577,32 @@ async def apuracao_proporcional(
         for sc, cnd in cands_db
     ]
     r = calcular_eleitos_proporcional(cands_prop, vagas=vagas)
+
+    # Status PROJETADO: roda o motor de novo com votos projetados pela
+    # janela móvel. Mostra pro usuário "quem seria eleito se o ritmo
+    # recente continuar" — útil pra proporcional onde votos individuais
+    # altos não garantem vaga (QE/QP/sobras é que decide).
+    proj_tendencia = await _calcular_projecao_tendencia(
+        sess, cargo, uf.upper(), snap, tot,
+        [sc for sc, _ in cands_db],
+    )
+    status_projetado: dict[str, str] = {}
+    if proj_tendencia:
+        cands_prop_proj = [
+            CandidatoProporcional(
+                sq_candidato=sc.sq_candidato,
+                nome_urna=cnd.nome_urna,
+                numero=cnd.numero,
+                partido_numero=cnd.partido_numero,
+                votos=(proj_tendencia.get(sc.sq_candidato) or {}).get("votos", sc.votos),
+                situacao=cnd.situacao,
+                idade_anos=_idade_de(cnd),
+            )
+            for sc, cnd in cands_db
+        ]
+        r_proj = calcular_eleitos_proporcional(cands_prop_proj, vagas=vagas)
+        status_projetado = {c.sq_candidato: c.status for c in r_proj.candidatos}
+
     return {
         "disponivel": True,
         "vagas": r.vagas,
@@ -563,6 +618,7 @@ async def apuracao_proporcional(
                 "federacao": c.federacao,
                 "votos": c.votos,
                 "status": c.status,      # "eleito" / "suplente" / "nao_atingiu_barreira" / "partido_sem_vaga"
+                "status_projetado": status_projetado.get(c.sq_candidato),  # mesmo cálculo com votos projetados
                 "posicao_partido": c.posicao_no_partido,
             }
             for c in r.candidatos

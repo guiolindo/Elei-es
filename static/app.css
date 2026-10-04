@@ -731,6 +731,16 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 .badge-suplente   { background: rgba(148,161,184,0.15); color: #b6c0d4; border: 1px solid #94a1b8; }
 .badge-barreira   { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid #ef4444; }
 .badge-sem-vaga   { background: rgba(245,158,11,0.15); color: #f0b429; border: 1px solid #f0b429; }
+/* Status projetado — bem discreto, tracejado, pra não confundir com dado real */
+.badge-prop-proj {
+  display: inline-block; padding: 2px 7px; border-radius: 999px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.3px;
+  margin-top: 3px; margin-left: 4px;
+  text-transform: none;
+  color: var(--muted); border: 1px dashed var(--line-2);
+  background: transparent; opacity: 0.75;
+  cursor: help;
+}
 
 .prop-info {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;

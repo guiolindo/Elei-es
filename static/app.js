@@ -440,6 +440,19 @@ function renderLista() {
       }[prop.status] || "";
       const fed = prop.federacao ? ` · Fed.` : "";
       badgeProp = `<div class="badge-prop ${cls}" title="${prop.status}">${label}${fed}</div>`;
+      // Status projetado — só mostra quando difere do atual. Útil pra
+      // proporcional: candidato ainda não está eleito, mas se o ritmo
+      // recente continuar, estaria. Visual bem discreto.
+      const sp = prop.status_projetado;
+      if (sp && sp !== prop.status) {
+        const labelProj = {
+          eleito: "~ proj. ELEITO",
+          suplente: "~ proj. suplente",
+          nao_atingiu_barreira: "~ proj. s/ barreira",
+          partido_sem_vaga: "~ proj. partido s/ vaga",
+        }[sp] || `~ proj. ${sp}`;
+        badgeProp += `<div class="badge-prop-proj" title="Projeção baseada no ritmo recente — não é resultado final">${labelProj}</div>`;
+      }
     }
     const pillPart = badgePartidoHtml(c.partido);
     // Tarja de status matemático (eleito/eliminado). Cargo majoritário
@@ -987,27 +1000,37 @@ async function atualizarPainelTotais() {
     if (votos) animarNumero(votos, c.votos, 400);
     if (pct) {
       const pctApur = dados.totais?.pct_apurado || 0;
-      // Projeção como FAIXA entre duas métricas aritméticas simples:
-      //   - linear: votos_atual × secoes_total ÷ secoes_apuradas
-      //   - janela móvel: usa o ritmo das últimas 15 snapshots
-      // Se as duas convergem, a faixa colapsa num número só. Se divergem,
-      // a faixa reflete a incerteza real (ritmo mudou nas urnas recentes).
-      // Nenhuma modela composição regional das urnas faltantes — é só
-      // extrapolação. Some ao atingir 100% apurado.
+      // Projeção como FAIXA (votos e %, quando disponível):
+      //   - L = linear: votos_atual × secoes_total ÷ secoes_apuradas
+      //   - T = janela móvel: usa o ritmo das últimas 15 snapshots
+      // Convergem → número único. Divergem → faixa reflete incerteza real.
+      // Projeção % só nos majoritários (Presidente, Governador, Senador).
+      // Em proporcional (Dep. Fed/Est) % individual não decide eleição —
+      // é o cálculo proporcional (QE/QP/sobras) que define a vaga.
       const L = c.projecao_linear, T = c.projecao_tendencia;
+      const Tp = c.projecao_pct_tendencia;  // só vem pra majoritários
       const mostra = pctApur >= 30 && pctApur < 100 && L;
       let projTxt = "";
       if (mostra) {
-        if (T != null && T !== L) {
-          const lo = Math.min(L, T), hi = Math.max(L, T);
-          projTxt = ` · ~ ${fmtNum(lo)}–${fmtNum(hi)} proj.`;
-        } else {
-          projTxt = ` · ~ ${fmtNum(L)} proj.`;
+        // Votos: faixa L↔T quando divergem
+        const vTxt = (T != null && T !== L)
+          ? `${fmtNum(Math.min(L, T))}–${fmtNum(Math.max(L, T))}`
+          : fmtNum(L);
+        // Pct: faixa pct_atual↔Tp quando Tp existe E diverge do pct atual
+        let pTxt = "";
+        if (Tp != null) {
+          const pAtual = c.pct_validos;
+          const diff = Math.abs(Tp - pAtual);
+          pTxt = diff >= 0.1
+            ? ` · ${Math.min(pAtual, Tp).toFixed(1)}–${Math.max(pAtual, Tp).toFixed(1)}%`
+            : ` · ${pAtual.toFixed(1)}%`;
         }
+        projTxt = ` · ~ ${vTxt}${pTxt} proj.`;
       }
-      const tooltip = "Projeção aritmética (faixa entre extrapolação linear e janela "
-        + "móvel das últimas 15 atualizações). Não considera composição regional "
-        + "das urnas faltantes — é só estimativa. Some ao atingir 100%.";
+      const tooltip = "Projeção aritmética — faixa entre extrapolação linear e "
+        + "janela móvel das últimas 15 atualizações. Não considera composição "
+        + "regional das urnas faltantes. Projeção de % só em cargos majoritários. "
+        + "Some ao atingir 100%.";
       pct.innerHTML = `${c.pct_validos.toFixed(2)}% dos válidos`
         + (projTxt ? `<span class="cand-proj" title="${tooltip}">${projTxt}</span>` : "");
     }
