@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261004i";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004i";
+import { renderMapa } from "/static/mapa-br.js?v=20261004j";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004j";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1365,10 +1365,10 @@ async function atualizarGrafHome() {
       data: (data.series[sq] || []).map(p => [p.t, p.pct]),
     };
   });
-  // Layout responsivo: no mobile a legenda vai pra parte de baixo com
-  // scroll horizontal (muitos nomes atropelavam o eixo Y + se sobrepunham
-  // entre si), fontes menores, grid com mais margem embaixo pra caber a
-  // legenda. Desktop/TV mantêm legenda no topo.
+  // Layout responsivo. Mobile: legenda em cima (top:4) MAIS COMPACTA
+  // em uma linha. Grid com top:28 e bottom:28 pra dar área grande ao
+  // plot. Antes virava "listra" porque bottom:44 + containLabel comia
+  // metade da altura disponível.
   const estreito = window.innerWidth < 640;
   _grafHome.setOption({
     backgroundColor: "transparent",
@@ -1376,18 +1376,19 @@ async function atualizarGrafHome() {
                 backgroundColor: "#161b24", borderColor: "#303a4d",
                 textStyle: { color: "#ecf0f7" } },
     legend: estreito
-      ? { textStyle: { color: "#94a1b8", fontSize: 10 }, bottom: 0,
-          type: "scroll", icon: "circle", itemGap: 8,
-          itemWidth: 10, itemHeight: 10 }
+      ? { textStyle: { color: "#94a1b8", fontSize: 10 }, top: 4,
+          type: "scroll", icon: "circle", itemGap: 10,
+          itemWidth: 10, itemHeight: 10, pageIconSize: 10,
+          pageTextStyle: { color: "#94a1b8", fontSize: 9 } }
       : { textStyle: { color: "#94a1b8" }, top: 0, type: "scroll" },
     grid: estreito
-      ? { left: 40, right: 10, top: 10, bottom: 44, containLabel: true }
+      ? { left: 44, right: 14, top: 28, bottom: 24 }
       : { left: 48, right: 16, top: 36, bottom: 32 },
     xAxis: {
       type: "time",
       axisLabel: {
         color: "#94a1b8",
-        fontSize: estreito ? 10 : 12,
+        fontSize: estreito ? 9 : 12,
         hideOverlap: true,
         formatter: (val) => new Date(val).toLocaleTimeString("pt-BR",
           { timeZone: TZ, hour: "2-digit", minute: "2-digit" }),

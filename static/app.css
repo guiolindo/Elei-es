@@ -525,6 +525,13 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   min-height: 280px;
 }
 #graf-home { width: 100%; height: 300px; }
+/* Mobile: padding menor + altura explícita grande. Antes o chart virava
+   "listra" porque o próprio container ficava apertado entre padding do
+   .home-graf-wrap e o layout mobile. */
+@media (max-width: 640px) {
+  .home-graf-wrap { padding: 10px 8px; min-height: 260px; }
+  #graf-home { height: 240px; }
+}
 .home-graf-vazio {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
