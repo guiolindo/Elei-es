@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261004k";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004k";
+import { renderMapa } from "/static/mapa-br.js?v=20261004l";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004l";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1457,6 +1457,16 @@ function _absorverEventoNoState(ev) {
   // Popula state.eliminados / state.eleitos a partir de um evento.
   // Chamado no carregamento inicial e em cada evento novo via WS —
   // fonte única de verdade pro visual dos cards.
+  //
+  // IGNORA eventos majoritários em cargos proporcionais (Dep Fed=6, Dep
+  // Est=7). O motor matemático foi corrigido pra não emitir mais esses
+  // eventos pra proporcional, mas o banco pode ter eventos antigos
+  // acumulados do bug 05/10/2026 (candidato com AMBAS tarjas verde eleito
+  // + vermelha "sem chance"). Pra proporcional, quem está eleito ou sem
+  // chance vem do cálculo QE/QP/sobras em state.proporcional.
+  if (state.cargo === 6 || state.cargo === 7) {
+    return;
+  }
   if (ev.tipo === "MATEMATICAMENTE_ELIMINADO" && ev.sq_candidato_a) {
     state.eliminados.add(ev.sq_candidato_a);
   } else if ((ev.tipo === "ELEITO_1T" || ev.tipo === "ELEITO_MAJORITARIO")

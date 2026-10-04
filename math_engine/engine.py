@@ -487,6 +487,21 @@ def avaliar_apuracao(
     """
     if pct_apurado(totais) < APURACAO_MIN_PCT:
         return []
+    # EARLY RETURN pra cargos proporcionais (Dep Federal=6, Dep Estadual=7).
+    # Esta função avaliar_apuracao() calcula apenas ELEITO/MATEMATICAMENTE_
+    # ELIMINADO MAJORITÁRIO (quem tem mais votos ganha). Pra proporcional
+    # (QE/QP/sobras/D'Hondt) o cálculo está em math_engine.proporcional e
+    # é exposto via /api/apuracao/proporcional separado.
+    #
+    # Bug 05/10/2026 20:47 BRT em SP Dep Fed: engine aplicava lógica
+    # majoritária com vagas=1 (default), marcando Sâmia Bomfim, Kim
+    # Kataguiri e dezenas de outros TOP candidatos (que o motor proporcional
+    # tinha corretamente marcado como "✓ ELEITO · FED") como MATEMATICAMENTE_
+    # ELIMINADO porque não estavam no top-1. Resultado visual: candidato
+    # com AMBAS as tarjas verde (eleito) e vermelha (sem chance) ao mesmo
+    # tempo — contradição absoluta.
+    if cod_cargo in (6, 7):
+        return []
     # EXCLUSÃO LEGAL: candidatos com situação não-ativa recebem votos no
     # TSE mas por Lei 9.504/97 art. 175 §3º esses votos são considerados
     # nulos na apuração oficial. Motor os remove ANTES de qualquer
