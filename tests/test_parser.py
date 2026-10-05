@@ -75,3 +75,56 @@ def test_parse_vazio_tolerante():
     p = parse_snapshot({})
     assert p.totais.qt_secoes_total == 0
     assert p.candidatos == []
+
+
+def test_parse_qt_votos_validos_inclui_sub_judice():
+    """Caso RJ Gov 04/10/2026: candidato Garotinho estava "Indeferido em prazo
+    recursal" (sub judice). O TSE separa esses votos do `v.vv` do payload
+    porque podem virar nulos se o recurso for rejeitado — mas enquanto roda,
+    a Lei 9.504 art. 16-A manda contar como válidos pros efeitos de maioria
+    absoluta no 1T. O parser agora usa max(vv, sum(cand.vap)) pra não
+    subestimar o denominador e produzir falso-positivo de ELEITO_MAJORITARIO.
+    """
+    payload = {
+        "dg": "04/10/2026", "hg": "22:30:00",
+        "s": {"ts": 37675, "st": 37675},
+        "e": {"te": 12842517, "est": 12842517, "c": 9845867, "a": 2996650},
+        "v": {"vv": 8394627, "vb": 501537, "vn": 675292},  # TSE's vv exclui o sub judice
+        "carg": [{
+            "agr": [{
+                "par": [{
+                    "cand": [
+                        {"sqcand": "LIDER", "vap": 4271199, "pvap": 49.27, "nmu": "LIDER", "n": 22},
+                        {"sqcand": "SEG",   "vap": 3706984, "pvap": 42.76, "nmu": "SEG",   "n": 15},
+                        {"sqcand": "GAR",   "vap": 274411,  "pvap": 3.17,  "nmu": "GAROTINHO", "n": 10},
+                        {"sqcand": "D",     "vap": 235347,  "pvap": 2.71,  "nmu": "D", "n": 11},
+                        {"sqcand": "E",     "vap": 84889,   "pvap": 0.98,  "nmu": "E", "n": 12},
+                    ]
+                }]
+            }]
+        }],
+    }
+    p = parse_snapshot(payload)
+    soma = 4271199 + 3706984 + 274411 + 235347 + 84889
+    # Piso vence: TSE vv (8394627) < soma (8572830)
+    assert p.totais.qt_votos_validos == soma, (
+        f"Esperava max(vv_tse, soma_vap)={soma}, obteve {p.totais.qt_votos_validos}"
+    )
+    # Com o denominador correto, 2 × 4271199 = 8542398 NÃO ultrapassa
+    # 8572830 → líder NÃO tem maioria absoluta → vai pro 2T.
+    assert 2 * 4271199 < p.totais.qt_votos_validos
+
+
+def test_parse_qt_votos_validos_mantem_vv_quando_maior():
+    """Caso normal: TSE's vv >= soma. Mantém vv (nunca abaixa)."""
+    payload = {
+        "s": {"ts": 100, "st": 100},
+        "e": {"te": 1000, "est": 1000, "c": 900, "a": 100},
+        "v": {"vv": 800, "vb": 50, "vn": 50},
+        "carg": [{"agr": [{"par": [{"cand": [
+            {"sqcand": "A", "vap": 400},
+            {"sqcand": "B", "vap": 300},
+        ]}]}]}],
+    }
+    p = parse_snapshot(payload)
+    assert p.totais.qt_votos_validos == 800  # vv do TSE, não a soma 700

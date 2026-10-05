@@ -135,6 +135,24 @@ def parse_snapshot(payload: dict) -> ParsedSnapshot:
     e = root.get("e") if isinstance(root.get("e"), dict) else {}
     v = root.get("v") if isinstance(root.get("v"), dict) else {}
 
+    # Soma dos votos dos candidatos no payload — serve de piso pro
+    # qt_votos_validos. Bug 04/10/2026 (RJ Gov): TSE declarou 2T com
+    # líder em 49,27%, mas nosso engine declarou ELEITO_MAJORITARIO com
+    # "50,88%". Causa: o campo `v.vv` do TSE separa votos a candidato
+    # "indeferido em prazo recursal" (Garotinho, 274k votos). Enquanto
+    # roda o recurso o candidato segue na urna e votos contam como
+    # válidos pros efeitos de maioria absoluta (Lei 9.504 art. 16-A).
+    # Sem incluir essas 274k, o denominador fica subestimado e >50%
+    # vira falso-positivo. Fix: piso = sum(c.vap) do payload.
+    soma_vap = 0
+    if "carg" in root and isinstance(root["carg"], list) and root["carg"]:
+        for cargo in root["carg"]:
+            for agr in cargo.get("agr", []) or []:
+                for par in agr.get("par", []) or []:
+                    for cand in par.get("cand", []) or []:
+                        soma_vap += _to_int(cand.get("vap") or cand.get("votos") or cand.get("vv"))
+
+    vv_tse = _to_int(v.get("vv") or root.get("qt_votos_validos"))
     tot = ParsedTotais(
         # Total de seções da abrangência (ex.: 499.248 no BR).
         # Fallback pra chave legada `s` direto (fixtures antigas).
@@ -146,7 +164,7 @@ def parse_snapshot(payload: dict) -> ParsedSnapshot:
         ),
         qt_comparecimento=_to_int(e.get("c") or root.get("qt_comparecimento")),
         qt_abstencoes=_to_int(e.get("a") or root.get("qt_abstencoes")),
-        qt_votos_validos=_to_int(v.get("vv") or root.get("qt_votos_validos")),
+        qt_votos_validos=max(vv_tse, soma_vap),
         qt_votos_brancos=_to_int(v.get("vb") or root.get("qt_votos_brancos")),
         qt_votos_nulos=_to_int(v.get("vn") or root.get("qt_votos_nulos")),
         # TSE 2026: dg (data) e hg (hora) vêm SEPARADOS. Fixtures legadas
