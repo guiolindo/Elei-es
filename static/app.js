@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005e";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005e";
+import { renderMapa } from "/static/mapa-br.js?v=20261005f";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005f";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -128,6 +128,12 @@ function detectarTV() {
   return /SmartTV|SMART-TV|GoogleTV|AppleTV|LGSmartTV|LGE WebOS|Tizen|Web0?OS|WebOS|Roku|PlayStation|Xbox|HbbTV|NetCast|BRAVIA|SmartHub|CrKey|Vidaa|VIDAA|Vewd|Opera TV/i.test(ua);
 }
 if (detectarTV()) document.body.classList.add("is-tv");
+// Classe adicional pra layouts específicos de turno (TV 2T usa layout
+// head-to-head com 2 cards gigantes em vez de lista com scroll).
+function _sincronizarClasseTurno() {
+  document.body.classList.toggle("turno-1", state.turno === 1);
+  document.body.classList.toggle("turno-2", state.turno === 2);
+}
 
 // Toggle manual do modo TV (botão no rodapé).
 function alternarModoTV() {
@@ -416,6 +422,7 @@ async function trocarTurno(novoTurno) {
   if (novoTurno !== 1 && novoTurno !== 2) return;
   if (state.turno === novoTurno) return;
   state.turno = novoTurno;
+  _sincronizarClasseTurno();
   // Reset de contexto específico do turno anterior
   state.ultimoSnapshot = null;
   state.snapshotAnterior = null;
@@ -1349,11 +1356,23 @@ async function atualizarPainelTotais() {
   // Mapa do snapshot anterior pra calcular delta
   const antMap = new Map((state.snapshotAnterior?.candidatos || [])
     .map(c => [c.sq_candidato, c]));
+  // PERF: antes fazia 4 × N querySelectors globais no documento. Agora
+  // escaneia a lista UMA vez e indexa por sq pros 4 campos. Em Dep Est
+  // SP (94 candidatos × 4 queries = 376 scans do DOM) ia 50-200ms;
+  // agora é 1 pass de ~5ms.
+  const listaEl = document.getElementById("lista-candidatos");
+  const idx = { votos: {}, pct: {}, barra: {}, delta: {} };
+  if (listaEl) {
+    listaEl.querySelectorAll("[data-sq]").forEach(el => { idx.votos[el.dataset.sq] = el; });
+    listaEl.querySelectorAll("[data-sq-pct]").forEach(el => { idx.pct[el.dataset.sqPct] = el; });
+    listaEl.querySelectorAll("[data-sq-barra]").forEach(el => { idx.barra[el.dataset.sqBarra] = el; });
+    listaEl.querySelectorAll("[data-sq-delta]").forEach(el => { idx.delta[el.dataset.sqDelta] = el; });
+  }
   dados.candidatos.forEach(c => {
-    const votos = document.querySelector(`[data-sq="${c.sq_candidato}"]`);
-    const pct = document.querySelector(`[data-sq-pct="${c.sq_candidato}"]`);
-    const barra = document.querySelector(`[data-sq-barra="${c.sq_candidato}"]`);
-    const delta = document.querySelector(`[data-sq-delta="${c.sq_candidato}"]`);
+    const votos = idx.votos[c.sq_candidato];
+    const pct = idx.pct[c.sq_candidato];
+    const barra = idx.barra[c.sq_candidato];
+    const delta = idx.delta[c.sq_candidato];
     if (votos) animarNumero(votos, c.votos, 400);
     if (pct) {
       const pctApur = dados.totais?.pct_apurado || 0;
@@ -2167,12 +2186,15 @@ function bootMobile() {
   document.querySelectorAll(".m-nav-item, .m-fab, .m-chip, .m-icon-btn, .btn-ghost")
     .forEach(addRipple);
 
-  // Chip Cargo → bottom sheet
+  // Chip Cargo → bottom sheet. Em 2T só mostra Pres e Gov (único com 2T).
   $("m-chip-cargo")?.addEventListener("click", () => {
+    const permitidos = new Set(CARGOS_POR_TURNO[state.turno] || CARGOS_POR_TURNO[1]);
     abrirBottomSheet("Escolher cargo",
-      Object.entries(NOMES_CARGO).map(([k, v]) => ({
-        label: v, value: +k, ativo: +k === state.cargo,
-      })),
+      Object.entries(NOMES_CARGO)
+        .filter(([k]) => permitidos.has(+k))
+        .map(([k, v]) => ({
+          label: v, value: +k, ativo: +k === state.cargo,
+        })),
       (v) => {
         state.cargo = v;
         $("sel-cargo").value = v;
@@ -2363,6 +2385,7 @@ async function boot() {
 
   // Ordem: 1) prefs salvas 2) URL da share (sobrescreve) 3) ajusta UF ↔ cargo
   carregarPrefs();
+  _sincronizarClasseTurno();
   // Ripple em botões desktop também (não só mobile — QA reclamou de
   // "não vi animação"). Aplica em botões que já existem no DOM inicial.
   document.querySelectorAll(".btn-ghost, .btn-primary, .d-topnav-link").forEach(addRipple);

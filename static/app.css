@@ -535,6 +535,17 @@ body.is-tv .pag-btn { min-width: 32px; height: 32px; font-size: 12px; }
               background var(--dur-fast);
   display: flex; flex-direction: column; gap: 12px;
   overflow: hidden;
+  /* PERF: isolar reflow/paint do card. Mudar vote-count num card não
+     recalcula layout dos vizinhos. `contain: content` = layout + paint
+     + style + size (quando possível). */
+  contain: content;
+  /* PERF: browser pode pular rendering de cards fora da viewport e
+     renderizá-los quando entram em visualização — comportamento
+     automático de virtualização. Preserva animações pq o card renderiza
+     normalmente quando visível. contain-intrinsic-size reserva espaço
+     pra evitar jump no scroll. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 180px;
 }
 /* Barra de votos usa cor do partido em vez do gradiente dourado padrão
    — assim o visual do card bate com a cor que pinta o UF no mapa. */
@@ -2030,6 +2041,100 @@ body.is-tv ::-webkit-scrollbar-track { background: transparent; }
   body.is-tv .cand-votos { font-size: 32px; }
   body.is-tv .cand-nome { font-size: 20px; }
   body.is-tv .brand-title { font-size: 28px; }
+}
+
+/* ============ TV MODE · 2º TURNO · head-to-head ============
+   No 2T só tem 2 candidatos (Pres BR ou Gov UF). Em TV faz sentido
+   dar MUITO mais espaço pra eles — foto grande, votos gigantes,
+   lado-a-lado tipo partida de futebol. Mapa e gráfico ficam embaixo
+   compactos. */
+body.is-tv.turno-2 main.page {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  grid-template-areas:
+    "pagehead pagehead"
+    "lista    lista"
+    "mapa     grafico"
+    "eventos  eventos";
+}
+/* Lista vira 2 cards gigantes side-by-side */
+body.is-tv.turno-2 main.page > .grid-candidatos {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+  overflow: visible;
+  gap: 20px;
+  padding: 0;
+}
+body.is-tv.turno-2 .candidato {
+  padding: 24px 28px !important;
+  gap: 16px !important;
+  min-height: 0;
+  justify-content: space-between;
+  position: relative;
+  border-left-width: 8px;
+}
+body.is-tv.turno-2 .cand-topo { gap: 20px; align-items: center; }
+body.is-tv.turno-2 .cand-foto {
+  width: 120px !important; height: 120px !important; flex: 0 0 120px;
+  border: 3px solid var(--cor-partido);
+  border-radius: 50%;
+}
+body.is-tv.turno-2 .cand-nome {
+  font-size: 32px !important;
+  line-height: 1.1;
+  white-space: normal;
+  overflow: visible;
+}
+body.is-tv.turno-2 .cand-numero-tag { font-size: 18px; padding: 4px 10px; }
+body.is-tv.turno-2 .cand-uf-tag { font-size: 14px; }
+body.is-tv.turno-2 .pill-partido { font-size: 14px; padding: 3px 10px; }
+body.is-tv.turno-2 .cand-votos {
+  font-size: 56px !important;
+  margin: 8px 0 !important;
+  color: var(--cor-partido);
+  font-weight: 900;
+}
+body.is-tv.turno-2 .cand-pct { font-size: 18px; }
+body.is-tv.turno-2 .cand-barra {
+  height: 10px;
+  margin-top: 8px;
+  border-radius: 5px;
+}
+body.is-tv.turno-2 .cand-tarja {
+  font-size: 14px !important;
+  padding: 8px 14px !important;
+  margin-top: auto;
+}
+body.is-tv.turno-2 .cand-tarja svg { width: 18px; height: 18px; }
+/* Esconde elementos menos relevantes no head-to-head */
+body.is-tv.turno-2 .cand-check-vazio { display: none !important; }
+/* Mapa e gráfico ficam side-by-side embaixo, bem compactos */
+body.is-tv.turno-2 .mapa-secao { grid-area: mapa; }
+body.is-tv.turno-2 .home-graf-secao { grid-area: grafico; }
+/* Separador visual VS no meio dos 2 cards */
+body.is-tv.turno-2 main.page > .grid-candidatos::before {
+  content: "×";
+  position: absolute;
+  left: 50%; top: calc(50% + 30px);
+  transform: translate(-50%, -50%);
+  font-size: 72px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.1);
+  pointer-events: none;
+  z-index: 10;
+}
+/* 1920+: fontes ainda maiores no head-to-head */
+@media (min-width: 1920px) {
+  body.is-tv.turno-2 .cand-foto {
+    width: 160px !important; height: 160px !important; flex: 0 0 160px;
+  }
+  body.is-tv.turno-2 .cand-nome { font-size: 40px !important; }
+  body.is-tv.turno-2 .cand-votos { font-size: 72px !important; }
+  body.is-tv.turno-2 .cand-pct { font-size: 22px; }
+  body.is-tv.turno-2 main.page > .grid-candidatos::before {
+    font-size: 96px;
+  }
 }
 
 
