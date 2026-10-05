@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261004l";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261004l";
+import { renderMapa } from "/static/mapa-br.js?v=20261005a";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005a";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -19,11 +19,24 @@ const MAX_SEL = 4;
 // Eleições Gerais 2026 — primeiro domingo de outubro, art. 1º da Lei 9.504/97.
 // 17h BRT = fechamento das urnas e início da apuração.
 const DIA_D = new Date("2026-10-04T17:00:00-03:00");
+// 2º turno 2026: 26/10/2026 (último domingo de outubro), 17h BRT.
+const DIA_D_2T = new Date("2026-10-26T17:00:00-03:00");
 const TITULO_BASE = "Apuração 2026 · Brasil";
+
+// Default do turno: depois do fechamento do 1T (04/10 17h BRT), o site
+// vira a cara pro 2T automaticamente. Antes de 04/10 = 1T (pré-apuração);
+// a partir de 05/10 = 2T (foco principal do site). User pode trocar
+// manualmente via toggle no header.
+function _turnoPadrao() {
+  // Depois de 05/10/2026 00h BRT (dia seguinte ao 1T), default = 2
+  const CORTE = new Date("2026-10-05T00:00:00-03:00");
+  return Date.now() >= CORTE.getTime() ? 2 : 1;
+}
 
 const state = {
   cargo: 1,
   abrangencia: "BR",
+  turno: _turnoPadrao(),
   candidatos: [],
   ficha: {},
   selecionados: [],
@@ -57,6 +70,7 @@ function salvarPrefs() {
     localStorage.setItem(PREFS_KEY, JSON.stringify({
       cargo: state.cargo,
       abrangencia: state.abrangencia,
+      turno: state.turno,
       filtro: {
         partido: state.filtro.partido || "",
         ordenar: state.filtro.ordenar || "votos",
@@ -71,6 +85,7 @@ function carregarPrefs() {
     const p = JSON.parse(raw);
     if (typeof p.cargo === "number") state.cargo = p.cargo;
     if (typeof p.abrangencia === "string") state.abrangencia = p.abrangencia;
+    if (p.turno === 1 || p.turno === 2) state.turno = p.turno;
     if (p.filtro && typeof p.filtro === "object") state.filtro = {
       texto: "",  // sempre reseta — não restaura busca velha
       partido: p.filtro.partido || "",
@@ -341,7 +356,36 @@ function cargoRequerUF(cargo) {
   return cargo !== 1;  // 1 = Presidente é nacional
 }
 
+// Quais cargos existem em cada turno. Lei 9.504/97 + CF:
+//   1º turno: Presidente, Governador, Senador, Dep. Federal, Dep. Estadual
+//   2º turno: SÓ Presidente e Governador (nos lugares que não tiveram
+//             maioria absoluta no 1T). Senador e Deputados nunca têm 2T.
+const CARGOS_POR_TURNO = { 1: [1, 3, 5, 6, 7], 2: [1, 3] };
+
+function ajustarCargosPorTurno() {
+  const sel = document.getElementById("sel-cargo");
+  if (!sel) return;
+  const permitidos = new Set(CARGOS_POR_TURNO[state.turno] || CARGOS_POR_TURNO[1]);
+  Array.from(sel.options).forEach(o => {
+    const num = Number(o.value);
+    const permitido = permitidos.has(num);
+    o.hidden = !permitido;
+    o.disabled = !permitido;
+  });
+  // Se o cargo atual não existe nesse turno, cai pro Presidente
+  if (!permitidos.has(state.cargo)) {
+    state.cargo = 1;
+    sel.value = "1";
+  }
+  // Também atualiza o estado do toggle visual
+  document.querySelectorAll(".turno-btn").forEach(b => {
+    b.setAttribute("aria-pressed",
+      Number(b.dataset.turno) === state.turno ? "true" : "false");
+  });
+}
+
 function ajustarUFParaCargo() {
+  ajustarCargosPorTurno();
   const selUF = $("sel-uf");
   selUF.disabled = false;
   // Exterior ("ZZ") só vota em Presidente (CF art. 14 §1º + LC 44/82).
@@ -359,6 +403,31 @@ function ajustarUFParaCargo() {
       selUF.value = "SP";
     }
   }
+}
+
+// Trocar turno = reset completo (muda cargos disponíveis, estado da
+// apuração é outro, snapshots diferentes, candidatos diferentes).
+// Equivalente a mudar cargo+UF ao mesmo tempo + persistir em URL.
+async function trocarTurno(novoTurno) {
+  if (novoTurno !== 1 && novoTurno !== 2) return;
+  if (state.turno === novoTurno) return;
+  state.turno = novoTurno;
+  // Reset de contexto específico do turno anterior
+  state.ultimoSnapshot = null;
+  state.snapshotAnterior = null;
+  state.proporcional = null;
+  state.eliminados.clear();
+  state.eleitos.clear();
+  state.segundoTurno.clear();
+  state.selecionados = [];
+  salvarPrefs();
+  // Reflete turno na URL pra links compartilhados preservarem o contexto
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set("turno", String(state.turno));
+    history.replaceState({}, "", u.toString());
+  } catch(e) {}
+  await onFiltroChange();
 }
 
 // ============ lista de candidatos ============
@@ -1062,7 +1131,7 @@ async function inicializarGraficos() {
   const sqs = state.selecionados.join(",");
   let hist;
   try {
-    hist = await get(`/api/apuracao/historico?cargo=${state.cargo}&abrangencia=${state.abrangencia}&candidatos=${sqs}`);
+    hist = await get(`/api/apuracao/historico?cargo=${state.cargo}&abrangencia=${state.abrangencia}&candidatos=${sqs}&turno=${state.turno}`);
   } catch (e) {
     hist = { series: {} };
   }
@@ -1256,7 +1325,7 @@ async function atualizarMapa() {
   if (state.abrangencia === "BR") {
     const dadosPorUF = {};
     try {
-      const r = await fetch(`/api/apuracao/lideres-por-uf?cargo=${state.cargo}`);
+      const r = await fetch(`/api/apuracao/lideres-por-uf?cargo=${state.cargo}&turno=${state.turno}`);
       if (r.ok) {
         const j = await r.json();
         for (const [uf, d] of Object.entries(j.ufs || {})) {
@@ -1289,7 +1358,7 @@ async function atualizarMapa() {
   // Modo UF: mapa dos municípios daquela UF
   const dadosPorMun = {};
   try {
-    const r = await fetch(`/api/apuracao/lideres-por-municipio?cargo=${state.cargo}&uf=${state.abrangencia}`);
+    const r = await fetch(`/api/apuracao/lideres-por-municipio?cargo=${state.cargo}&uf=${state.abrangencia}&turno=${state.turno}`);
     if (r.ok) {
       const j = await r.json();
       for (const [mun, d] of Object.entries(j.municipios || {})) {
@@ -1340,7 +1409,7 @@ async function atualizarGrafHome() {
   }
   let data;
   try {
-    const r = await fetch(`/api/apuracao/historico?cargo=${state.cargo}&abrangencia=${state.abrangencia}&candidatos=${topSqs.join(",")}`);
+    const r = await fetch(`/api/apuracao/historico?cargo=${state.cargo}&abrangencia=${state.abrangencia}&candidatos=${topSqs.join(",")}&turno=${state.turno}`);
     if (!r.ok) throw 0;
     data = await r.json();
   } catch (e) {
@@ -1480,7 +1549,7 @@ function _absorverEventoNoState(ev) {
 
 async function carregarEventos() {
   let evs = [];
-  try { evs = await get(`/api/eventos?cargo=${state.cargo}&abrangencia=${state.abrangencia}`); } catch (e) {}
+  try { evs = await get(`/api/eventos?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=${state.turno}`); } catch (e) {}
   // Reseta os sets — cargo/UF podem ter mudado e temos que zerar
   state.eliminados.clear();
   state.eleitos.clear();
@@ -1534,7 +1603,7 @@ async function carregarEventos() {
 // ============ ciclo ============
 async function refreshApuracao() {
   try {
-    const novo = await get(`/api/apuracao/atual?cargo=${state.cargo}&abrangencia=${state.abrangencia}`);
+    const novo = await get(`/api/apuracao/atual?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=${state.turno}`);
     // Guarda snapshot anterior pra calcular tendência (só se realmente mudou)
     if (state.ultimoSnapshot?.disponivel &&
         state.ultimoSnapshot.coletado_em !== novo.coletado_em) {
@@ -1560,7 +1629,7 @@ async function refreshApuracao() {
   state.proporcional = null;
   if ((state.cargo === 6 || state.cargo === 7) && state.abrangencia !== "BR") {
     try {
-      const p = await get(`/api/apuracao/proporcional?cargo=${state.cargo}&uf=${state.abrangencia}`);
+      const p = await get(`/api/apuracao/proporcional?cargo=${state.cargo}&uf=${state.abrangencia}&turno=${state.turno}`);
       if (p.disponivel) state.proporcional = p;
     } catch (e) { /* sem dados ainda */ }
   }
@@ -1624,7 +1693,7 @@ function conectarWS() {
     try { state.ws.close(); } catch(e){}
   }
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  const ws = new WebSocket(`${proto}//${location.host}/ws/apuracao?cargo=${state.cargo}&abrangencia=${state.abrangencia}`);
+  const ws = new WebSocket(`${proto}//${location.host}/ws/apuracao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=${state.turno}`);
   ws.onopen = () => {
     $("conexao").querySelector(".dot").classList.add("on");
     $("conexao-label").textContent = "ao vivo";
@@ -1845,6 +1914,10 @@ async function compartilhar() {
 // ============ UX: aplicar estado vindo da URL ============
 function aplicarEstadoDaURL() {
   const p = new URLSearchParams(location.search);
+  if (p.has("turno")) {
+    const t = +p.get("turno");
+    if (t === 1 || t === 2) state.turno = t;
+  }
   if (p.has("cargo")) state.cargo = +p.get("cargo") || 1;
   if (p.has("uf")) state.abrangencia = p.get("uf");
   if (p.has("sqs")) state.selecionados = p.get("sqs").split(",").filter(Boolean).slice(0, MAX_SEL);
@@ -2064,6 +2137,10 @@ async function pedirNotificacoes() {
 async function boot() {
   $("sel-cargo").addEventListener("change", (e) => { state.cargo = +e.target.value; salvarPrefs(); onFiltroChange(); });
   $("sel-uf").addEventListener("change", (e) => { state.abrangencia = e.target.value; salvarPrefs(); onFiltroChange(); });
+  // Toggle 1T / 2T no header
+  document.querySelectorAll(".turno-btn").forEach(b => {
+    b.addEventListener("click", () => trocarTurno(Number(b.dataset.turno)));
+  });
   $("btn-fechar").addEventListener("click", fecharComparacao);
   $("btn-comparar").addEventListener("click", abrirComparacao);
   $("btn-notif").addEventListener("click", pedirNotificacoes);

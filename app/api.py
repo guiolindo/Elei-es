@@ -234,10 +234,20 @@ async def ficha(sq: str, sess: AsyncSession = Depends(get_session)) -> dict[str,
     }
 
 
-async def _ultimo_snapshot(sess: AsyncSession, cargo: int, abr: str) -> Snapshot | None:
+async def _ultimo_snapshot(
+    sess: AsyncSession, cargo: int, abr: str, turno: int | None = None,
+) -> Snapshot | None:
+    """Último snapshot não-suspeito pra (cargo, abrangencia).
+    turno=None → qualquer turno (último de todos).
+    turno=1 → só 1T (fica fixo em páginas de arquivo do 1º turno).
+    turno=2 → só 2T (novo default do site após 05/10/2026)."""
+    where = [Snapshot.cod_cargo == cargo, Snapshot.abrangencia == abr,
+             Snapshot.suspeito.is_(False)]
+    if turno is not None:
+        where.append(Snapshot.turno == turno)
     q = (
         select(Snapshot)
-        .where(and_(Snapshot.cod_cargo == cargo, Snapshot.abrangencia == abr, Snapshot.suspeito.is_(False)))
+        .where(and_(*where))
         .order_by(Snapshot.coletado_em.desc())
         .limit(1)
     )
@@ -350,6 +360,10 @@ async def _calcular_projecao_tendencia(
 async def apuracao_atual(
     cargo: int = Query(...),
     abrangencia: str = Query("BR"),
+    turno: int | None = Query(None, ge=1, le=2, description=
+        "Filtra pelo turno (1 ou 2). Omitido = último snapshot de qualquer "
+        "turno (compatibilidade). Páginas de 2T devem passar turno=2 "
+        "explicitamente; páginas de arquivo do 1T devem passar turno=1."),
     inflate: bool = Query(False, description=
         "Se true, inclui nome_urna/numero/partido/situacao de cada "
         "candidato inline no snapshot. Facilita auditoria via curl/"
@@ -357,7 +371,7 @@ async def apuracao_atual(
         "false pra manter o payload leve (hot path do WS)."),
     sess: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    snap = await _ultimo_snapshot(sess, cargo, abrangencia)
+    snap = await _ultimo_snapshot(sess, cargo, abrangencia, turno=turno)
     if not snap:
         return {"disponivel": False}
     tot = (await sess.execute(select(SnapshotTotais).where(SnapshotTotais.snapshot_id == snap.id))).scalar_one()
@@ -480,10 +494,18 @@ async def historico(
     cargo: int = Query(...),
     abrangencia: str = Query("BR"),
     candidatos: str = Query(..., description="lista sq_candidato separada por vírgula"),
+    turno: int | None = Query(None, ge=1, le=2),
     desde: datetime | None = None,
     sess: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     sqs = [s for s in candidatos.split(",") if s]
+    where_clauses = [
+        Snapshot.cod_cargo == cargo,
+        Snapshot.abrangencia == abrangencia,
+        Snapshot.suspeito.is_(False),
+    ]
+    if turno is not None:
+        where_clauses.append(Snapshot.turno == turno)
     stmt = (
         select(Snapshot.id, Snapshot.coletado_em, SnapshotCandidato.sq_candidato,
                SnapshotCandidato.votos, SnapshotCandidato.pct_validos,
@@ -492,9 +514,7 @@ async def historico(
         .join(SnapshotCandidato, SnapshotCandidato.snapshot_id == Snapshot.id)
         .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
         .where(and_(
-            Snapshot.cod_cargo == cargo,
-            Snapshot.abrangencia == abrangencia,
-            Snapshot.suspeito.is_(False),
+            *where_clauses,
             # Só inclui snapshots que já são apuração — critério é
             # qt_secoes_totalizadas > 0 (não qt_votos_validos). Diferença
             # importante no dia D: uma seção pode ter sido totalizada com
@@ -719,6 +739,7 @@ async def detalhe_municipio(
 async def lideres_por_municipio(
     cargo: int = Query(...),
     uf: str = Query(...),
+    turno: int | None = Query(None, ge=1, le=2),
     sess: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Retorna líder de cada município da UF, extraído do breakdown por
@@ -729,13 +750,16 @@ async def lideres_por_municipio(
     """
     from sqlalchemy import func
     # Último snapshot dessa (cargo, uf) e busca líder por município
+    base_where = [
+        Snapshot.cod_cargo == cargo,
+        Snapshot.abrangencia == uf,
+        Snapshot.suspeito.is_(False),
+    ]
+    if turno is not None:
+        base_where.append(Snapshot.turno == turno)
     subq = (
         select(func.max(Snapshot.id).label("last_id"))
-        .where(
-            Snapshot.cod_cargo == cargo,
-            Snapshot.abrangencia == uf,
-            Snapshot.suspeito.is_(False),
-        )
+        .where(and_(*base_where))
         .scalar_subquery()
     )
     # Top-5 por município pra conseguir pular retirados/cassados —
@@ -785,6 +809,7 @@ async def lideres_por_municipio(
 @router.get("/apuracao/lideres-por-uf")
 async def lideres_por_uf(
     cargo: int = Query(...),
+    turno: int | None = Query(None, ge=1, le=2),
     sess: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Retorna, para cada UF onde há snapshot desse cargo, quem está em 1º.
@@ -795,13 +820,16 @@ async def lideres_por_uf(
     """
     # Último snapshot por UF/cargo — subquery com max(coletado_em) por UF
     from sqlalchemy import func
+    base_where = [Snapshot.cod_cargo == cargo, Snapshot.suspeito.is_(False),
+                  Snapshot.abrangencia != "BR"]
+    if turno is not None:
+        base_where.append(Snapshot.turno == turno)
     subq = (
         select(
             Snapshot.abrangencia.label("abr"),
             func.max(Snapshot.coletado_em).label("ts"),
         )
-        .where(Snapshot.cod_cargo == cargo, Snapshot.suspeito.is_(False),
-               Snapshot.abrangencia != "BR")
+        .where(and_(*base_where))
         .group_by(Snapshot.abrangencia)
         .subquery()
     )
@@ -854,11 +882,20 @@ async def lideres_por_uf(
 async def eventos(
     cargo: int = Query(...),
     abrangencia: str = Query("BR"),
+    turno: int | None = Query(None, ge=1, le=2, description=
+        "Filtra eventos pelo turno (1 ou 2). Omitido = todos os turnos. "
+        "Páginas 2T devem passar turno=2 pra não mostrar MATEMATICAMENTE_"
+        "ELIMINADO/VIRADA do 1T no feed do 2T."),
     sess: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
+    where = [Evento.cod_cargo == cargo, Evento.abrangencia == abrangencia]
+    if turno is not None:
+        # Snapshot do evento tem o turno; join leve
+        where.append(Evento.snapshot_id.in_(
+            select(Snapshot.id).where(Snapshot.turno == turno)
+        ))
     r = await sess.execute(
-        select(Evento).where(Evento.cod_cargo == cargo, Evento.abrangencia == abrangencia)
-        .order_by(Evento.ocorrido_em)
+        select(Evento).where(and_(*where)).order_by(Evento.ocorrido_em)
     )
     return [
         {

@@ -241,6 +241,42 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 }
 .brand-sub { font-size: 12px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
 
+/* Toggle 1T / 2T no header. Segmented control compacto, visualmente
+   secundário ao brand mas visível pra qualquer usuário trocar sem
+   ter que mexer em URL. */
+.turno-toggle {
+  display: inline-flex;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+  margin-left: 14px;
+}
+.turno-btn {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.turno-btn:hover { color: var(--fg); }
+.turno-btn[aria-pressed="true"] {
+  background: var(--brand);
+  color: #17130b;
+}
+@media (max-width: 640px) {
+  .turno-toggle { margin-left: 0; order: 10; }
+  .turno-btn { padding: 5px 10px; font-size: 11px; }
+}
+body.is-tv .turno-toggle { margin-left: 10px; padding: 2px; }
+body.is-tv .turno-btn { font-size: 11px; padding: 4px 12px; }
+
 .filtros { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .filtro-grupo { display: flex; flex-direction: column; gap: 4px; }
 .filtro-grupo label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-left: 2px; }
