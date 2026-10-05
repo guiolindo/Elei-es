@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005n";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005n";
+import { renderMapa } from "/static/mapa-br.js?v=20261005o";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005o";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -413,6 +413,33 @@ function ajustarUFParaCargo() {
       selUF.value = "SP";
     }
   }
+  // 2T + Governador: só mostra UFs que têm 2º turno (CF art. 77 §2º,
+  // >50% dos válidos no 1T encerra). As demais estão decididas, não
+  // há coleta nem apuração de 2T lá.
+  const ufsGov2T = state._ufsGov2T;  // populado por carregarUfsGov2T()
+  Array.from(selUF.options).forEach(o => {
+    if (o.value === "ZZ" || o.value === "BR") return;  // controlados acima
+    const esconderPor2T = (state.turno === 2 && state.cargo === 3 &&
+                           Array.isArray(ufsGov2T) && !ufsGov2T.includes(o.value));
+    o.hidden = esconderPor2T;
+    o.disabled = esconderPor2T;
+  });
+  // Se a UF atual não tem 2T de Gov, pula pra primeira que tem
+  if (state.turno === 2 && state.cargo === 3 && Array.isArray(ufsGov2T) &&
+      ufsGov2T.length > 0 && !ufsGov2T.includes(state.abrangencia)) {
+    state.abrangencia = ufsGov2T[0];
+    selUF.value = state.abrangencia;
+  }
+}
+
+// Lista de UFs com 2T de Gov. Cacheia uma vez por carga; refetch quando
+// chega evento SEGUNDO_TURNO_DEFINIDO (novo 2T aparece durante apuração 1T).
+async function carregarUfsGov2T() {
+  try {
+    state._ufsGov2T = await get("/api/segundo-turno/ufs-governador");
+  } catch (e) {
+    state._ufsGov2T = [];
+  }
 }
 
 // Trocar turno = reset completo (muda cargos disponíveis, estado da
@@ -444,6 +471,7 @@ async function trocarTurno(novoTurno) {
     u.searchParams.set("turno", String(state.turno));
     history.replaceState({}, "", u.toString());
   } catch(e) {}
+  await carregarUfsGov2T();  // lista pode ter mudado entre páginas 1T↔2T
   await onFiltroChange();
 }
 
@@ -2038,6 +2066,8 @@ function conectarWS() {
           toast(`${nome} eleito(a)!`, "ok");
         } else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
           toast(`2º turno matematicamente definido`, "ok");
+          // Nova UF com 2T de Gov → refresca o dropdown pra ela aparecer
+          carregarUfsGov2T().then(() => ajustarUFParaCargo());
         } else {
           toast(`✓ ${nome} eleito(a)`, "ok");
         }
@@ -2683,6 +2713,7 @@ async function boot() {
   // pode mudar state.abrangencia (ex.: cargo=5 obriga UF, muda BR→SP), então
   // só sincronizamos os selects DEPOIS dele pra evitar valor desatualizado.
   const selCargo = $("sel-cargo"); if (selCargo) selCargo.value = state.cargo;
+  await carregarUfsGov2T();  // antes do ajustarUFParaCargo pra já esconder as sem 2T no primeiro paint
   ajustarUFParaCargo();
   const selUF = $("sel-uf"); if (selUF) selUF.value = state.abrangencia;
   // Restaura filtros nos inputs (localStorage → UI). filtro.texto é

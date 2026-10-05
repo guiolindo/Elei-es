@@ -99,6 +99,21 @@ async def listar_ufs(sess: AsyncSession = Depends(get_session)) -> list[dict[str
     return [{"sigla": u.sigla, "nome": u.nome} for u in r.scalars()]
 
 
+@router.get("/segundo-turno/ufs-governador")
+async def ufs_governador_segundo_turno(
+    sess: AsyncSession = Depends(get_session),
+) -> list[str]:
+    """UFs que terão 2º turno de Governador (CF art. 77 §2º: só com <50%+1
+    dos válidos no 1T). O frontend usa pra esconder do dropdown de UF, no
+    modo 2T + cargo Governador, as UFs que já foram decididas no 1T."""
+    r = await sess.execute(
+        select(Evento.abrangencia).where(
+            and_(Evento.cod_cargo == 3, Evento.tipo == "SEGUNDO_TURNO_DEFINIDO")
+        ).distinct()
+    )
+    return sorted({row for row in r.scalars() if row})
+
+
 @router.get("/candidatos")
 async def listar_candidatos(
     cargo: int = Query(...),
