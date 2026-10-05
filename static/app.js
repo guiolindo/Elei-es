@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005f";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005f";
+import { renderMapa } from "/static/mapa-br.js?v=20261005g";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005g";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -310,10 +310,10 @@ const fmtHora = iso => new Date(iso).toLocaleTimeString("pt-BR", { timeZone: TZ 
 const $ = id => document.getElementById(id);
 
 // Anima transição entre valores numéricos (efeito ao vivo)
-function animarNumero(el, novoValor, duracao = 500) {
+function animarNumero(el, novoValor, duracao = 500, sufixo = "") {
   if (!el) return;
   const anterior = parseInt((el.dataset.valor || el.textContent).replace(/\D/g, ""), 10) || 0;
-  if (anterior === novoValor) { el.textContent = fmtNum(novoValor); return; }
+  if (anterior === novoValor) { el.textContent = fmtNum(novoValor) + sufixo; return; }
   el.dataset.valor = novoValor;
   // Flash: destaque visual sutil pra sinalizar mudança
   if (anterior > 0) {
@@ -327,9 +327,9 @@ function animarNumero(el, novoValor, duracao = 500) {
     const p = Math.min(1, (t - inicio) / duracao);
     const eased = 1 - Math.pow(1 - p, 3);
     const atual = Math.round(anterior + (novoValor - anterior) * eased);
-    el.textContent = fmtNum(atual);
+    el.textContent = fmtNum(atual) + sufixo;
     if (p < 1) requestAnimationFrame(tick);
-    else el.textContent = fmtNum(novoValor);
+    else el.textContent = fmtNum(novoValor) + sufixo;
   }
   requestAnimationFrame(tick);
 }
@@ -445,7 +445,17 @@ async function trocarTurno(novoTurno) {
 async function carregarCandidatos() {
   renderSkeletons(6);
   const uf = state.abrangencia === "BR" ? "" : `&uf=${state.abrangencia}`;
-  const cands = await get(`/api/candidatos?cargo=${state.cargo}${uf}&turno=${state.turno}`);
+  let cands;
+  try {
+    cands = await get(`/api/candidatos?cargo=${state.cargo}${uf}&turno=${state.turno}`);
+  } catch (e) {
+    // Error state: ao invés de travar com skeletons eternos, mostra uma
+    // UI acionável com botão "tentar de novo". Toast também sinaliza.
+    console.warn("falha ao carregar candidatos:", e);
+    toast("Falha de rede ao carregar candidatos", "warn");
+    renderErroCarregamento("candidatos", carregarCandidatos);
+    return;
+  }
   atualizarSubtitulo();
   state.candidatos = cands;
   state.ficha = {};
@@ -455,6 +465,25 @@ async function carregarCandidatos() {
   atualizarFiltroPartidos();
   renderLista();
   atualizarChipCount();
+}
+
+// Error state generalizado — reusável pra qualquer fetch que falhar.
+// UI acionável (botão de retry) + mensagem clara + ícone.
+function renderErroCarregamento(contexto, acaoRetry) {
+  const el = document.getElementById("lista-candidatos");
+  if (!el) return;
+  el.innerHTML = `
+    <div class="empty-state error-state" role="alert">
+      <svg class="empty-ico" width="48" height="48" aria-hidden="true"><use href="#i-x"/></svg>
+      <h3>Não consegui carregar ${contexto}</h3>
+      <p>Pode ser rede caindo ou o servidor sobrecarregado no dia da apuração.
+      Tenta de novo em alguns segundos.</p>
+      <button type="button" class="btn-primary error-retry">↻ Tentar de novo</button>
+    </div>`;
+  el.querySelector(".error-retry")?.addEventListener("click", () => {
+    renderSkeletons(6);
+    acaoRetry();
+  });
 }
 
 function candidatosFiltrados() {
@@ -802,9 +831,9 @@ function renderLista() {
         <button type="button" class="cand-check-vazio" data-comparar="${c.sq_candidato}" aria-label="${sel >= 0 ? 'Remover da comparação' : 'Adicionar à comparação'}" aria-pressed="${sel >= 0 ? 'true' : 'false'}"></button>
       </div>
       <div class="cand-metricas">
-        <div class="cand-votos" data-sq="${c.sq_candidato}">0 votos</div>
+        <div class="cand-pct" data-sq-pct="${c.sq_candidato}">0,00%<span class="cand-pct-sub"> dos válidos</span></div>
         <div class="cand-linha-inf">
-          <span class="cand-pct" data-sq-pct="${c.sq_candidato}">0,00% dos válidos</span>
+          <span class="cand-votos" data-sq="${c.sq_candidato}">0 votos</span>
           <span class="cand-delta" data-sq-delta="${c.sq_candidato}"></span>
         </div>
         <div class="cand-barra"><div data-sq-barra="${c.sq_candidato}" style="width:0%"></div></div>
@@ -1373,7 +1402,12 @@ async function atualizarPainelTotais() {
     const pct = idx.pct[c.sq_candidato];
     const barra = idx.barra[c.sq_candidato];
     const delta = idx.delta[c.sq_candidato];
-    if (votos) animarNumero(votos, c.votos, 400);
+    if (votos) {
+      // Agora votos vira texto secundário ("1.234.567 votos"), com %
+      // promovido pro número principal. animarNumero recebe só o número,
+      // o " votos" entra via dataset pra não re-renderizar.
+      animarNumero(votos, c.votos, 400, " votos");
+    }
     if (pct) {
       const pctApur = dados.totais?.pct_apurado || 0;
       // Projeção como FAIXA (votos e %, quando disponível):
@@ -1407,7 +1441,11 @@ async function atualizarPainelTotais() {
         + "janela móvel das últimas 15 atualizações. Não considera composição "
         + "regional das urnas faltantes. Projeção de % só em cargos majoritários. "
         + "Some ao atingir 100%.";
-      pct.innerHTML = `${c.pct_validos.toFixed(2)}% dos válidos`
+      // % passou a ser o número hero do card. Formato:
+      //   48,50<span class="cand-pct-sub"> dos válidos</span>
+      // Visual: 48,50 é o grande (herda font-size do .cand-pct), "dos
+      // válidos" é cinza/pequeno via .cand-pct-sub.
+      pct.innerHTML = `${c.pct_validos.toFixed(2)}%<span class="cand-pct-sub"> dos válidos</span>`
         + (projTxt ? `<span class="cand-proj" title="${tooltip}">${projTxt}</span>` : "");
     }
     if (barra) barra.style.width = (c.votos / maxV * 100) + "%";

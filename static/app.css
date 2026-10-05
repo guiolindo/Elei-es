@@ -502,6 +502,96 @@ body.is-tv .turno-btn { font-size: 11px; padding: 4px 12px; }
   color: var(--muted);
   user-select: none;
 }
+
+/* ============ Error state ============ */
+.error-state {
+  padding: 32px 20px;
+  text-align: center;
+  background: rgba(239, 68, 68, 0.04);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius);
+}
+.error-state .empty-ico {
+  color: var(--danger);
+  margin-bottom: 12px;
+}
+.error-state h3 {
+  color: var(--fg);
+  margin: 0 0 8px;
+}
+.error-state p {
+  color: var(--muted);
+  max-width: 420px;
+  margin: 0 auto 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.error-retry {
+  min-height: 44px;
+  padding: 10px 24px;
+}
+
+/* ============ Prefers-reduced-motion refinamento ============
+   Antes só matava animações. Agora adiciona crossfade suave (opacity)
+   que respeita o standard mas mantém feedback visual de mudança. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Mas crossfade de aparição ainda rola: 150ms suave, não jarring */
+  .anim-in-up,
+  .toast,
+  .empty-state {
+    animation: fade-in 150ms ease-out !important;
+    opacity: 1;
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+/* ============ A11Y: foco visível em TODOS os elementos interativos ============
+   Apple HIG + WCAG 2.4.7: focus visível é obrigatório pra keyboard nav.
+   Antes só alguns elementos tinham outline, outros ficavam invisíveis
+   ao tabular. Agora padrão consistente em tudo que foca. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+.candidato:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ============ Touch targets: WCAG 2.5.5 recomenda min 44x44 ============
+   Antes vários botões ficavam 24-32px (bolinha, chip arrow). Agora
+   todos clicáveis atingem o mínimo via min-height/width ou padding
+   que soma 44px no total do hitbox. */
+@media (hover: none) and (pointer: coarse) {
+  button, [role="button"], a.btn-ghost, a.btn-primary,
+  .m-chip, .m-nav-item, .cand-acao, .pag-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Permite bolinha pequena mas com área clicável maior via before */
+  .cand-check-vazio {
+    position: relative;
+  }
+  .cand-check-vazio::before {
+    content: "";
+    position: absolute;
+    inset: -8px;  /* expande hitbox invisível pra 44x44 total */
+  }
+}
 .pag-info {
   width: 100%;
   text-align: center;
@@ -641,26 +731,41 @@ body.is-tv .pag-btn { min-width: 32px; height: 32px; font-size: 12px; }
   font-size: 11px; color: var(--muted); letter-spacing: 0.4px;
 }
 
-/* Bloco 2: métricas */
-.cand-metricas { display: flex; flex-direction: column; gap: 6px; }
-.cand-votos {
-  font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums; color: var(--fg);
-}
-.cand-linha-inf {
-  display: flex; gap: 8px; align-items: baseline; min-height: 16px;
-  /* flex-wrap: wrap pra deixar a faixa de projeção descer pra linha
-     seguinte quando o card não comporta tudo em uma linha. Antes o texto
-     passava reto da borda em telas estreitas (mobile vertical, TV
-     3-colunas). */
-  flex-wrap: wrap;
-}
+/* Bloco 2: métricas — HIERARQUIA CORRETA: % é o KPI principal da
+   eleição (quem está ganhando, por quanto), votos é apoio. Antes votos
+   dominava (22px bold) e % ficava 12px discreto; agora INVERTIDO. */
+.cand-metricas { display: flex; flex-direction: column; gap: 4px; }
 .cand-pct {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px; color: var(--fg-2);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--cor-partido);
+  font-variant-numeric: tabular-nums;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+/* "dos válidos" não deve brigar com o número — vira subtítulo discreto */
+.cand-pct-sub {
+  font-size: 0.4em;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.4px;
+  margin-left: 2px;
+  vertical-align: 0.3em;
+}
+.cand-votos {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.cand-linha-inf {
+  display: flex; gap: 8px; align-items: baseline; min-height: 14px;
+  flex-wrap: wrap;
 }
 /* Projeção ao final da apuração — discreta, não compete com o número real.
    Some automaticamente ao chegar 100% (controlado em JS). */
@@ -1902,15 +2007,24 @@ body.is-tv .cand-nome { font-size: 13px; line-height: 1.15; }
 body.is-tv .cand-numero-tag { font-size: 11px; padding: 1px 5px; }
 body.is-tv .cand-uf-tag { font-size: 10px; }
 body.is-tv .pill-partido { font-size: 10px; padding: 1px 5px; }
-body.is-tv .cand-votos { font-size: 18px !important; margin: 0 !important; line-height: 1.1; }
+/* TV 1T: % é hero (igual ao resto), votos é apoio. Antes votos tinha
+   18px bold e % 11px discreto — invertido pra bater com hierarquia
+   correta (% é o KPI da eleição). */
 body.is-tv .cand-pct {
-  font-size: 11px;
-  /* Em TV o texto base + faixa de projeção estava passando reto da
-     largura do card porque .cand-pct tem white-space:nowrap por default.
-     Quebra em várias linhas quando necessário, com line-height compacto. */
+  font-size: 24px !important;
+  font-weight: 800;
+  line-height: 1;
   white-space: normal !important;
-  line-height: 1.3;
   word-break: break-word;
+  margin: 2px 0;
+}
+body.is-tv .cand-pct-sub { font-size: 0.4em; }
+body.is-tv .cand-votos {
+  font-size: 11px !important;
+  margin: 0 !important;
+  line-height: 1.2;
+  color: var(--muted);
+  font-weight: 600;
 }
 body.is-tv .cand-linha-inf {
   flex-wrap: wrap;
@@ -2038,9 +2152,11 @@ body.is-tv ::-webkit-scrollbar-track { background: transparent; }
 @media (min-width: 1920px) {
   body.is-tv { font-size: 20px; }
   body.is-tv .stat-hero .stat-value { font-size: 60px; }
-  body.is-tv .cand-votos { font-size: 32px; }
+  body.is-tv .cand-pct { font-size: 32px !important; }
+  body.is-tv .cand-votos { font-size: 13px !important; }
   body.is-tv .cand-nome { font-size: 20px; }
   body.is-tv .brand-title { font-size: 28px; }
+  body.is-tv.turno-2 .cand-pct { font-size: 128px !important; }
 }
 
 /* ============ TV MODE · 2º TURNO · head-to-head ============
@@ -2089,13 +2205,29 @@ body.is-tv.turno-2 .cand-nome {
 body.is-tv.turno-2 .cand-numero-tag { font-size: 18px; padding: 4px 10px; }
 body.is-tv.turno-2 .cand-uf-tag { font-size: 14px; }
 body.is-tv.turno-2 .pill-partido { font-size: 14px; padding: 3px 10px; }
-body.is-tv.turno-2 .cand-votos {
-  font-size: 56px !important;
-  margin: 8px 0 !important;
+/* HIERARQUIA: % é o KPI principal da apuração. Em TV 2T head-to-head
+   tipo partida de futebol: % domina a tela, votos é info secundária.
+   Antes votos tinha 56px e % 18px — inverteu completamente. */
+body.is-tv.turno-2 .cand-pct {
+  font-size: 96px !important;
+  font-weight: 900 !important;
+  line-height: 1;
+  margin: 12px 0 4px;
   color: var(--cor-partido);
-  font-weight: 900;
+  text-align: left;
 }
-body.is-tv.turno-2 .cand-pct { font-size: 18px; }
+body.is-tv.turno-2 .cand-pct-sub {
+  font-size: 0.2em;
+  color: var(--muted);
+}
+body.is-tv.turno-2 .cand-votos {
+  font-size: 20px !important;
+  margin: 0 !important;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  font-variant-numeric: tabular-nums;
+}
 body.is-tv.turno-2 .cand-barra {
   height: 10px;
   margin-top: 8px;
