@@ -2209,13 +2209,14 @@ body.is-tv.turno-2 .cand-numero-tag { font-size: 11px; padding: 1px 5px; }
 body.is-tv.turno-2 .cand-uf-tag { font-size: 10px; }
 body.is-tv.turno-2 .pill-partido { font-size: 10px; padding: 1px 5px; }
 body.is-tv.turno-2 .cand-metricas {
-  flex: 0 0 auto;
-  min-width: 150px;
+  flex: 0 0 180px;
+  width: 180px;
   text-align: right;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 2px;
+  font-variant-numeric: tabular-nums;
 }
 /* HIERARQUIA: % é o KPI principal da apuração. Em TV 2T head-to-head
    tipo partida de futebol: % domina a tela, votos é info secundária.
@@ -2231,6 +2232,9 @@ body.is-tv.turno-2 .cand-pct {
 body.is-tv.turno-2 .cand-pct-sub {
   font-size: 0.3em;
   color: var(--muted);
+  display: block;
+  line-height: 1.1;
+  margin-top: 2px;
 }
 body.is-tv.turno-2 .cand-votos {
   font-size: 11px !important;
@@ -2334,10 +2338,11 @@ body.is-tv.turno-2 main.page {
 /* Cards no side-top ficam EMPILHADOS (um sobre o outro) porque a coluna
    right é estreita. Cada card horizontal ocupa a largura inteira. */
 body.is-tv.turno-2 main.page {
-  grid-template-rows: auto minmax(0, auto) minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, auto) minmax(0, auto) minmax(0, 1fr) auto;
   grid-template-areas:
     "pagehead pagehead"
     "mapa     side-top"
+    "mapa     side-mid"
     "mapa     side-bot"
     "eventos  eventos";
 }
@@ -2349,12 +2354,15 @@ body.is-tv.turno-2 main.page > .grid-candidatos {
   padding: 0;
   overflow: visible;
 }
+body.is-tv.turno-2 main.page > .tv2t-placar {
+  grid-area: side-mid;
+  display: flex !important;
+}
 body.is-tv.turno-2 main.page > .home-graf-secao {
   grid-area: side-bot;
 }
-/* Placar e UFs removidos */
-body.is-tv.turno-2 .tv2t-ufs,
-body.is-tv.turno-2 .tv2t-placar { display: none !important; }
+/* UFs lideradas segue oculto por falta de espaço — placar volta como 2º gráfico */
+body.is-tv.turno-2 .tv2t-ufs { display: none !important; }
 /* Mapa dominante — reduz padding interno pra Brasil shape ocupar
    quase toda a célula. */
 body.is-tv.turno-2 .mapa-wrap { padding: 2px !important; }
