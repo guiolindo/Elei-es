@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005m";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005m";
+import { renderMapa } from "/static/mapa-br.js?v=20261005n";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005n";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1308,22 +1308,61 @@ async function inicializarGraficos() {
     }],
   });
 
-  // faixa de vitória
-  const serie = (idx) => {
-    const s = hist.series[state.selecionados[idx]] || [];
-    return {
-      name: nomes[idx], type: "line", smooth: true, showSymbol: false,
-      color: PALETA[idx], lineStyle: { width: 2 },
-      data: s.map(p => [p.t, p.votos]),
-      markArea: {
-        itemStyle: { color: PALETA[idx], opacity: 0.12 },
-        data: s.map(p => [{ xAxis: p.t, yAxis: p.votos }, { xAxis: p.t, yAxis: p.votos + (p.restantes_max || 0) }]),
-      },
-    };
-  };
+  // Margem até vitória matemática: líder.votos − (2º.votos + 2º.restantes_max).
+  // Enquanto negativa → 2º ainda tem como virar matematicamente. Cruza o
+  // zero → líder já venceu, não há cenário em que o 2º alcança. É info
+  // ortogonal ao graf-votos (que mostra totais) e ao graf-dif (gap atual
+  // de votos). Aqui o eixo Y é a MARGEM DE SEGURANÇA matemática ao longo
+  // do tempo. Y=0 em linha dashed = fronteira da vitória.
+  let seriesMargem = [];
+  if (state.selecionados.length >= 2) {
+    const [A, B] = state.selecionados;
+    const mA = new Map((hist.series[A] || []).map(p => [p.t, p]));
+    const mB = new Map((hist.series[B] || []).map(p => [p.t, p]));
+    for (const t of mA.keys()) {
+      if (!mB.has(t)) continue;
+      const pA = mA.get(t), pB = mB.get(t);
+      const tetoB = (pB.votos || 0) + (pB.restantes_max || 0);
+      seriesMargem.push([t, (pA.votos || 0) - tetoB]);
+    }
+  }
+  const nomeA = nomes[0] || "A";
+  const nomeB = nomes[1] || "B";
   graf("graf-banda").setOption({
     ...baseOpts(),
-    series: state.selecionados.map((_, i) => serie(i)),
+    tooltip: { trigger: "axis",
+      formatter: (params) => {
+        const p = params[0];
+        const v = p.value[1];
+        const sinal = v >= 0
+          ? `<b style="color:#22c55e">${nomeA} já venceu</b> (sobra +${fmtNum(v)} votos acima do teto de ${nomeB})`
+          : `${nomeB} ainda pode virar: faltam ${fmtNum(-v)} votos pra alcançar o teto`;
+        return `${new Date(p.value[0]).toLocaleString("pt-BR")}<br>${sinal}`;
+      } },
+    series: [{
+      name: `margem de ${nomeA}`, type: "line", smooth: true, showSymbol: false,
+      data: seriesMargem,
+      lineStyle: { width: 2.5, color: "#f0b429" },
+      areaStyle: {
+        opacity: 0.25,
+        color: {
+          type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: "rgba(34,197,94,0.4)" },     // verde no topo (ganhando)
+            { offset: 0.5, color: "rgba(240,180,41,0.3)" },  // amarelo no meio
+            { offset: 1, color: "rgba(239,68,68,0.35)" },    // vermelho embaixo (perdendo)
+          ],
+        },
+      },
+      markLine: {
+        symbol: "none",
+        data: [{
+          yAxis: 0,
+          label: { formatter: "FRONTEIRA · vitória matemática", color: "#f0b429", fontSize: 11 },
+          lineStyle: { color: "#f0b429", type: "dashed", width: 1.5 },
+        }],
+      },
+    }],
   });
 }
 
