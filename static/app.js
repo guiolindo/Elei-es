@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005p";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005p";
+import { renderMapa } from "/static/mapa-br.js?v=20261005q";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005q";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1336,61 +1336,69 @@ async function inicializarGraficos() {
     }],
   });
 
-  // Margem até vitória matemática: líder.votos − (2º.votos + 2º.restantes_max).
-  // Enquanto negativa → 2º ainda tem como virar matematicamente. Cruza o
-  // zero → líder já venceu, não há cenário em que o 2º alcança. É info
-  // ortogonal ao graf-votos (que mostra totais) e ao graf-dif (gap atual
-  // de votos). Aqui o eixo Y é a MARGEM DE SEGURANÇA matemática ao longo
-  // do tempo. Y=0 em linha dashed = fronteira da vitória.
-  let seriesMargem = [];
-  if (state.selecionados.length >= 2) {
-    const [A, B] = state.selecionados;
-    const mA = new Map((hist.series[A] || []).map(p => [p.t, p]));
-    const mB = new Map((hist.series[B] || []).map(p => [p.t, p]));
-    for (const t of mA.keys()) {
-      if (!mB.has(t)) continue;
-      const pA = mA.get(t), pB = mB.get(t);
-      const tetoB = (pB.votos || 0) + (pB.restantes_max || 0);
-      seriesMargem.push([t, (pA.votos || 0) - tetoB]);
+  // Margem até vitória matemática: UMA LINHA POR CANDIDATO SELECIONADO.
+  // Para cada candidato i, margem_i(t) = i.votos − max_j_de_outros(j.votos
+  // + j.restantes_max). Enquanto negativa, algum oponente ainda pode
+  // alcançar matematicamente. Cruza o zero → i já venceu, não há cenário
+  // em que outro alcança. Antes só mostrava 1 linha (A vs B assimétrico),
+  // o que confundia quando o user comparava mais de 2 ou invertia a ordem.
+  const seriesPorSq = {};  // { sq: [[t, margem], ...] }
+  for (const sq of state.selecionados) {
+    seriesPorSq[sq] = [];
+    const meuHist = new Map((hist.series[sq] || []).map(p => [p.t, p]));
+    const outrosHists = state.selecionados
+      .filter(x => x !== sq)
+      .map(x => new Map((hist.series[x] || []).map(p => [p.t, p])));
+    for (const [t, pMeu] of meuHist.entries()) {
+      let tetoMaxOutro = 0;
+      let temOutro = false;
+      for (const outro of outrosHists) {
+        const po = outro.get(t);
+        if (!po) continue;
+        temOutro = true;
+        const teto = (po.votos || 0) + (po.restantes_max || 0);
+        if (teto > tetoMaxOutro) tetoMaxOutro = teto;
+      }
+      if (!temOutro) continue;
+      seriesPorSq[sq].push([t, (pMeu.votos || 0) - tetoMaxOutro]);
     }
   }
-  const nomeA = nomes[0] || "A";
-  const nomeB = nomes[1] || "B";
   graf("graf-banda").setOption({
     ...baseOpts(),
+    legend: {
+      show: state.selecionados.length > 1,
+      textStyle: { color: "#c8d0dc", fontSize: 11 },
+      top: 2,
+    },
     tooltip: { trigger: "axis",
       formatter: (params) => {
-        const p = params[0];
-        const v = p.value[1];
-        const sinal = v >= 0
-          ? `<b style="color:#22c55e">${nomeA} já venceu</b> (sobra +${fmtNum(v)} votos acima do teto de ${nomeB})`
-          : `${nomeB} ainda pode virar: faltam ${fmtNum(-v)} votos pra alcançar o teto`;
-        return `${new Date(p.value[0]).toLocaleString("pt-BR")}<br>${sinal}`;
+        const data = new Date(params[0].value[0]).toLocaleString("pt-BR");
+        const linhas = params.map(p => {
+          const v = p.value[1];
+          const sinal = v >= 0
+            ? `<b style="color:#22c55e">+${fmtNum(v)}</b> (venceu)`
+            : `<span style="color:#f87171">${fmtNum(v)}</span> (ainda alcançável)`;
+          return `${p.marker} ${p.seriesName}: ${sinal}`;
+        }).join("<br>");
+        return `${data}<br>${linhas}`;
       } },
-    series: [{
-      name: `margem de ${nomeA}`, type: "line", smooth: true, showSymbol: false,
-      data: seriesMargem,
-      lineStyle: { width: 2.5, color: "#f0b429" },
+    series: state.selecionados.map((sq, i) => ({
+      name: `margem de ${nomes[i]}`, type: "line", smooth: true, showSymbol: false,
+      data: seriesPorSq[sq],
+      lineStyle: { width: 2.5, color: PALETA[i] },
       areaStyle: {
-        opacity: 0.25,
-        color: {
-          type: "linear", x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [
-            { offset: 0, color: "rgba(34,197,94,0.4)" },     // verde no topo (ganhando)
-            { offset: 0.5, color: "rgba(240,180,41,0.3)" },  // amarelo no meio
-            { offset: 1, color: "rgba(239,68,68,0.35)" },    // vermelho embaixo (perdendo)
-          ],
-        },
+        opacity: state.selecionados.length === 1 ? 0.25 : 0.08,
+        color: PALETA[i],
       },
-      markLine: {
-        symbol: "none",
+      markLine: i === 0 ? {
+        symbol: "none", silent: true,
         data: [{
           yAxis: 0,
-          label: { formatter: "FRONTEIRA · vitória matemática", color: "#f0b429", fontSize: 11 },
+          label: { formatter: "fronteira · vitória matemática", color: "#f0b429", fontSize: 10, position: "end" },
           lineStyle: { color: "#f0b429", type: "dashed", width: 1.5 },
         }],
-      },
-    }],
+      } : undefined,
+    })),
   });
 }
 
