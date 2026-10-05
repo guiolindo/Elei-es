@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005j";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005j";
+import { renderMapa } from "/static/mapa-br.js?v=20261005k";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005k";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -423,6 +423,12 @@ async function trocarTurno(novoTurno) {
   if (state.turno === novoTurno) return;
   state.turno = novoTurno;
   _sincronizarClasseTurno();
+  // Força ECharts a redimensionar após layout do novo turno aplicar.
+  // Em TV 2T sem isso o mapa e gráfico ficam no tamanho antigo até
+  // o próximo snapshot — primeiros 20s parecem bugados.
+  requestAnimationFrame(() => {
+    setTimeout(() => window.dispatchEvent(new Event("resize")), 150);
+  });
   // Reset de contexto específico do turno anterior
   state.ultimoSnapshot = null;
   state.snapshotAnterior = null;
@@ -2520,6 +2526,11 @@ async function boot() {
   // Ordem: 1) prefs salvas 2) URL da share (sobrescreve) 3) ajusta UF ↔ cargo
   carregarPrefs();
   _sincronizarClasseTurno();
+  // Em modo TV + turno 2 (layout drasticamente diferente), força
+  // ECharts a redimensionar quando o DOM estabilizar.
+  requestAnimationFrame(() => {
+    setTimeout(() => window.dispatchEvent(new Event("resize")), 200);
+  });
   // Ripple em botões desktop também (não só mobile — QA reclamou de
   // "não vi animação"). Aplica em botões que já existem no DOM inicial.
   document.querySelectorAll(".btn-ghost, .btn-primary, .d-topnav-link").forEach(addRipple);

@@ -2313,22 +2313,52 @@ body.is-tv.turno-2 .tv2t-ufs {
   overflow: hidden;
   min-height: 0;
 }
-/* Grid simplificado pro TV 2T: 4 rows, MAPA/GRÁFICO ocupam todo o
-   espaço vertical livre (1fr), cards+placar+eventos são auto
-   (ocupam só o que precisam). Antes 5 rows com fr competindo
-   deixavam o mapa com 20% da tela. Agora mapa = ~55% da tela. */
+/* Grid MAPA-FIRST pro TV 2T: mapa ocupa a coluna esquerda inteira
+   (altura total ~90% da tela, largura ~65%), direita é sidebar com
+   cards no topo + gráfico embaixo. Mapa ocupa mais da metade da
+   tela como numa cobertura profissional de TV. */
 body.is-tv.turno-2 main.page {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-columns: 1.8fr 1fr;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas:
     "pagehead pagehead"
-    "lista    lista"
-    "placar   placar"
-    "mapa     grafico"
+    "mapa     side"
+    "eventos  eventos";
+  padding: 8px 10px 6px;
+  gap: 8px;
+}
+/* Lista + gráfico empilhados no lado direito via subgrid-like.
+   Cards são o container de .grid-candidatos — usamos display:contents
+   não é bem suportado em grid. Vamos manter o grid de 2 col + rows e
+   usar grid-area de .side com display:flex column pros filhos. */
+/* Cards no side-top ficam EMPILHADOS (um sobre o outro) porque a coluna
+   right é estreita. Cada card horizontal ocupa a largura inteira. */
+body.is-tv.turno-2 main.page {
+  grid-template-rows: auto minmax(0, auto) minmax(0, 1fr) auto;
+  grid-template-areas:
+    "pagehead pagehead"
+    "mapa     side-top"
+    "mapa     side-bot"
     "eventos  eventos";
 }
-/* UFs section removida — redundante com o mapa colorido. */
-body.is-tv.turno-2 .tv2t-ufs { display: none !important; }
+body.is-tv.turno-2 main.page > .grid-candidatos {
+  grid-area: side-top;
+  display: flex !important;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  overflow: visible;
+}
+body.is-tv.turno-2 main.page > .home-graf-secao {
+  grid-area: side-bot;
+}
+/* Placar e UFs removidos */
+body.is-tv.turno-2 .tv2t-ufs,
+body.is-tv.turno-2 .tv2t-placar { display: none !important; }
+/* Mapa dominante — reduz padding interno pra Brasil shape ocupar
+   quase toda a célula. */
+body.is-tv.turno-2 .mapa-wrap { padding: 2px !important; }
+body.is-tv.turno-2 .home-graf-wrap { padding: 4px !important; }
 /* Placar: score tipo partida com 3 colunas */
 .tv2t-score {
   display: grid;
