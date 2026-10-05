@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
@@ -843,6 +844,168 @@ async def lideres_por_municipio(
             "cor_idx": sq_para_idx[lider.sq_candidato],
         }
     return {"municipios": municipios}
+
+
+# Cache em memória pra expiração do lazy populate
+_MUNIC_POPULADO_EM: dict[tuple[int, str, int], float] = {}
+_MUNIC_LOCK = asyncio.Lock()
+_MUNIC_TTL_SEG = 15 * 60  # 15 min — depois o cache do UF snapshot que mudou força repopular
+
+
+@router.post("/apuracao/popular-municipios")
+async def popular_municipios(
+    cargo: int = Query(...),
+    uf: str = Query(...),
+    turno: int = Query(1, ge=1, le=2),
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Puxa breakdown por município direto do TSE pros cargos onde o
+    endpoint `{uf}-c{cargo}-e{el}-u.json` não traz `mu[]` (presidente,
+    gov, etc). Lazy: só roda quando o user abre o mapa UF.
+
+    Pattern descoberto no SPA do TSE 05/10/2026:
+      {base}/{cod_eleicao}/dados/{uf}/{uf}{cod_tse}-c{cargo:04d}-e{el:06d}-u.json
+
+    Idempotente com TTL de 15 min por (cargo, uf, turno). Depois do TTL,
+    refetch. Limpeza automática: só mantém SnapshotMunicipio do snapshot
+    UF mais recente — snapshots anteriores perdem suas rows municipais.
+    """
+    import json as _json
+    import time
+    from pathlib import Path
+    from app.config import get_settings
+    from poller.tse_client import cliente_tse, resultado_url, buscar_json, NAO_PUBLICADO
+    from poller.parser import parse_snapshot
+
+    uf = uf.upper()
+    chave = (cargo, uf, turno)
+
+    # TTL check
+    agora = time.time()
+    ultimo = _MUNIC_POPULADO_EM.get(chave, 0)
+    if agora - ultimo < _MUNIC_TTL_SEG:
+        return {"ok": True, "cached": True, "ttl_restante_s": int(_MUNIC_TTL_SEG - (agora - ultimo))}
+
+    # Deduplica execuções concorrentes
+    async with _MUNIC_LOCK:
+        # re-check depois do lock (outro request pode ter populado enquanto esperávamos)
+        if agora - _MUNIC_POPULADO_EM.get(chave, 0) < _MUNIC_TTL_SEG:
+            return {"ok": True, "cached": True, "race_resolved": True}
+
+        # Snapshot alvo onde as rows municipais ficam penduradas: último
+        # snapshot bom (não suspeito) daquele cargo/UF/turno.
+        snap_atual = (await sess.execute(
+            select(Snapshot).where(and_(
+                Snapshot.cod_cargo == cargo,
+                Snapshot.abrangencia == uf,
+                Snapshot.turno == turno,
+                Snapshot.suspeito.is_(False),
+            )).order_by(Snapshot.coletado_em.desc()).limit(1)
+        )).scalar_one_or_none()
+        if snap_atual is None:
+            return {"ok": False, "erro": "nenhum snapshot UF disponível ainda"}
+
+        # Mapping TSE↔IBGE embarcado
+        mapping_path = Path(__file__).resolve().parent / "data" / "tse_municipios.json"
+        try:
+            mapping = _json.loads(mapping_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {"ok": False, "erro": f"mapping TSE indisponível: {exc}"}
+        munics = mapping.get(uf, [])
+        if not munics:
+            return {"ok": False, "erro": f"nenhum município mapeado pra UF {uf}"}
+
+        # cod_eleicao pelo turno/cargo (mesma regra do poller)
+        settings = get_settings()
+        if cargo == 1:
+            cod_eleicao = settings.eleicao_cod_1t if turno == 1 else settings.eleicao_cod_2t
+        else:
+            cod_eleicao = settings.eleicao_cod_1t_estadual if turno == 1 else settings.eleicao_cod_2t_estadual
+        if not cod_eleicao:
+            return {"ok": False, "erro": "cod_eleicao não configurado"}
+
+        # Fetch paralelo (semáforo pra não martelar o TSE)
+        base = settings.tse_cdn_base.rstrip("/")
+        uf_low = uf.lower()
+        sem = asyncio.Semaphore(40)
+
+        async def fetch_mun(client, mun):
+            cod_tse = mun["tse"]
+            url = f"{base}/{cod_eleicao}/dados/{uf_low}/{uf_low}{cod_tse}-c{cargo:04d}-e{cod_eleicao:06d}-u.json"
+            async with sem:
+                res = await buscar_json(client, url)
+            if not res or res == NAO_PUBLICADO or not isinstance(res, tuple):
+                return (mun, None)
+            payload, _sha = res
+            try:
+                parsed = parse_snapshot(payload)
+            except Exception:
+                return (mun, None)
+            return (mun, parsed)
+
+        inseridos = 0
+        falhas = 0
+        async with cliente_tse() as client:
+            resultados = await asyncio.gather(*[fetch_mun(client, m) for m in munics])
+
+        # Antes de inserir, limpa SnapshotMunicipio de snapshots velhos
+        # dessa combinação (cargo, uf, turno) exceto o atual. Isso é o
+        # "banco joga fora dps de algum tempo": só o snapshot UF mais
+        # recente retém dados municipais.
+        snap_ids_velhos = (await sess.execute(
+            select(Snapshot.id).where(and_(
+                Snapshot.cod_cargo == cargo,
+                Snapshot.abrangencia == uf,
+                Snapshot.turno == turno,
+                Snapshot.id != snap_atual.id,
+            ))
+        )).scalars().all()
+        if snap_ids_velhos:
+            await sess.execute(
+                SnapshotMunicipio.__table__.delete().where(
+                    SnapshotMunicipio.snapshot_id.in_(snap_ids_velhos)
+                )
+            )
+
+        # Limpa quaisquer rows municipais antigas desse mesmo snapshot
+        # (pra re-popular idempotente dentro do TTL caso o cache dê miss)
+        await sess.execute(
+            SnapshotMunicipio.__table__.delete().where(
+                SnapshotMunicipio.snapshot_id == snap_atual.id
+            )
+        )
+
+        # Insere resultados
+        for mun, parsed in resultados:
+            if parsed is None or not parsed.candidatos:
+                falhas += 1
+                continue
+            # Top-5 por município (padrão do poller normal — basta pro
+            # endpoint lideres-por-municipio pegar o líder após filtro
+            # situacao=ativo). Mantém as mesmas colunas pra reusar query.
+            ordenados = sorted(parsed.candidatos, key=lambda c: -c.votos)[:5]
+            total_votos = parsed.totais.qt_votos_validos or sum(c.votos for c in ordenados) or 1
+            for pos, c in enumerate(ordenados, start=1):
+                sess.add(SnapshotMunicipio(
+                    snapshot_id=snap_atual.id,
+                    cod_ibge=mun["ibge"],
+                    sq_candidato=c.sq_candidato,
+                    votos=c.votos,
+                    pct_validos=(c.votos / total_votos * 100) if total_votos else 0,
+                    posicao=pos,
+                ))
+                inseridos += 1
+
+        await sess.commit()
+        _MUNIC_POPULADO_EM[chave] = agora
+        return {
+            "ok": True,
+            "snapshot_id": snap_atual.id,
+            "municipios_total": len(munics),
+            "rows_inseridas": inseridos,
+            "falhas": falhas,
+            "snapshots_velhos_limpos": len(snap_ids_velhos),
+        }
 
 
 @router.get("/apuracao/lideres-por-uf")

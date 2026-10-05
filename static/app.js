@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005o";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005o";
+import { renderMapa } from "/static/mapa-br.js?v=20261005p";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005p";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1579,18 +1579,36 @@ async function atualizarMapa() {
 
   // Modo UF: mapa dos municípios daquela UF
   const dadosPorMun = {};
-  try {
+  async function _puxarLideresMun() {
     const r = await fetch(`/api/apuracao/lideres-por-municipio?cargo=${state.cargo}&uf=${state.abrangencia}&turno=${state.turno}`);
-    if (r.ok) {
-      const j = await r.json();
-      for (const [mun, d] of Object.entries(j.municipios || {})) {
-        dadosPorMun[mun] = {
-          valor: d.votos || 0,
-          cor: corDoCandidato(d.sq_candidato, d.cor_idx),
-          nome_lider: d.nome_lider,
-          votos: d.votos,
-        };
-      }
+    if (!r.ok) return {};
+    const j = await r.json();
+    return j.municipios || {};
+  }
+  try {
+    let mun = await _puxarLideresMun();
+    // Vazio = TSE não envia breakdown de município nos JSONs de UF
+    // (confirmado em 05/10/2026 pra todos os cargos). Dispara lazy
+    // populate que puxa cada município direto do TSE em paralelo e
+    // persiste. Cacheado 15 min server-side. Primeira abertura leva
+    // ~5-15s; subsequentes ficam instantâneas.
+    if (Object.keys(mun).length === 0) {
+      renderLegenda(leg, {}, {
+        tituloVazio: `Carregando municípios de ${state.abrangencia}…`,
+        tituloCheio: "", dica: "Puxando dados direto do TSE em paralelo. Pode levar alguns segundos.",
+      });
+      try {
+        await fetch(`/api/apuracao/popular-municipios?cargo=${state.cargo}&uf=${state.abrangencia}&turno=${state.turno}`, { method: "POST" });
+        mun = await _puxarLideresMun();
+      } catch (e) {}
+    }
+    for (const [codMun, d] of Object.entries(mun)) {
+      dadosPorMun[codMun] = {
+        valor: d.votos || 0,
+        cor: corDoCandidato(d.sq_candidato, d.cor_idx),
+        nome_lider: d.nome_lider,
+        votos: d.votos,
+      };
     }
   } catch (e) {}
   await renderMapa(container, state.abrangencia, dadosPorMun, {
