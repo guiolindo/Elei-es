@@ -2262,11 +2262,175 @@ body.is-tv.turno-2 main.page > .grid-candidatos::before {
     width: 160px !important; height: 160px !important; flex: 0 0 160px;
   }
   body.is-tv.turno-2 .cand-nome { font-size: 40px !important; }
-  body.is-tv.turno-2 .cand-votos { font-size: 72px !important; }
-  body.is-tv.turno-2 .cand-pct { font-size: 22px; }
   body.is-tv.turno-2 main.page > .grid-candidatos::before {
     font-size: 96px;
   }
+}
+
+/* ============ TV 2T · PLACAR + UFs por líder ============
+   Visualizações extras pedidas pelo user: diferença ao vivo,
+   barra de split proporcional, tendência, barra de progresso de
+   apuração + lista de UFs lideradas por cada candidato. */
+.tv2t-placar, .tv2t-ufs {
+  display: none;  /* escondidos em tudo exceto TV 2T */
+}
+body.is-tv.turno-2 .tv2t-placar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  grid-area: placar;
+  padding: 16px 24px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+body.is-tv.turno-2 .tv2t-ufs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  grid-area: ufs;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+/* Novo layout do grid pra encaixar placar + ufs */
+body.is-tv.turno-2 main.page {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto minmax(0, 1.2fr) auto minmax(0, 0.9fr) auto;
+  grid-template-areas:
+    "pagehead pagehead"
+    "lista    lista"
+    "placar   placar"
+    "mapa     grafico"
+    "ufs      eventos";
+}
+/* Placar: score tipo partida com 3 colunas */
+.tv2t-score {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 20px;
+  align-items: center;
+}
+.tv2t-diff, .tv2t-tendencia {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+.tv2t-diff-lab, .tv2t-tend-lab {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.tv2t-diff-num, .tv2t-tend-num {
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.tv2t-diff-pct {
+  font-size: 15px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.tv2t-tend-num.subindo { color: #22c55e; }
+.tv2t-tend-num.caindo { color: var(--danger); }
+.tv2t-tend-num.estavel { color: var(--muted); font-size: 24px; }
+/* Spread bar: 2 segmentos coloridos lado a lado */
+.tv2t-spread {
+  display: flex;
+  height: 36px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+}
+.tv2t-spread-a, .tv2t-spread-b {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  transition: flex-basis 600ms var(--ease-out-quart);
+  min-width: 60px;
+}
+.tv2t-spread-a { background: var(--cor-a, #3b82f6); }
+.tv2t-spread-b { background: var(--cor-b, #ec4899); }
+/* Progresso: barra ao longo da apuração */
+.tv2t-progresso {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tv2t-progresso-bar {
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tv2t-progresso-bar > div {
+  height: 100%;
+  background: var(--brand);
+  transition: width 500ms ease-out;
+}
+.tv2t-progresso-lab {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* UFs por líder — 2 colunas (um por candidato) */
+.tv2t-ufs-titulo {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  text-align: center;
+}
+.tv2t-ufs-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.tv2t-uf-coluna {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-content: flex-start;
+  padding: 8px;
+  background: var(--surface-1);
+  border-radius: 8px;
+  overflow-y: auto;
+}
+.tv2t-uf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px;
+  background: var(--cor-partido, var(--brand));
+  color: #fff;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  font-variant-numeric: tabular-nums;
+}
+.tv2t-uf-pill small {
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.85;
 }
 
 

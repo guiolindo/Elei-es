@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005g";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005g";
+import { renderMapa } from "/static/mapa-br.js?v=20261005h";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005h";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1807,7 +1807,103 @@ async function refreshApuracao() {
   if (state.ultimoSnapshot?.disponivel) {
     try { atualizarMapa(); } catch(e) {}
     try { atualizarGrafHome(); } catch(e) {}
+    try { atualizarPlacar2T(); } catch(e) {}
   }
+}
+
+// Placar extra do modo TV 2T: diferença absoluta, barra de split
+// proporcional, tendência (quem está subindo), progresso de apuração,
+// e UFs lideradas por cada candidato. Noop fora de TV 2T.
+async function atualizarPlacar2T() {
+  if (!document.body.classList.contains("is-tv") || state.turno !== 2) return;
+  const snap = state.ultimoSnapshot;
+  if (!snap?.disponivel || !snap.candidatos?.length) return;
+  const ativos = snap.candidatos
+    .filter(c => (state.ficha[c.sq_candidato]?.situacao || "ativo") === "ativo")
+    .sort((a, b) => b.votos - a.votos);
+  if (ativos.length < 2) return;
+  const [a, b] = ativos;
+  const corA = corDoCandidato(a.sq_candidato);
+  const corB = corDoCandidato(b.sq_candidato);
+  // Diferença absoluta + em pontos percentuais
+  const diffVotos = a.votos - b.votos;
+  const diffPct = a.pct_validos - b.pct_validos;
+  const diffNumEl = document.getElementById("tv2t-diff-num");
+  const diffPctEl = document.getElementById("tv2t-diff-pct");
+  if (diffNumEl) diffNumEl.textContent = fmtNum(diffVotos);
+  if (diffPctEl) diffPctEl.textContent = `${diffPct.toFixed(2)} pontos`;
+  // Spread bar: % de A e % de B proporcional (restante vai pros outros,
+  // tipicamente < 5% em 2T puro, mas somando pode haver resíduo)
+  const total = a.pct_validos + b.pct_validos;
+  const flexA = total > 0 ? (a.pct_validos / total * 100) : 50;
+  const flexB = 100 - flexA;
+  const spreadA = document.getElementById("tv2t-spread-a");
+  const spreadB = document.getElementById("tv2t-spread-b");
+  if (spreadA) {
+    spreadA.style.flexBasis = flexA + "%";
+    spreadA.style.setProperty("--cor-a", corA);
+    spreadA.style.background = corA;
+    spreadA.textContent = `${a.pct_validos.toFixed(1)}%`;
+  }
+  if (spreadB) {
+    spreadB.style.flexBasis = flexB + "%";
+    spreadB.style.setProperty("--cor-b", corB);
+    spreadB.style.background = corB;
+    spreadB.textContent = `${b.pct_validos.toFixed(1)}%`;
+  }
+  // Tendência: compara com snapshot anterior pra ver se o líder tá
+  // puxando ou perdendo gás. Delta de pct_validos > 0 = subindo.
+  const ant = state.snapshotAnterior?.candidatos?.find(c => c.sq_candidato === a.sq_candidato);
+  const tendEl = document.getElementById("tv2t-tend-num");
+  if (tendEl) {
+    if (!ant) {
+      tendEl.textContent = "—";
+      tendEl.className = "tv2t-tend-num estavel";
+    } else {
+      const deltaPct = a.pct_validos - ant.pct_validos;
+      if (Math.abs(deltaPct) < 0.01) {
+        tendEl.textContent = "estável";
+        tendEl.className = "tv2t-tend-num estavel";
+      } else {
+        tendEl.textContent = (deltaPct > 0 ? "▲ " : "▼ ") + Math.abs(deltaPct).toFixed(2);
+        tendEl.className = "tv2t-tend-num " + (deltaPct > 0 ? "subindo" : "caindo");
+      }
+    }
+  }
+  // Progresso de apuração
+  const t = snap.totais || {};
+  const pctApur = t.pct_apurado || 0;
+  const fill = document.getElementById("tv2t-progresso-fill");
+  const lab = document.getElementById("tv2t-progresso-lab");
+  if (fill) fill.style.width = Math.min(100, pctApur) + "%";
+  if (lab) lab.textContent = `${pctApur.toFixed(2)}% apurado · ${fmtNum(t.secoes_totalizadas || 0)} de ${fmtNum(t.secoes_total || 0)} seções`;
+  // UFs lideradas (só Pres BR) — para Governador 2T uf-específico
+  // o conceito não faz sentido, então mostra municípios liderados.
+  const colA = document.getElementById("tv2t-ufs-a");
+  const colB = document.getElementById("tv2t-ufs-b");
+  if (!colA || !colB) return;
+  colA.innerHTML = "";
+  colB.innerHTML = "";
+  if (state.cargo === 1 && state.abrangencia === "BR") {
+    try {
+      const r = await fetch(`/api/apuracao/lideres-por-uf?cargo=1&turno=${state.turno}`);
+      if (r.ok) {
+        const j = await r.json();
+        const ufs = j.ufs || {};
+        for (const [uf, info] of Object.entries(ufs)) {
+          const pill = document.createElement("span");
+          pill.className = "tv2t-uf-pill";
+          pill.style.background = corDoCandidato(info.sq_candidato, info.cor_idx);
+          pill.innerHTML = `${uf} <small>${fmtNum(info.votos || 0)}</small>`;
+          if (info.sq_candidato === a.sq_candidato) colA.appendChild(pill);
+          else if (info.sq_candidato === b.sq_candidato) colB.appendChild(pill);
+        }
+      }
+    } catch(e) { /* silencia */ }
+  }
+  // Props aria pros leitores de tela
+  document.getElementById("tv2t-placar")?.setAttribute("aria-hidden", "false");
+  document.getElementById("tv2t-ufs")?.setAttribute("aria-hidden", "false");
 }
 
 function atualizarPainelProporcional() {
