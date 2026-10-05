@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005b";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005b";
+import { renderMapa } from "/static/mapa-br.js?v=20261005c";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005c";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1781,7 +1781,11 @@ async function onFiltroChange() {
 function atualizarContagemRegressiva() {
   const el = $("countdown");
   if (!el) return;
-  const diff = DIA_D.getTime() - Date.now();
+  // Qual DIA D exibir depende do turno escolhido no header
+  const alvo = state.turno === 2 ? DIA_D_2T : DIA_D;
+  const titulo = state.turno === 2 ? "2º turno começa em" : "Apuração começa em";
+  const dataStr = state.turno === 2 ? "· 26/10 17h BRT" : "· 4/10 17h BRT";
+  const diff = alvo.getTime() - Date.now();
   if (diff <= 0) { el.classList.add("oculto"); return; }
   const dias = Math.floor(diff / 86_400_000);
   const horas = Math.floor((diff % 86_400_000) / 3_600_000);
@@ -1790,14 +1794,14 @@ function atualizarContagemRegressiva() {
   el.classList.remove("oculto");
   el.innerHTML = `
     <svg class="cd-icone" width="14" height="14"><use href="#i-hourglass"/></svg>
-    <span class="cd-titulo">Apuração começa em</span>
+    <span class="cd-titulo">${titulo}</span>
     <span class="cd-nums">
       <b>${String(dias).padStart(2,"0")}</b>d
       <b>${String(horas).padStart(2,"0")}</b>h
       <b>${String(min).padStart(2,"0")}</b>m
       <b>${String(seg).padStart(2,"0")}</b>s
     </span>
-    <span class="cd-sub">· 4/10 17h BRT</span>
+    <span class="cd-sub">${dataStr}</span>
   `;
 }
 
