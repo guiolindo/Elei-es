@@ -945,7 +945,7 @@ async def popular_municipios(
 
         inseridos = 0
         falhas = 0
-        async with cliente_tse() as client:
+        async with await cliente_tse() as client:
             resultados = await asyncio.gather(*[fetch_mun(client, m) for m in munics])
 
         # Antes de inserir, limpa SnapshotMunicipio de snapshots velhos
