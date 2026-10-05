@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005c";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005c";
+import { renderMapa } from "/static/mapa-br.js?v=20261005d";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005d";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -638,6 +638,10 @@ function renderLista() {
   const flip = flipReorder(el);
 
   const primeiraVez = !el.dataset.jaRenderizou;
+  // PERF: constrói todos os cards em DocumentFragment e appenda UMA vez
+  // no DOM. Antes 70 appendChild sucessivos causavam 70 reflows em
+  // dispositivos lentos. Agora é 1 reflow só.
+  const frag = document.createDocumentFragment();
   for (const c of filtrados) {
     const sel = state.selecionados.indexOf(c.sq_candidato);
     const div = document.createElement("div");
@@ -772,7 +776,7 @@ function renderLista() {
           </div>
           ${badgeProp}
         </div>
-        <div class="cand-check-vazio" aria-hidden="true"></div>
+        <button type="button" class="cand-check-vazio" data-comparar="${c.sq_candidato}" aria-label="${sel >= 0 ? 'Remover da comparação' : 'Adicionar à comparação'}" aria-pressed="${sel >= 0 ? 'true' : 'false'}"></button>
       </div>
       <div class="cand-metricas">
         <div class="cand-votos" data-sq="${c.sq_candidato}">0 votos</div>
@@ -799,8 +803,10 @@ function renderLista() {
         return;
       abrirModal(c.sq_candidato);
     });
-    el.appendChild(div);
+    frag.appendChild(div);
   }
+  // PERF: um único reflow em vez de N
+  el.appendChild(frag);
   el.querySelectorAll("[data-detalhes]").forEach(b => {
     b.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -821,17 +827,24 @@ function renderLista() {
   const sqsNovos = Array.from(cards).map(c => c.dataset.sqCard).sort().join(",");
   const sqsAntes = el.dataset.sqsRenderizados || "";
   const conjuntoMudou = sqsNovos !== sqsAntes;
+  // PERF: cascata é O(n) de reflow + animation handles. Com >30 cards
+  // (Dep Fed SP = 70+, SP Dep Est = 94+) trava celular mediano por
+  // 1-2s. Acima desse corte entramos sem animação — card aparece
+  // instantâneo mas tudo responde.
+  const LIMITE_CASCATA = 30;
   if (primeiraVez || conjuntoMudou) {
-    anexarEntradaCascata(cards);
+    if (cards.length <= LIMITE_CASCATA) anexarEntradaCascata(cards);
     el.dataset.jaRenderizou = "1";
     el.dataset.sqsRenderizados = sqsNovos;
   } else {
     flip.commit();
   }
-  // Ripple em ambos os botões do rodapé (funciona em mouse + touch)
-  el.querySelectorAll(".cand-acao").forEach(addRipple);
-  // Card inteiro também tem ripple (ação primária = ver ficha)
-  cards.forEach(addRipple);
+  // Ripple é caro em listas grandes (adiciona pointer listeners).
+  // Também corta no mesmo limite — card ainda clica, só sem efeito ripple.
+  if (cards.length <= LIMITE_CASCATA) {
+    el.querySelectorAll(".cand-acao").forEach(addRipple);
+    cards.forEach(addRipple);
+  }
   // CRÍTICO: todo renderLista reconstrói innerHTML com "0 votos"
   // placeholder. SEMPRE re-preencher via atualizarPainelTotais logo
   // depois — senão interações do usuário (buscar, filtrar partido,
@@ -1000,6 +1013,12 @@ function fecharComparacao() {
   $("comparacao").classList.add("oculto");
   renderLista();
   atualizarChipCount();
+  // Mobile: user tá na aba "comparar" quando clica no X. Esconder só
+  // .comparacao deixa a página preta (tabs de m-tab-comparar escondem
+  // tudo que não é .comparacao). Volta pra aba "placar" automaticamente.
+  if (document.body.classList.contains("m-tab-comparar")) {
+    trocarTabMobile("placar");
+  }
 }
 
 function renderCardsComp() {

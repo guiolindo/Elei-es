@@ -489,12 +489,26 @@ body.is-tv .turno-btn { font-size: 11px; padding: 4px 12px; }
 /* Bloco 1: topo — foto + info + check */
 .cand-topo { display: flex; gap: 12px; align-items: flex-start; }
 .cand-check-vazio {
-  width: 24px; height: 24px; border-radius: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
   border: 2px solid var(--line-2);
+  background: transparent;
   flex-shrink: 0;
-  transition: border-color var(--dur-fast), background var(--dur-fast);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color var(--dur-fast), background var(--dur-fast),
+              transform var(--dur-fast);
+  position: relative;
 }
 .candidato:hover .cand-check-vazio { border-color: var(--muted); }
+.cand-check-vazio:hover {
+  border-color: var(--brand) !important;
+  transform: scale(1.1);
+}
+.cand-check-vazio:active { transform: scale(0.95); }
+.cand-check-vazio:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
 .candidato.selecionado .cand-check-vazio {
   background: var(--brand); border-color: var(--brand);
   position: relative;
