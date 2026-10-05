@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005d";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005d";
+import { renderMapa } from "/static/mapa-br.js?v=20261005e";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005e";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -45,6 +45,10 @@ const state = {
   graficos: {},
   ws: null,
   filtro: { texto: "", partido: "", ordenar: "votos" },
+  // Paginação da lista — ativa só pra cargos com muitos candidatos
+  // (Dep Est tem 100+ por UF, matou dispositivos mais lentos). Reseta
+  // pra 1 em cada mudança de cargo/UF/filtro.
+  paginaAtual: 1,
   proporcional: null,
   // Candidatos matematicamente eliminados — sem chance aritmética de
   // vencer/ir ao 2º turno mesmo somando todos os votos restantes. Poputa
@@ -634,15 +638,27 @@ function renderLista() {
     </div>`;
     return;
   }
+  // PAGINAÇÃO — ativa quando lista tem mais que CANDS_POR_PAGINA.
+  // Dep Est SP tem 94 candidatos; renderizar tudo trava celular médio.
+  // 20 por página = ~3-5 páginas, scroll leve + dispositivo responsivo.
+  const CANDS_POR_PAGINA = 20;
+  const temPaginacao = filtrados.length > CANDS_POR_PAGINA;
+  const totalPaginas = Math.ceil(filtrados.length / CANDS_POR_PAGINA);
+  // Clamp: se trocou cargo e página atual não existe mais, volta pra 1
+  if (state.paginaAtual > totalPaginas) state.paginaAtual = 1;
+  const pagina = temPaginacao ? state.paginaAtual : 1;
+  const inicio = (pagina - 1) * CANDS_POR_PAGINA;
+  const fim = inicio + CANDS_POR_PAGINA;
+  const paginaAtualItens = temPaginacao ? filtrados.slice(inicio, fim) : filtrados;
   // FLIP: mede posições antes de re-renderizar pra animar reordenação
   const flip = flipReorder(el);
 
   const primeiraVez = !el.dataset.jaRenderizou;
   // PERF: constrói todos os cards em DocumentFragment e appenda UMA vez
-  // no DOM. Antes 70 appendChild sucessivos causavam 70 reflows em
+  // no DOM. Antes N appendChild sucessivos causavam N reflows em
   // dispositivos lentos. Agora é 1 reflow só.
   const frag = document.createDocumentFragment();
-  for (const c of filtrados) {
+  for (const c of paginaAtualItens) {
     const sel = state.selecionados.indexOf(c.sq_candidato);
     const div = document.createElement("div");
     const eliminado = state.eliminados.has(c.sq_candidato);
@@ -853,6 +869,50 @@ function renderLista() {
   // existe (branch early-return no topo da função).
   if (state.ultimoSnapshot?.disponivel) {
     atualizarPainelTotais();
+  }
+  // Pagination controls — só quando há mais que 1 página
+  const paginadorExistente = document.getElementById("paginador-lista");
+  if (paginadorExistente) paginadorExistente.remove();
+  if (temPaginacao && totalPaginas > 1) {
+    const p = document.createElement("nav");
+    p.id = "paginador-lista";
+    p.className = "paginador";
+    p.setAttribute("aria-label", "Páginas da lista de candidatos");
+    const btnPrev = pagina > 1
+      ? `<button type="button" class="pag-btn" data-pag="${pagina - 1}" aria-label="Página anterior">← anterior</button>`
+      : `<span class="pag-btn pag-off">← anterior</span>`;
+    const btnNext = pagina < totalPaginas
+      ? `<button type="button" class="pag-btn" data-pag="${pagina + 1}" aria-label="Próxima página">próxima →</button>`
+      : `<span class="pag-btn pag-off">próxima →</span>`;
+    // Números individuais (max 5 visíveis + ...): sempre mostra 1,
+    // final, atual-1, atual, atual+1. Preenche com ellipsis quando pula.
+    const nums = [];
+    const visiveis = new Set([1, totalPaginas, pagina - 1, pagina, pagina + 1]
+      .filter(n => n >= 1 && n <= totalPaginas));
+    let last = 0;
+    [...visiveis].sort((a, b) => a - b).forEach(n => {
+      if (n - last > 1) nums.push(`<span class="pag-ellipsis">…</span>`);
+      nums.push(n === pagina
+        ? `<span class="pag-btn pag-atual" aria-current="page">${n}</span>`
+        : `<button type="button" class="pag-btn" data-pag="${n}">${n}</button>`);
+      last = n;
+    });
+    p.innerHTML = `
+      ${btnPrev}
+      <div class="pag-nums">${nums.join("")}</div>
+      ${btnNext}
+      <div class="pag-info">Página <b>${pagina}</b> de <b>${totalPaginas}</b> · ${filtrados.length} candidatos</div>
+    `;
+    p.querySelectorAll(".pag-btn[data-pag]").forEach(b => {
+      b.addEventListener("click", () => {
+        state.paginaAtual = Number(b.dataset.pag);
+        renderLista();
+        // Volta scroll pro topo da lista pra ver os cards da página nova
+        document.getElementById("lista-candidatos")?.scrollIntoView(
+          { behavior: "smooth", block: "start" });
+      });
+    });
+    el.after(p);
   }
 }
 
@@ -1777,6 +1837,7 @@ function conectarWS() {
 async function onFiltroChange() {
   ajustarUFParaCargo();
   state.selecionados = [];
+  state.paginaAtual = 1;  // reset paginação ao trocar cargo/UF
   $("comparacao").classList.add("oculto");
   // Limpa IMEDIATAMENTE state e UI — sem esperar o fetch retornar.
   // Bug antigo: durante o network delay (centenas de ms), UI continuava
@@ -2249,17 +2310,20 @@ async function boot() {
     clearTimeout(buscaTimer);
     buscaTimer = setTimeout(() => {
       state.filtro.texto = e.target.value;
+      state.paginaAtual = 1;  // reset pra ver resultado desde a 1ª página
       salvarPrefs();
       renderLista();
     }, 150);
   });
   $("filtro-partido").addEventListener("change", (e) => {
     state.filtro.partido = e.target.value;
+    state.paginaAtual = 1;
     salvarPrefs();
     renderLista();
   });
   $("ordenar").addEventListener("change", (e) => {
     state.filtro.ordenar = e.target.value;
+    state.paginaAtual = 1;
     salvarPrefs();
     renderLista();
   });
