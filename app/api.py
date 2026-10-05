@@ -1174,6 +1174,87 @@ async def limpar_eventos_pre_apuracao(sess: AsyncSession = Depends(get_session))
     return {"ok": True, "removidos": r.rowcount or 0, "snapshots_afetados": len(snaps_zero)}
 
 
+@router.post("/admin/corrigir-rj-gov-sub-judice", dependencies=[Depends(_exigir_admin)])
+async def corrigir_rj_gov_sub_judice(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Correção retroativa do RJ Gov 1T após fix do parser (sub judice).
+
+    Em 04/10/2026 ~00:01 BRT o engine emitiu ELEITO_MAJORITARIO pro líder
+    do RJ Gov com maioria_absoluta=True baseado em qt_votos_validos
+    subestimado (TSE separou os 274.411 votos do Garotinho — "Indeferido
+    em prazo recursal" — do v.vv). Lei 9.504 art. 16-A: votos a sub judice
+    contam como válidos enquanto roda o recurso. O TSE declarou 2º turno
+    confirmando (Douglas Ruas × Eduardo Paes).
+
+    Esta rotina remove os eventos falsos e emite SEGUNDO_TURNO_DEFINIDO
+    com a dupla correta. Idempotente.
+    """
+    from datetime import datetime, timezone
+    from sqlalchemy import delete
+
+    CARGO = 3
+    UF = "RJ"
+    SQ_DOUGLAS = "190002542887"
+    SQ_EDUARDO = "190002543380"
+
+    snap = (await sess.execute(
+        select(Snapshot).where(and_(
+            Snapshot.cod_cargo == CARGO, Snapshot.abrangencia == UF, Snapshot.turno == 1
+        )).order_by(Snapshot.coletado_em.desc()).limit(1)
+    )).scalar_one_or_none()
+    if snap is None:
+        return {"ok": False, "erro": "nenhum snapshot RJ Gov 1T"}
+
+    existe_2t = (await sess.execute(select(Evento).where(and_(
+        Evento.cod_cargo == CARGO, Evento.abrangencia == UF,
+        Evento.tipo == "SEGUNDO_TURNO_DEFINIDO",
+    )))).scalars().all()
+    tem_eleito = (await sess.execute(select(Evento).where(and_(
+        Evento.cod_cargo == CARGO, Evento.abrangencia == UF,
+        Evento.tipo == "ELEITO_MAJORITARIO",
+    )))).scalars().all()
+
+    if existe_2t and not tem_eleito:
+        return {"ok": True, "skip": "RJ Gov já corrigido"}
+
+    n_del_eleito = (await sess.execute(delete(Evento).where(and_(
+        Evento.cod_cargo == CARGO, Evento.abrangencia == UF,
+        Evento.tipo == "ELEITO_MAJORITARIO",
+    )))).rowcount
+
+    n_del_elim = 0
+    for sq in (SQ_DOUGLAS, SQ_EDUARDO):
+        r = await sess.execute(delete(Evento).where(and_(
+            Evento.cod_cargo == CARGO, Evento.abrangencia == UF,
+            Evento.tipo == "MATEMATICAMENTE_ELIMINADO",
+            Evento.sq_candidato_a == sq,
+        )))
+        n_del_elim += r.rowcount or 0
+
+    novo = False
+    if not existe_2t:
+        sess.add(Evento(
+            cod_cargo=CARGO, abrangencia=UF,
+            tipo="SEGUNDO_TURNO_DEFINIDO",
+            sq_candidato_a=SQ_DOUGLAS,
+            sq_candidato_b=SQ_EDUARDO,
+            snapshot_id=snap.id,
+            ocorrido_em=datetime.now(timezone.utc),
+            detalhes={
+                "corrigido_manualmente": True,
+                "motivo": "sub judice (Garotinho) incluído no denominador por Lei 9.504 art. 16-A",
+            },
+        ))
+        novo = True
+
+    await sess.commit()
+    return {
+        "ok": True,
+        "eleito_removidos": n_del_eleito or 0,
+        "eliminado_removidos": n_del_elim,
+        "segundo_turno_adicionado": novo,
+    }
+
+
 @router.post("/admin/corrigir-partidos", dependencies=[Depends(_exigir_admin)])
 async def corrigir_partidos(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Repara candidatos cujo partido_numero foi derivado errado (bug
