@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # Código da eleição no divulgacandcontas (usado para candidatos e fotos)
     eleicao_cod_divulga: int = 20322002026
     poll_interval_seconds: int = 20
+    # Quais turnos o poller coleta. Opções: "all" (default), "1", "2".
+    # Entre 1T e 2T não há ganho em polar 1T (já 100% apurado), então
+    # define POLL_TURNO=2 nas env vars reduz ~70% dos requests (137
+    # alvos 1T removidos) + bate menos no S3/CloudFront do TSE.
+    # Volta pra "all" se precisar reconsultar algo específico.
+    poll_turno: str = "all"
     # Intervalo do cleanup de snapshots (segundos). No dia D vale baixar
     # pra 900 (15 min) pra não acumular; dias normais 3600 (1h) basta.
     cleanup_interval_seconds: int = 3600

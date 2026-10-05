@@ -62,8 +62,7 @@ _UFS = [
     "RR", "SC", "SP", "SE", "TO",
 ]
 
-ALVOS_PADRAO: list[AlvoColeta] = (
-    # ---- 1º turno ----
+_ALVOS_1T: list[AlvoColeta] = (
     [AlvoColeta(1, 1, "BR")]                       # Presidente nacional
     + [AlvoColeta(1, 1, "ZZ")]                     # Presidente — voto do exterior (LC 44/82)
     + [AlvoColeta(1, 1, uf) for uf in _UFS]        # Presidente por UF (mapa)
@@ -71,15 +70,35 @@ ALVOS_PADRAO: list[AlvoColeta] = (
     + [AlvoColeta(1, 5, uf) for uf in _UFS]        # Senador de cada UF
     + [AlvoColeta(1, 6, uf) for uf in _UFS]        # Deputado Federal
     + [AlvoColeta(1, 7, uf) for uf in _UFS]        # Deputado Estadual
-    # ---- 2º turno ----
+)
+
+_ALVOS_2T: list[AlvoColeta] = (
     # Enquanto o TSE não abrir o 2T, os requests retornam 404 e o poller
     # pula silenciosamente. Quando abrir, começa a coletar sozinho — sem
     # precisar de deploy nem mudança de config. Deputado não tem 2T.
-    + [AlvoColeta(2, 1, "BR")]                     # Presidente 2T nacional
+    [AlvoColeta(2, 1, "BR")]                       # Presidente 2T nacional
     + [AlvoColeta(2, 1, "ZZ")]                     # Presidente 2T exterior
     + [AlvoColeta(2, 1, uf) for uf in _UFS]        # Presidente 2T por UF
     + [AlvoColeta(2, 3, uf) for uf in _UFS]        # Governador 2T de cada UF
 )
+
+
+def _alvos_segundo_turno_env() -> list[AlvoColeta]:
+    """Monta a lista de alvos conforme a env var POLL_TURNO.
+    Default "all" mantém o comportamento antigo (1T + 2T). "1" ou "2"
+    restringe pro turno correspondente. Útil pra desligar o polling
+    de 1T entre 05/10 e 26/10/2026 sem perder os dados já coletados
+    (os snapshots ficam no DB, só não refresca)."""
+    settings = get_settings()
+    turno = (getattr(settings, "poll_turno", "all") or "all").lower()
+    if turno == "1":
+        return list(_ALVOS_1T)
+    if turno == "2":
+        return list(_ALVOS_2T)
+    return list(_ALVOS_1T) + list(_ALVOS_2T)
+
+
+ALVOS_PADRAO: list[AlvoColeta] = _alvos_segundo_turno_env()
 
 
 async def _snapshot_ja_existe(sess: AsyncSession, sha: str) -> bool:
