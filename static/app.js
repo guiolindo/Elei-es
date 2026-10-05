@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005h";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005h";
+import { renderMapa } from "/static/mapa-br.js?v=20261005i";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005i";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
