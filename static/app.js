@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005q";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005q";
+import { renderMapa } from "/static/mapa-br.js?v=20261005r";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005r";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1336,37 +1336,110 @@ async function inicializarGraficos() {
     }],
   });
 
-  // Margem até vitória matemática: UMA LINHA POR CANDIDATO SELECIONADO.
-  // Para cada candidato i, margem_i(t) = i.votos − max_j_de_outros(j.votos
-  // + j.restantes_max). Enquanto negativa, algum oponente ainda pode
-  // alcançar matematicamente. Cruza o zero → i já venceu, não há cenário
-  // em que outro alcança. Antes só mostrava 1 linha (A vs B assimétrico),
-  // o que confundia quando o user comparava mais de 2 ou invertia a ordem.
-  const seriesPorSq = {};  // { sq: [[t, margem], ...] }
+  // Margem matemática contra os OUTROS SELECIONADOS.
+  // Pra 2 candidatos as duas linhas são paralelas (mesmo `restantes`
+  // global desloca ambas), virariam ruído visual. Então:
+  //   - 2 selecionados → UMA linha: margem do LÍDER entre eles
+  //     (positivo = líder já tem mais que o pior cenário do outro).
+  //   - 3+ selecionados → uma linha POR candidato (líder relativo
+  //     dentro do grupo).
+  // Importante: "venceu/perdeu" aqui é só CONTRA O GRUPO SELECIONADO,
+  // não a eleição toda (em Pres 1T pode ter outros candidatos fora
+  // do grupo). Rotulamos "lidera/atrás no confronto" pra evitar
+  // confusão com vitória matemática real da urna.
+  const tempoDeTudo = new Set();
   for (const sq of state.selecionados) {
-    seriesPorSq[sq] = [];
-    const meuHist = new Map((hist.series[sq] || []).map(p => [p.t, p]));
-    const outrosHists = state.selecionados
-      .filter(x => x !== sq)
-      .map(x => new Map((hist.series[x] || []).map(p => [p.t, p])));
-    for (const [t, pMeu] of meuHist.entries()) {
-      let tetoMaxOutro = 0;
-      let temOutro = false;
-      for (const outro of outrosHists) {
-        const po = outro.get(t);
-        if (!po) continue;
-        temOutro = true;
-        const teto = (po.votos || 0) + (po.restantes_max || 0);
-        if (teto > tetoMaxOutro) tetoMaxOutro = teto;
-      }
-      if (!temOutro) continue;
-      seriesPorSq[sq].push([t, (pMeu.votos || 0) - tetoMaxOutro]);
-    }
+    for (const p of (hist.series[sq] || [])) tempoDeTudo.add(p.t);
   }
+  const histMap = {};
+  for (const sq of state.selecionados) {
+    histMap[sq] = new Map((hist.series[sq] || []).map(p => [p.t, p]));
+  }
+
+  let seriesFinal;
+  if (state.selecionados.length === 2) {
+    // Uma linha só: margem do líder dinâmico (quem tiver mais votos naquele t)
+    const [A, B] = state.selecionados;
+    const dados = [];
+    for (const t of [...tempoDeTudo].sort()) {
+      const pA = histMap[A].get(t), pB = histMap[B].get(t);
+      if (!pA || !pB) continue;
+      const [lider, segundo] = pA.votos >= pB.votos ? [pA, pB] : [pB, pA];
+      const nomeLider = pA.votos >= pB.votos ? nomes[0] : nomes[1];
+      const margem = lider.votos - (segundo.votos + (segundo.restantes_max || 0));
+      dados.push([t, margem, nomeLider]);
+    }
+    seriesFinal = [{
+      name: "margem do líder no confronto", type: "line", smooth: true, showSymbol: false,
+      data: dados.map(([t, m]) => [t, m]),
+      _rotulosLider: dados.map(([_, __, n]) => n),
+      lineStyle: { width: 2.5, color: "#f0b429" },
+      areaStyle: {
+        opacity: 0.22,
+        color: {
+          type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: "rgba(34,197,94,0.5)" },
+            { offset: 0.5, color: "rgba(240,180,41,0.3)" },
+            { offset: 1, color: "rgba(239,68,68,0.4)" },
+          ],
+        },
+      },
+      markLine: {
+        symbol: "none", silent: true,
+        data: [{
+          yAxis: 0,
+          label: { formatter: "fronteira do confronto", color: "#f0b429", fontSize: 10, position: "end" },
+          lineStyle: { color: "#f0b429", type: "dashed", width: 1.5 },
+        }],
+      },
+    }];
+  } else {
+    // 3+ selecionados: margem_i vs max_outros_selecionados
+    const seriesPorSq = {};
+    for (const sq of state.selecionados) {
+      seriesPorSq[sq] = [];
+      const outros = state.selecionados.filter(x => x !== sq).map(x => histMap[x]);
+      for (const [t, pMeu] of histMap[sq].entries()) {
+        let tetoMax = 0, temOutro = false;
+        for (const outro of outros) {
+          const po = outro.get(t);
+          if (!po) continue;
+          temOutro = true;
+          const teto = (po.votos || 0) + (po.restantes_max || 0);
+          if (teto > tetoMax) tetoMax = teto;
+        }
+        if (!temOutro) continue;
+        seriesPorSq[sq].push([t, (pMeu.votos || 0) - tetoMax]);
+      }
+    }
+    seriesFinal = state.selecionados.map((sq, i) => ({
+      name: `margem de ${nomes[i]}`, type: "line", smooth: true, showSymbol: false,
+      data: seriesPorSq[sq],
+      lineStyle: { width: 2.5, color: PALETA[i] },
+      areaStyle: { opacity: 0.08, color: PALETA[i] },
+      markLine: i === 0 ? {
+        symbol: "none", silent: true,
+        data: [{
+          yAxis: 0,
+          label: { formatter: "fronteira do confronto", color: "#f0b429", fontSize: 10, position: "end" },
+          lineStyle: { color: "#f0b429", type: "dashed", width: 1.5 },
+        }],
+      } : undefined,
+    }));
+  }
+
+  const rotuloMargem = (v, pctApurFinal) => {
+    if (v >= 0) return `<b style="color:#22c55e">+${fmtNum(v)}</b> ${pctApurFinal ? "(venceu o confronto)" : "(lidera no confronto)"}`;
+    if (pctApurFinal) return `<span style="color:#f87171">${fmtNum(v)}</span> (perdeu o confronto)`;
+    return `<span style="color:#f0b429">${fmtNum(v)}</span> (ainda alcançável)`;
+  };
+  const pctApurFinal = (state.ultimoSnapshot?.totais?.pct_apurado || 0) >= 99.995;
+
   graf("graf-banda").setOption({
     ...baseOpts(),
     legend: {
-      show: state.selecionados.length > 1,
+      show: state.selecionados.length > 2,
       textStyle: { color: "#c8d0dc", fontSize: 11 },
       top: 2,
     },
@@ -1375,30 +1448,16 @@ async function inicializarGraficos() {
         const data = new Date(params[0].value[0]).toLocaleString("pt-BR");
         const linhas = params.map(p => {
           const v = p.value[1];
-          const sinal = v >= 0
-            ? `<b style="color:#22c55e">+${fmtNum(v)}</b> (venceu)`
-            : `<span style="color:#f87171">${fmtNum(v)}</span> (ainda alcançável)`;
-          return `${p.marker} ${p.seriesName}: ${sinal}`;
+          let nome = p.seriesName;
+          if (state.selecionados.length === 2 && seriesFinal[0]._rotulosLider) {
+            const dsIdx = seriesFinal[0].data.findIndex(d => d[0] === p.value[0]);
+            if (dsIdx >= 0) nome = `líder: ${seriesFinal[0]._rotulosLider[dsIdx]}`;
+          }
+          return `${p.marker} ${nome}: ${rotuloMargem(v, pctApurFinal)}`;
         }).join("<br>");
         return `${data}<br>${linhas}`;
       } },
-    series: state.selecionados.map((sq, i) => ({
-      name: `margem de ${nomes[i]}`, type: "line", smooth: true, showSymbol: false,
-      data: seriesPorSq[sq],
-      lineStyle: { width: 2.5, color: PALETA[i] },
-      areaStyle: {
-        opacity: state.selecionados.length === 1 ? 0.25 : 0.08,
-        color: PALETA[i],
-      },
-      markLine: i === 0 ? {
-        symbol: "none", silent: true,
-        data: [{
-          yAxis: 0,
-          label: { formatter: "fronteira · vitória matemática", color: "#f0b429", fontSize: 10, position: "end" },
-          lineStyle: { color: "#f0b429", type: "dashed", width: 1.5 },
-        }],
-      } : undefined,
-    })),
+    series: seriesFinal,
   });
 }
 
