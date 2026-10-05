@@ -103,12 +103,36 @@ async def listar_ufs(sess: AsyncSession = Depends(get_session)) -> list[dict[str
 async def listar_candidatos(
     cargo: int = Query(...),
     uf: str | None = None,
+    turno: int | None = Query(None, ge=1, le=2, description=
+        "Se 2, retorna apenas os candidatos que foram ao 2º turno "
+        "(pros cargos 1 Pres e 3 Gov). Derivado dos eventos "
+        "SEGUNDO_TURNO_DEFINIDO (sq_a e sq_b). Senador/Deputado nunca "
+        "têm 2T, então turno=2 retorna []. Omitido = todos."),
     sess: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
     stmt = select(Candidato).where(Candidato.cod_cargo == cargo)
     # Presidente é nacional: candidatos têm uf=NULL. Ignora o filtro de UF.
     if uf and cargo != 1:
         stmt = stmt.where(Candidato.uf == uf)
+    # Filtro por turno: pros cargos 1/3 que têm 2T, pega sq_candidatos
+    # dos eventos SEGUNDO_TURNO_DEFINIDO. Senador(5), Dep Fed(6), Dep Est(7)
+    # nunca têm 2T → turno=2 retorna lista vazia.
+    if turno == 2:
+        if cargo not in (1, 3):
+            return []
+        abr = "BR" if cargo == 1 else (uf.upper() if uf else None)
+        if abr:
+            where_ev = [Evento.cod_cargo == cargo,
+                        Evento.abrangencia == abr,
+                        Evento.tipo == "SEGUNDO_TURNO_DEFINIDO"]
+            r_ev = (await sess.execute(select(Evento).where(and_(*where_ev)))).scalars().all()
+            sqs_2t: set[str] = set()
+            for e in r_ev:
+                if e.sq_candidato_a: sqs_2t.add(e.sq_candidato_a)
+                if e.sq_candidato_b: sqs_2t.add(e.sq_candidato_b)
+            if not sqs_2t:
+                return []
+            stmt = stmt.where(Candidato.sq_candidato.in_(sqs_2t))
     r = await sess.execute(stmt.order_by(Candidato.numero))
     todos = list(r.scalars())
     # Dedup HONESTO por (uf, numero). O TSE às vezes mantém dois registros

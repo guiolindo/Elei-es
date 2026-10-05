@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005a";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005a";
+import { renderMapa } from "/static/mapa-br.js?v=20261005b";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005b";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -434,7 +434,7 @@ async function trocarTurno(novoTurno) {
 async function carregarCandidatos() {
   renderSkeletons(6);
   const uf = state.abrangencia === "BR" ? "" : `&uf=${state.abrangencia}`;
-  const cands = await get(`/api/candidatos?cargo=${state.cargo}${uf}`);
+  const cands = await get(`/api/candidatos?cargo=${state.cargo}${uf}&turno=${state.turno}`);
   atualizarSubtitulo();
   state.candidatos = cands;
   state.ficha = {};
@@ -607,11 +607,24 @@ function renderLista() {
       ? `${state.candidatos.length} candidatos`
       : `${filtrados.length} de ${state.candidatos.length}`;
   if (state.candidatos.length === 0) {
-    el.innerHTML = `<div class="empty-state">
-      <svg class="empty-ico" width="48" height="48"><use href="#i-clock"/></svg>
-      <h3>Aguardando o TSE liberar os dados</h3>
-      <p>Os primeiros resultados começam a sair a partir das 17h de domingo, quando as urnas fecham. O placar preenche sozinho assim que os primeiros votos chegarem.</p>
-    </div>`;
+    if (state.turno === 2) {
+      // Contexto diferente — 2T é em 26/10/2026 e normalmente só define
+      // os candidatos depois que o 1T fecha matematicamente.
+      const cargoNome = state.cargo === 3 ? "esta UF" : "a disputa nacional";
+      el.innerHTML = `<div class="empty-state">
+        <svg class="empty-ico" width="48" height="48"><use href="#i-clock"/></svg>
+        <h3>Sem 2º turno aqui</h3>
+        <p>Ou ${cargoNome} foi decidida no 1º turno (vitória por maioria absoluta),
+        ou o TSE ainda não publicou os candidatos do 2º turno.
+        Volte pro 1º turno no toggle acima pra ver o resultado final.</p>
+      </div>`;
+    } else {
+      el.innerHTML = `<div class="empty-state">
+        <svg class="empty-ico" width="48" height="48"><use href="#i-clock"/></svg>
+        <h3>Aguardando o TSE liberar os dados</h3>
+        <p>Os primeiros resultados começam a sair a partir das 17h de domingo, quando as urnas fecham. O placar preenche sozinho assim que os primeiros votos chegarem.</p>
+      </div>`;
+    }
     return;
   }
   if (filtrados.length === 0) {

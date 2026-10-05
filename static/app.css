@@ -273,6 +273,18 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 @media (max-width: 640px) {
   .turno-toggle { margin-left: 0; order: 10; }
   .turno-btn { padding: 5px 10px; font-size: 11px; }
+  /* Esconde a versão desktop no mobile (está dentro do .nav escondido),
+     mostra a versão específica do mobile (dentro do m-chips zone). */
+  .turno-toggle-desktop { display: none !important; }
+  .turno-toggle-mobile {
+    display: inline-flex !important;
+    margin: 10px 12px 0;
+    align-self: flex-start;
+  }
+}
+/* Desktop: esconde a versão mobile */
+@media (min-width: 641px) {
+  .turno-toggle-mobile { display: none !important; }
 }
 body.is-tv .turno-toggle { margin-left: 10px; padding: 2px; }
 body.is-tv .turno-btn { font-size: 11px; padding: 4px 12px; }
