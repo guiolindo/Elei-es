@@ -2183,54 +2183,70 @@ body.is-tv.turno-2 main.page > .grid-candidatos {
   padding: 0;
 }
 body.is-tv.turno-2 .candidato {
-  padding: 14px 18px !important;
-  gap: 10px !important;
+  padding: 10px 14px !important;
+  gap: 6px !important;
   min-height: 0;
-  justify-content: space-between;
   position: relative;
-  border-left-width: 6px;
+  border-left-width: 5px;
+  flex-direction: row !important;
+  align-items: center;
 }
-body.is-tv.turno-2 .cand-topo { gap: 14px; align-items: center; }
+body.is-tv.turno-2 .cand-topo { gap: 10px; align-items: center; flex: 0 0 auto; }
 body.is-tv.turno-2 .cand-foto {
-  width: 72px !important; height: 72px !important; flex: 0 0 72px;
+  width: 48px !important; height: 48px !important; flex: 0 0 48px;
   border: 2px solid var(--cor-partido);
   border-radius: 50%;
 }
+body.is-tv.turno-2 .cand-info { flex: 1 1 auto; }
 body.is-tv.turno-2 .cand-nome {
-  font-size: 22px !important;
-  line-height: 1.15;
-  white-space: normal;
-  overflow: visible;
+  font-size: 16px !important;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-body.is-tv.turno-2 .cand-numero-tag { font-size: 13px; padding: 2px 7px; }
-body.is-tv.turno-2 .cand-uf-tag { font-size: 11px; }
-body.is-tv.turno-2 .pill-partido { font-size: 11px; padding: 2px 7px; }
+body.is-tv.turno-2 .cand-numero-tag { font-size: 11px; padding: 1px 5px; }
+body.is-tv.turno-2 .cand-uf-tag { font-size: 10px; }
+body.is-tv.turno-2 .pill-partido { font-size: 10px; padding: 1px 5px; }
+body.is-tv.turno-2 .cand-metricas {
+  flex: 0 0 auto;
+  min-width: 150px;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
 /* HIERARQUIA: % é o KPI principal da apuração. Em TV 2T head-to-head
    tipo partida de futebol: % domina a tela, votos é info secundária.
    Antes votos tinha 56px e % 18px — inverteu completamente. */
 body.is-tv.turno-2 .cand-pct {
-  font-size: 56px !important;
+  font-size: 36px !important;
   font-weight: 900 !important;
   line-height: 1;
-  margin: 6px 0 2px;
+  margin: 0 !important;
   color: var(--cor-partido);
-  text-align: left;
+  text-align: right;
 }
 body.is-tv.turno-2 .cand-pct-sub {
-  font-size: 0.22em;
+  font-size: 0.3em;
   color: var(--muted);
 }
 body.is-tv.turno-2 .cand-votos {
-  font-size: 14px !important;
+  font-size: 11px !important;
   margin: 0 !important;
   color: var(--muted);
   font-weight: 600;
   letter-spacing: 0.3px;
   font-variant-numeric: tabular-nums;
 }
-body.is-tv.turno-2 .cand-barra {
-  height: 6px;
-  margin-top: 4px;
+body.is-tv.turno-2 .cand-barra { display: none; }
+body.is-tv.turno-2 .cand-linha-inf { justify-content: flex-end; }
+/* Tarjas de eleito/eliminado permanecem compactas */
+body.is-tv.turno-2 .cand-tarja {
+  font-size: 10px !important;
+  padding: 3px 8px !important;
+  margin-left: auto;
 }
 body.is-tv.turno-2 .cand-tarja {
   font-size: 12px !important;
@@ -2242,29 +2258,16 @@ body.is-tv.turno-2 .cand-check-vazio { display: none !important; }
 /* Mapa e gráfico ficam side-by-side embaixo, bem compactos */
 body.is-tv.turno-2 .mapa-secao { grid-area: mapa; }
 body.is-tv.turno-2 .home-graf-secao { grid-area: grafico; }
-/* Separador visual VS no meio dos 2 cards */
-body.is-tv.turno-2 main.page > .grid-candidatos::before {
-  content: "×";
-  position: absolute;
-  left: 50%; top: calc(50% + 30px);
-  transform: translate(-50%, -50%);
-  font-size: 72px;
-  font-weight: 900;
-  color: rgba(255,255,255,0.1);
-  pointer-events: none;
-  z-index: 10;
-}
-/* 1920+: proporção mantida, só um pouco maior pra tela de TV grande */
+/* "×" removido — não cabe no layout horizontal compacto, cards já
+   são claramente separados pelo gap do grid. */
+/* 1920+: proporção mantida, só um pouco maior pra TV grande */
 @media (min-width: 1920px) {
   body.is-tv.turno-2 .cand-foto {
-    width: 92px !important; height: 92px !important; flex: 0 0 92px;
+    width: 60px !important; height: 60px !important; flex: 0 0 60px;
   }
-  body.is-tv.turno-2 .cand-nome { font-size: 26px !important; }
-  body.is-tv.turno-2 .cand-pct { font-size: 72px !important; }
-  body.is-tv.turno-2 main.page > .grid-candidatos::before {
-    font-size: 72px;
-    top: calc(50% + 10px);
-  }
+  body.is-tv.turno-2 .cand-nome { font-size: 20px !important; }
+  body.is-tv.turno-2 .cand-pct { font-size: 48px !important; }
+  body.is-tv.turno-2 .cand-votos { font-size: 13px !important; }
 }
 
 /* ============ TV 2T · PLACAR + UFs por líder ============
@@ -2277,13 +2280,27 @@ body.is-tv.turno-2 main.page > .grid-candidatos::before {
 body.is-tv.turno-2 .tv2t-placar {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   grid-area: placar;
-  padding: 10px 18px;
+  padding: 8px 14px;
   background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
+body.is-tv.turno-2 .tv2t-score {
+  grid-template-columns: 1fr 1.8fr 1fr;
+  gap: 14px;
+}
+body.is-tv.turno-2 .tv2t-diff-lab,
+body.is-tv.turno-2 .tv2t-tend-lab { font-size: 9px; letter-spacing: 1px; }
+body.is-tv.turno-2 .tv2t-diff-num,
+body.is-tv.turno-2 .tv2t-tend-num { font-size: 20px; }
+body.is-tv.turno-2 .tv2t-diff-pct { font-size: 11px; }
+body.is-tv.turno-2 .tv2t-spread { height: 22px; }
+body.is-tv.turno-2 .tv2t-spread-a,
+body.is-tv.turno-2 .tv2t-spread-b { font-size: 12px; }
+body.is-tv.turno-2 .tv2t-progresso-lab { font-size: 10px; }
+body.is-tv.turno-2 .tv2t-progresso-bar { height: 4px; }
 body.is-tv.turno-2 .tv2t-ufs {
   display: flex;
   flex-direction: column;
@@ -2296,20 +2313,22 @@ body.is-tv.turno-2 .tv2t-ufs {
   overflow: hidden;
   min-height: 0;
 }
-/* Novo layout do grid pra encaixar placar + ufs. Proporções
-   calibradas pra NÃO deixar os cards engolindo mapa+gráfico:
-   lista 1fr (compacta), placar auto, mapa+gráfico 1.3fr (dominante),
-   ufs+eventos auto (barras compactas). */
+/* Grid simplificado pro TV 2T: 4 rows, MAPA/GRÁFICO ocupam todo o
+   espaço vertical livre (1fr), cards+placar+eventos são auto
+   (ocupam só o que precisam). Antes 5 rows com fr competindo
+   deixavam o mapa com 20% da tela. Agora mapa = ~55% da tela. */
 body.is-tv.turno-2 main.page {
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto minmax(0, 0.9fr) auto minmax(0, 1.3fr) minmax(0, 0.5fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   grid-template-areas:
     "pagehead pagehead"
     "lista    lista"
     "placar   placar"
     "mapa     grafico"
-    "ufs      eventos";
+    "eventos  eventos";
 }
+/* UFs section removida — redundante com o mapa colorido. */
+body.is-tv.turno-2 .tv2t-ufs { display: none !important; }
 /* Placar: score tipo partida com 3 colunas */
 .tv2t-score {
   display: grid;
