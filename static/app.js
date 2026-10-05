@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005l";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005l";
+import { renderMapa } from "/static/mapa-br.js?v=20261005m";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005m";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1710,6 +1710,10 @@ async function carregarEventos() {
   state.eleitos.clear();
   state.segundoTurno.clear();
   evs.forEach(_absorverEventoNoState);
+  // Faixa persistente de "VENCEDOR" quando o usuário navega pra um cargo
+  // já decidido: diferente do modal (one-shot ao vivo), fica no topo da
+  // página enquanto a disputa estiver resolvida.
+  renderFaixaVencedor(evs);
   // CRÍTICO: re-renderiza os cards agora que state.eleitos/eliminados/
   // segundoTurno estão populados. SEM atualizarPainelTotais na sequência,
   // os votos ficam zerados: renderLista() reconstrói templates com
@@ -1838,24 +1842,35 @@ async function atualizarPlacar2T() {
   const diffPctEl = document.getElementById("tv2t-diff-pct");
   if (diffNumEl) diffNumEl.textContent = fmtNum(diffVotos);
   if (diffPctEl) diffPctEl.textContent = `${diffPct.toFixed(2)} pontos`;
-  // Spread bar: % de A e % de B proporcional (restante vai pros outros,
-  // tipicamente < 5% em 2T puro, mas somando pode haver resíduo)
+  // Spread bar: % de A e % de B proporcional. Com 0 votos (pré-apuração)
+  // 50/50 fica visualmente mentiroso — mostramos barra neutra "aguardando".
   const total = a.pct_validos + b.pct_validos;
-  const flexA = total > 0 ? (a.pct_validos / total * 100) : 50;
-  const flexB = 100 - flexA;
   const spreadA = document.getElementById("tv2t-spread-a");
   const spreadB = document.getElementById("tv2t-spread-b");
-  if (spreadA) {
-    spreadA.style.flexBasis = flexA + "%";
-    spreadA.style.setProperty("--cor-a", corA);
-    spreadA.style.background = corA;
-    spreadA.textContent = `${a.pct_validos.toFixed(1)}%`;
-  }
-  if (spreadB) {
-    spreadB.style.flexBasis = flexB + "%";
-    spreadB.style.setProperty("--cor-b", corB);
-    spreadB.style.background = corB;
-    spreadB.textContent = `${b.pct_validos.toFixed(1)}%`;
+  const spreadWrap = document.getElementById("tv2t-spread");
+  if (total <= 0) {
+    if (spreadWrap) {
+      spreadWrap.classList.add("tv2t-spread-vazio");
+      spreadWrap.setAttribute("data-aguardando", "Aguardando apuração");
+    }
+    if (spreadA) { spreadA.style.flexBasis = "50%"; spreadA.style.background = "transparent"; spreadA.textContent = ""; }
+    if (spreadB) { spreadB.style.flexBasis = "50%"; spreadB.style.background = "transparent"; spreadB.textContent = ""; }
+  } else {
+    if (spreadWrap) { spreadWrap.classList.remove("tv2t-spread-vazio"); spreadWrap.removeAttribute("data-aguardando"); }
+    const flexA = (a.pct_validos / total * 100);
+    const flexB = 100 - flexA;
+    if (spreadA) {
+      spreadA.style.flexBasis = flexA + "%";
+      spreadA.style.setProperty("--cor-a", corA);
+      spreadA.style.background = corA;
+      spreadA.textContent = `${a.pct_validos.toFixed(1)}%`;
+    }
+    if (spreadB) {
+      spreadB.style.flexBasis = flexB + "%";
+      spreadB.style.setProperty("--cor-b", corB);
+      spreadB.style.background = corB;
+      spreadB.textContent = `${b.pct_validos.toFixed(1)}%`;
+    }
   }
   // Tendência: compara com snapshot anterior pra ver se o líder tá
   // puxando ou perdendo gás. Delta de pct_validos > 0 = subindo.
@@ -1980,6 +1995,7 @@ function conectarWS() {
         const cor = num ? corDoPartido(num) : "#f0b429";
         if (ev.tipo === "ELEITO_1T" || ev.tipo === "ELEITO_MAJORITARIO") {
           comemorar(nome, cor);
+          abrirModalVitoria(ev.sq_candidato_a, cor);
           toast(`${nome} eleito(a)!`, "ok");
         } else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
           toast(`2º turno matematicamente definido`, "ok");
@@ -2087,7 +2103,94 @@ function atualizarTituloAba(dados) {
   document.title = `${nome} ${pct}% · ${apurado}% apurado · ${TITULO_BASE}`;
 }
 
-// ============ UX: confete + celebração ao eleger ============
+// Faixa fixa no topo "VENCEDOR: fulano" quando a disputa já foi
+// matematicamente decidida. Some sozinha se o cargo/UF muda pra um
+// que ainda não decidiu.
+function renderFaixaVencedor(eventos) {
+  const prev = document.getElementById("faixa-vencedor");
+  if (prev) prev.remove();
+  if (state.cargo === 6 || state.cargo === 7) return;  // proporcional não tem "o vencedor"
+  const eleito = (eventos || []).find(e =>
+    (e.tipo === "ELEITO_1T" || e.tipo === "ELEITO_MAJORITARIO") && e.sq_candidato_a
+  );
+  if (!eleito) return;
+  const ficha = state.ficha[eleito.sq_candidato_a] || {};
+  const nome = ficha.nome_urna || "Vencedor(a)";
+  const partido = ficha.partido || "";
+  const cor = partido ? corDoPartido(partido) : "#10b981";
+  const cargoNome = { 1: "Presidente", 3: "Governador(a)", 5: "Senador(a)" }[state.cargo] || "";
+  const abr = state.abrangencia === "BR" ? "do Brasil" : `de ${state.abrangencia}`;
+  const faixa = document.createElement("div");
+  faixa.id = "faixa-vencedor";
+  faixa.className = "faixa-vencedor";
+  faixa.style.setProperty("--cor-vencedor", cor);
+  faixa.innerHTML = `
+    <svg class="fv-ico" width="22" height="22" aria-hidden="true"><use href="#i-trophy"/></svg>
+    <span class="fv-lab">VENCEDOR</span>
+    <span class="fv-nome">${nome}</span>
+    <span class="fv-cargo">${cargoNome} ${abr}</span>
+  `;
+  const main = document.querySelector("main.page");
+  if (main) main.insertBefore(faixa, main.firstChild);
+}
+
+// ============ UX: troféu grande + confete ao eleger ============
+// Mostra MODAL DE VITÓRIA ocupando a tela inteira com foto, nome do
+// candidato, cargo + abrangência e % final. Fica até o usuário fechar
+// ou 25s. Dispara apenas pra ELEITO_* no cargo/abrangência que a pessoa
+// está acompanhando (WS já é canal-based, então garantido).
+function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
+  const ficha = state.ficha[sq_candidato] || {};
+  const nome = ficha.nome_urna || "Vencedor(a)";
+  const foto = ficha.foto_url;
+  const partido = ficha.partido || "";
+  const numero = ficha.numero || "";
+  const lider = (state.ultimoSnapshot?.candidatos || []).find(c => c.sq_candidato === sq_candidato);
+  const pct = lider ? `${lider.pct_validos.toFixed(2)}%` : "";
+  const cargoNome = { 1: "Presidente da República", 3: "Governador(a)", 5: "Senador(a)",
+                      6: "Deputado(a) Federal", 7: "Deputado(a) Estadual" }[state.cargo] || "";
+  const abr = state.abrangencia === "BR" ? "do Brasil" : `de ${state.abrangencia}`;
+
+  // Remove modal anterior se houver
+  document.querySelectorAll(".modal-vitoria").forEach(el => el.remove());
+
+  const modal = document.createElement("div");
+  modal.className = "modal-vitoria";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-label", `${nome} eleito ${cargoNome}`);
+  modal.style.setProperty("--cor-vencedor", cor);
+  modal.innerHTML = `
+    <div class="mv-back"></div>
+    <div class="mv-card">
+      <button class="mv-fechar" aria-label="Fechar">✕</button>
+      <div class="mv-trofeu" aria-hidden="true">
+        <svg width="72" height="72"><use href="#i-trophy"/></svg>
+      </div>
+      <div class="mv-selo">VENCEDOR</div>
+      ${foto ? `<img class="mv-foto" src="${foto}" alt="" onerror="this.style.display='none'">` : ""}
+      <div class="mv-nome">${nome}</div>
+      <div class="mv-partido">${numero ? numero + " · " : ""}${partido}</div>
+      <div class="mv-cargo">${cargoNome} ${abr}</div>
+      ${pct ? `<div class="mv-pct"><span class="mv-pct-num">${pct}</span><span class="mv-pct-lab">dos votos válidos</span></div>` : ""}
+      <div class="mv-sub">Matematicamente eleito(a)</div>
+      <button class="mv-ok">Continuar acompanhando</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const fechar = () => {
+    modal.classList.add("saindo");
+    setTimeout(() => modal.remove(), 400);
+  };
+  modal.querySelector(".mv-fechar").onclick = fechar;
+  modal.querySelector(".mv-ok").onclick = fechar;
+  modal.querySelector(".mv-back").onclick = fechar;
+  const onKey = (e) => { if (e.key === "Escape") { fechar(); document.removeEventListener("keydown", onKey); } };
+  document.addEventListener("keydown", onKey);
+  setTimeout(fechar, 25000);
+}
+
 function comemorar(nome, cor = "#f0b429") {
   // Confete simples via canvas (leve, sem dependência externa)
   const canvas = document.createElement("canvas");
