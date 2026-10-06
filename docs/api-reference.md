@@ -28,8 +28,13 @@ Lista dos cargos (Presidente, Governador, Senador, Dep. Federal, Dep. Estadual/D
 ### `GET /api/ufs`
 27 UFs com sigla, nome e código IBGE.
 
-### `GET /api/candidatos?cargo={n}[&uf={UF}]`
+### `GET /api/candidatos?cargo={n}[&uf={UF}][&turno={1|2}]`
 Lista de candidatos daquele cargo (opcionalmente por UF). **Dedup por `(uf, numero)`**: quando o TSE mantém dois `sq_candidato` pra mesma vaga (substituição/reregistro), devolve só um — preferência pra `situacao='ativo'`; empate → sq_candidato mais recente.
+
+`turno=2` restringe aos candidatos que foram ao 2º turno (derivado dos `sq_candidato_a/b` dos eventos `SEGUNDO_TURNO_DEFINIDO`). Pros cargos 5, 6, 7 (que não têm 2T) retorna `[]`.
+
+### `GET /api/segundo-turno/ufs-governador`
+Lista distinct de UFs com evento `SEGUNDO_TURNO_DEFINIDO` em `cod_cargo=3`. Frontend usa pra esconder do dropdown de UF (no modo 2T + cargo Governador) os estados que foram decididos no 1T. Ex.: `["RJ", "PE", "BA"]`.
 
 ### `GET /api/candidato/{sq}`
 Ficha completa. Campos:
@@ -74,7 +79,22 @@ Resultados por município (quando TSE inclui breakdown `abr[].mu[]`).
 ### `GET /api/apuracao/lideres-por-uf?cargo={n}`
 Líder de cada UF pra montar o mapa cloroplético. **Exige `votos > 0`** pra o candidato ser considerado líder — evita "líder fantasma" pré-apuração (candidato com 0 votos aparecendo colorido).
 
-### `GET /api/apuracao/lideres-por-municipio?uf={UF}&cargo={n}`
+### `POST /api/apuracao/popular-municipios?cargo={n}&uf={UF}[&turno={1|2}]`
+**Lazy populate on-demand**. O endpoint `{uf}-c{cargo}-e{el}-u.json` do TSE **não traz `mu[]`** pra nenhum cargo em 2026 — dados municipais estão em arquivos individuais `{uf}{cod_tse}-c{cargo}-e{el}-u.json`. O frontend chama este endpoint quando `lideres-por-municipio` retorna `{}`.
+
+Busca os ~850 municípios da UF em paralelo direto do TSE (semáforo 40 concorrentes), parseia e persiste em `SnapshotMunicipio` ligado ao último snapshot UF daquele cargo/turno. Mapping TSE↔IBGE embarcado em `app/data/tse_municipios.json` (5570 municípios).
+
+- **TTL in-memory 15 min por `(cargo, uf, turno)`**. Chamadas dentro do TTL retornam `{"ok": true, "cached": true, "ttl_restante_s": N}` sem refetchar.
+- **Limpeza automática**: a cada execução, DELETA `SnapshotMunicipio` de snapshots anteriores daquela `(cargo, uf, turno)` — só o snapshot mais recente retém dados municipais. Banco não cresce indefinidamente.
+- **Lock asyncio** evita race entre requests concorrentes.
+- Primeira abertura leva ~5-15s; subsequentes dentro do TTL são instantâneas.
+
+```json
+{"ok": true, "snapshot_id": 20086, "municipios_total": 853,
+ "rows_inseridas": 4215, "falhas": 2, "snapshots_velhos_limpos": 12}
+```
+
+### `GET /api/apuracao/lideres-por-municipio?uf={UF}&cargo={n}[&turno={1|2}]`
 Idem, mas por município da UF.
 
 ### `GET /api/apuracao/bu?uf={UF}&municipio={cod_tse}&zona={n}&secao={n}&cargo={n}[&turno={1|2}]`
@@ -86,10 +106,14 @@ Lista de municípios da UF pra o wizard do `/urna`. Dados vindos de `arquivo-urn
 ### `GET /api/municipios/{municipio}/zonas?uf={UF}`
 Zonas eleitorais do município, cada uma com a lista de seções disponíveis. Alimenta os pickers em cascata do wizard do BU.
 
-### `GET /api/eventos?[cargo={n}][&abrangencia={...}]`
+### `GET /api/eventos?[cargo={n}][&abrangencia={...}][&turno={1|2}]`
 Timeline dos eventos matemáticos (ELEITO_1T, VIRADA, SEGUNDO_TURNO_DEFINIDO, ELEITO_MAJORITARIO, ELEITO_2T, MATEMATICAMENTE_ELIMINADO). Ordenados por `ocorrido_em` desc, limit 100.
 
+`turno=2` filtra eventos cujo `snapshot_id` pertence a snapshots do 2º turno. Páginas 2T usam pra não misturar MATEMATICAMENTE_ELIMINADO / VIRADA do 1T no feed.
+
 **Garantia importante**: eventos NUNCA são emitidos pra alvos `(cargo=1 Presidente, UF)`. Maioria absoluta pra Presidente é nacional (CF art. 77 §2º).
+
+**Garantia proporcional**: cargos 6 (Dep Fed) e 7 (Dep Est) nunca recebem ELEITO_MAJORITARIO / MATEMATICAMENTE_ELIMINADO — proporcional não compartilha a máquina majoritária. Pra proporcional ver `/api/apuracao/proporcional`.
 
 ## Admin (requer `X-Admin-Token`)
 
@@ -125,6 +149,23 @@ Recebe `{sq_candidato, b64}` → salva em `static/candidatos/{sq}.jpg`.
 
 ### `POST /api/admin/sync-candidatos`
 Dispara `sincronizar_candidatos()` programaticamente. Falha nos endpoints bloqueados pelo Akamai.
+
+### `POST /api/admin/limpar-eventos-pre-apuracao`
+Apaga eventos (VIRADA, ELEITO, etc.) emitidos em snapshots com `qt_secoes_totalizadas = 0` — fantasma do bug fixado em 01/10/2026. Idempotente.
+
+### `POST /api/admin/corrigir-partidos`
+Repara `partido_numero` dos cargos 5/6/7 (que têm número de candidato de 3 dígitos — só os 2 primeiros são partido). Idempotente.
+
+### `POST /api/admin/corrigir-rj-gov-sub-judice`
+Correção retroativa one-shot do falso-positivo de `ELEITO_MAJORITARIO` em RJ Gov 1T (04/10/2026). O engine declarou eleito com base em `qt_votos_validos` subestimado — o TSE separa os votos de candidato "Indeferido em prazo recursal" (Garotinho, 274k) do `v.vv` do payload, mas Lei 9.504 art. 16-A manda contar como válidos. Parser corrigido globalmente (`max(TSE.vv, soma dos candidatos)`); este endpoint corrige o estado histórico no banco:
+
+- Remove `ELEITO_MAJORITARIO` emitido pro `sq=190002542887`.
+- Remove `MATEMATICAMENTE_ELIMINADO` emitidos como consequência.
+- Emite `SEGUNDO_TURNO_DEFINIDO` com Douglas Ruas (PL 22) × Eduardo Paes (PSD 15) ancorado no snapshot RJ Gov 1T mais recente.
+
+Idempotente — chamadas subsequentes retornam `{"ok": true, "skip": "RJ Gov já corrigido"}`.
+
+Alternativa via shell: `python -m scripts.corrigir_rj_gov_sub_judice`.
 
 ## Compare
 

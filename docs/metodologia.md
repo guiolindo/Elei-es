@@ -22,6 +22,12 @@ Todas as regras que o site usa pra decidir "resultado matematicamente definido",
 
 **Fonte da verdade**: campo `situacao` na tabela `candidatos`, atualizado pelo parser de `descricaoSituacao` do TSE (`poller/candidatos_tse.py`), com normalização de acentos. Caso real 2026: Leonardo Avalanche e Pablo Marçal (PRTB) marcados `renunciou`.
 
+**Sub judice ≠ não-ativo**. Candidato "Indeferido em prazo recursal" (recurso rodando) PERMANECE na urna e seus votos **contam como válidos** até trânsito em julgado (Lei 9.504 art. 16-A). O TSE, porém, segrega esses votos do campo `v.vv` do payload JSON — porque podem virar nulos se o recurso for rejeitado. O motor usaria um denominador subestimado e emitiria `ELEITO_MAJORITARIO` indevidamente.
+
+**Fix**: o parser de totais usa `qt_votos_validos = max(TSE.v.vv, soma dos cand.vap do payload)`. A soma incluindo todos os candidatos (ativos + sub judice) nunca fica abaixo da realidade. Testes `test_parse_qt_votos_validos_inclui_sub_judice` + `_mantem_vv_quando_maior`.
+
+**Caso real 2026 — RJ Gov 1T**: Garotinho (REP 10) "Indeferido em prazo recursal", 274.411 votos. Com `v.vv` do TSE o líder Douglas Ruas aparecia com 50,88% dos válidos → engine emitiu `ELEITO_MAJORITARIO`. Com `max(v.vv, soma)` o pct correto é 49,27% → `SEGUNDO_TURNO_DEFINIDO` com Douglas × Eduardo Paes (bate com o anúncio oficial do TSE). Correção retroativa aplicada via `POST /api/admin/corrigir-rj-gov-sub-judice`.
+
 **Escopo nacional vs. estadual**. A regra constitucional de maioria absoluta pra Presidente vale sobre os válidos do **Brasil inteiro** (CF art. 77 §2º). O coletor baixa `(cargo=1, UF)` apenas pra alimentar o mapa colorido por estado; o motor matemático **não avalia** nenhum evento (`ELEITO_1T`, `SEGUNDO_TURNO_DEFINIDO`, `MATEMATICAMENTE_ELIMINADO`) nesses alvos. Um candidato pode ter 70% dos válidos num estado e perder o pleito nacional.
 
 ## 1. Presidente eleito no 1º turno
