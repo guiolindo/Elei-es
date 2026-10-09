@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261009a";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261009a";
+import { renderMapa } from "/static/mapa-br.js?v=20261009b";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261009b";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -2266,7 +2266,7 @@ const NOTAS_CONTEXTO = [
     cargo: 3, uf: "RJ", turno: 1,
     titulo: "Decisão atípica — cassação pós-apuração",
     corpo: "A disputa pelo Governo do RJ só ficou decidida no 1º turno depois do TSE julgar a cassação de ANTHONY GAROTINHO (REP 10) em 09/10/2026. Durante a apuração, ele estava com registro INDEFERIDO em prazo recursal — pela Lei 9.504 art. 16-A, votos a candidato sub judice contam como válidos enquanto roda o recurso. Com os 274.411 votos dele dentro: líder tinha 49,27% → iria pro 2T. Com a cassação mantida, esses votos viraram NULOS (Lei 9.504 art. 175 §3º) → denominador caiu de 8.669.038 pra 8.394.627 → DOUGLAS RUAS passou pra 50,88% → eleito no 1º turno.",
-    link: "https://www.tse.jus.br/comunicacao/noticias/",
+    link: "https://www.tse.jus.br/comunicacao/noticias/2026/Outubro/tse-decide-pela-retotalizacao-dos-votos-para-governador-no-rio-de-janeiro",
   },
 ];
 
