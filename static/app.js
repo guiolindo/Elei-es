@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261005r";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261005r";
+import { renderMapa } from "/static/mapa-br.js?v=20261009a";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261009a";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1866,6 +1866,7 @@ async function carregarEventos() {
   // já decidido: diferente do modal (one-shot ao vivo), fica no topo da
   // página enquanto a disputa estiver resolvida.
   renderFaixaVencedor(evs);
+  renderNotaContexto();
   // CRÍTICO: re-renderiza os cards agora que state.eleitos/eliminados/
   // segundoTurno estão populados. SEM atualizarPainelTotais na sequência,
   // os votos ficam zerados: renderLista() reconstrói templates com
@@ -2255,6 +2256,50 @@ function atualizarTituloAba(dados) {
   const pct = lider.pct_validos.toFixed(0);
   const apurado = t.pct_apurado.toFixed(0);
   document.title = `${nome} ${pct}% · ${apurado}% apurado · ${TITULO_BASE}`;
+}
+
+// Notas de contexto pra disputas com história atípica (cassação pós-apuração,
+// mudança jurisprudencial no meio do pleito, etc). Data-driven pra facilitar
+// adicionar casos novos sem mexer no fluxo principal.
+const NOTAS_CONTEXTO = [
+  {
+    cargo: 3, uf: "RJ", turno: 1,
+    titulo: "Decisão atípica — cassação pós-apuração",
+    corpo: "A disputa pelo Governo do RJ só ficou decidida no 1º turno depois do TSE julgar a cassação de ANTHONY GAROTINHO (REP 10) em 09/10/2026. Durante a apuração, ele estava com registro INDEFERIDO em prazo recursal — pela Lei 9.504 art. 16-A, votos a candidato sub judice contam como válidos enquanto roda o recurso. Com os 274.411 votos dele dentro: líder tinha 49,27% → iria pro 2T. Com a cassação mantida, esses votos viraram NULOS (Lei 9.504 art. 175 §3º) → denominador caiu de 8.669.038 pra 8.394.627 → DOUGLAS RUAS passou pra 50,88% → eleito no 1º turno.",
+    link: "https://www.tse.jus.br/comunicacao/noticias/",
+  },
+];
+
+function renderNotaContexto() {
+  const prev = document.getElementById("nota-contexto");
+  if (prev) prev.remove();
+  const nota = NOTAS_CONTEXTO.find(n =>
+    n.cargo === state.cargo &&
+    n.uf === state.abrangencia &&
+    (n.turno == null || n.turno === state.turno)
+  );
+  if (!nota) return;
+  // Honra o dismiss persistido por nota
+  const dismissKey = `nota-contexto-dismiss:${nota.cargo}-${nota.uf}-${nota.turno || "any"}`;
+  if (localStorage.getItem(dismissKey) === "1") return;
+  const el = document.createElement("div");
+  el.id = "nota-contexto";
+  el.className = "nota-contexto";
+  el.setAttribute("role", "note");
+  el.innerHTML = `
+    <svg class="nc-ico" width="20" height="20" aria-hidden="true"><use href="#i-help"/></svg>
+    <div class="nc-corpo">
+      <div class="nc-titulo">${nota.titulo}</div>
+      <div class="nc-texto">${nota.corpo}${nota.link ? ` <a href="${nota.link}" target="_blank" rel="noopener">Saiba mais ↗</a>` : ""}</div>
+    </div>
+    <button class="nc-fechar" aria-label="Fechar nota" title="Fechar">✕</button>
+  `;
+  el.querySelector(".nc-fechar").onclick = () => {
+    try { localStorage.setItem(dismissKey, "1"); } catch(e) {}
+    el.remove();
+  };
+  const main = document.querySelector("main.page");
+  if (main) main.insertBefore(el, main.firstChild);
 }
 
 // Faixa fixa no topo "VENCEDOR: fulano" quando a disputa já foi
