@@ -671,3 +671,52 @@ def test_senador_multivaga_empate_antes_de_100pct_nao_decide():
     tot = TotaisResumo(qt_secoes_total=100, qt_secoes_totalizadas=99,
                        qt_eleitorado_apto=10_000_000, qt_eleitorado_apto_totalizadas=9_999_000, qt_votos_validos=1_500_000)
     assert eleitos_majoritario_multivaga(cands, tot, vagas=2) == []
+
+
+def test_rj_gov_cassacao_ajusta_denominador():
+    """Caso RJ Gov 09/10/2026: Garotinho (sub judice) cassado após julgamento.
+
+    Antes (sub judice, situacao=ativo):
+      válidos = 8.669.038 → líder 49,27% → SEGUNDO_TURNO_DEFINIDO
+    Depois da cassação (situacao=cancelado):
+      votos do Garotinho (274.411) viram NULOS pela Lei 9.504 art. 175 §3º.
+      Engine desconta do denominador: 8.669.038 − 274.411 = 8.394.627
+      Líder: 4.271.199 / 8.394.627 = 50,88% → ELEITO_MAJORITARIO
+    """
+    cands = [
+        CandidatoResumo("DOUGLAS", 4271199),
+        CandidatoResumo("EDUARDO", 3706984),
+        CandidatoResumo("GAROTINHO", 274411, situacao="cancelado"),
+        CandidatoResumo("D", 235347),
+        CandidatoResumo("E", 84889),
+    ]
+    t = totais(37675, 37675, 12842517, 12842517, 8669038)
+    eventos = avaliar_apuracao(cands, t, cod_cargo=3, vagas_majoritario=1)
+    tipos = [e["tipo"] for e in eventos]
+    assert "ELEITO_MAJORITARIO" in tipos, (
+        f"Esperava ELEITO_MAJORITARIO após cassação; eventos={tipos}"
+    )
+    eleito = next(e for e in eventos if e["tipo"] == "ELEITO_MAJORITARIO")
+    assert eleito["sq_candidato_a"] == "DOUGLAS"
+    assert eleito["detalhes"]["maioria_absoluta"] is True
+
+
+def test_rj_gov_sub_judice_continua_2t():
+    """Mesmo caso, mas com Garotinho ainda ATIVO (recurso rodando) — deve
+    ir pra 2T. Testa que o ajuste de denominador NÃO aplica quando não há
+    não-ativos."""
+    cands = [
+        CandidatoResumo("DOUGLAS", 4271199),
+        CandidatoResumo("EDUARDO", 3706984),
+        CandidatoResumo("GAROTINHO", 274411),  # ativo (default)
+        CandidatoResumo("D", 235347),
+        CandidatoResumo("E", 84889),
+    ]
+    t = totais(37675, 37675, 12842517, 12842517, 8669038)
+    eventos = avaliar_apuracao(cands, t, cod_cargo=3, vagas_majoritario=1)
+    tipos = [e["tipo"] for e in eventos]
+    # Com Garotinho dentro: 4271199 × 2 = 8542398 < 8669038 → NÃO tem
+    # maioria absoluta → SEGUNDO_TURNO_DEFINIDO (não ELEITO)
+    assert "ELEITO_MAJORITARIO" not in tipos, (
+        f"Com sub judice ativo não deveria eleger no 1T; eventos={tipos}"
+    )

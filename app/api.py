@@ -1337,6 +1337,99 @@ async def limpar_eventos_pre_apuracao(sess: AsyncSession = Depends(get_session))
     return {"ok": True, "removidos": r.rowcount or 0, "snapshots_afetados": len(snaps_zero)}
 
 
+@router.post("/admin/rj-gov-garotinho-cassado", dependencies=[Depends(_exigir_admin)])
+async def rj_gov_garotinho_cassado(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """09/10/2026: TSE julgou o recurso do Garotinho e manteve a cassação —
+    os 274.411 votos dele viram NULOS pela Lei 9.504 art. 175 §3º. Isso
+    muda a decisão em RJ Gov:
+      Antes (sub judice/ativo): 4.271.199 / 8.669.038 = 49,27% → 2T
+      Depois (cassado):         4.271.199 / 8.394.627 = 50,88% → ELEITO 1T
+
+    Esta rotina:
+    1. Marca Garotinho (sq=190002550196) com situacao='cancelado'.
+    2. Remove o SEGUNDO_TURNO_DEFINIDO que a rotina `corrigir-rj-gov-sub-judice`
+       havia emitido manualmente em 05/10.
+    3. Emite ELEITO_MAJORITARIO pro Douglas Ruas (sq=190002542887) +
+       MATEMATICAMENTE_ELIMINADO pros oponentes.
+
+    Idempotente. Rodar depois do deploy do fix do engine (ajuste de
+    denominador quando há não-ativos).
+    """
+    from datetime import datetime, timezone
+    from sqlalchemy import delete, update
+
+    CARGO = 3
+    UF = "RJ"
+    SQ_GAROTINHO = "190002550196"
+    SQ_DOUGLAS = "190002542887"
+    SQ_EDUARDO = "190002543380"
+
+    snap = (await sess.execute(
+        select(Snapshot).where(and_(
+            Snapshot.cod_cargo == CARGO, Snapshot.abrangencia == UF, Snapshot.turno == 1
+        )).order_by(Snapshot.coletado_em.desc()).limit(1)
+    )).scalar_one_or_none()
+    if snap is None:
+        return {"ok": False, "erro": "nenhum snapshot RJ Gov 1T"}
+
+    # 1) Marca Garotinho como cancelado
+    r_sit = await sess.execute(
+        update(Candidato)
+        .where(Candidato.sq_candidato == SQ_GAROTINHO)
+        .values(situacao="cancelado")
+    )
+
+    # Idempotência: já tem ELEITO_MAJORITARIO novo pro Douglas?
+    tem_eleito = (await sess.execute(select(Evento).where(and_(
+        Evento.cod_cargo == CARGO, Evento.abrangencia == UF,
+        Evento.tipo == "ELEITO_MAJORITARIO",
+        Evento.sq_candidato_a == SQ_DOUGLAS,
+    )))).scalars().all()
+
+    # 2) Remove SEGUNDO_TURNO_DEFINIDO manual (do fix anterior)
+    r_del_2t = await sess.execute(delete(Evento).where(and_(
+        Evento.cod_cargo == CARGO, Evento.abrangencia == UF,
+        Evento.tipo == "SEGUNDO_TURNO_DEFINIDO",
+    )))
+
+    # 3) Emite ELEITO_MAJORITARIO + MATEMATICAMENTE_ELIMINADO (se não houver)
+    novos = 0
+    if not tem_eleito:
+        sess.add(Evento(
+            cod_cargo=CARGO, abrangencia=UF,
+            tipo="ELEITO_MAJORITARIO",
+            sq_candidato_a=SQ_DOUGLAS,
+            snapshot_id=snap.id,
+            ocorrido_em=datetime.now(timezone.utc),
+            detalhes={
+                "cod_cargo": CARGO, "maioria_absoluta": True,
+                "corrigido_manualmente": True,
+                "motivo": "Garotinho cassado por decisão TSE 09/10/2026 — votos viraram nulos (Lei 9.504 art. 175 §3º). Denominador cai pra 8.394.627 → líder 50,88%.",
+            },
+        ))
+        novos += 1
+        for sq_adv in (SQ_EDUARDO,):
+            sess.add(Evento(
+                cod_cargo=CARGO, abrangencia=UF,
+                tipo="MATEMATICAMENTE_ELIMINADO",
+                sq_candidato_a=sq_adv,
+                snapshot_id=snap.id,
+                ocorrido_em=datetime.now(timezone.utc),
+                detalhes={"corrigido_manualmente": True,
+                          "motivo": "ELEITO_MAJORITARIO emitido pro líder após cassação do Garotinho"},
+            ))
+            novos += 1
+
+    await sess.commit()
+    return {
+        "ok": True,
+        "garotinho_cancelado": (r_sit.rowcount or 0) > 0,
+        "segundo_turno_removidos": r_del_2t.rowcount or 0,
+        "novos_eventos": novos,
+        "ja_tinha_eleito": bool(tem_eleito),
+    }
+
+
 @router.post("/admin/corrigir-rj-gov-sub-judice", dependencies=[Depends(_exigir_admin)])
 async def corrigir_rj_gov_sub_judice(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Correção retroativa do RJ Gov 1T após fix do parser (sub judice).

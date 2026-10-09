@@ -506,9 +506,34 @@ def avaliar_apuracao(
     # TSE mas por Lei 9.504/97 art. 175 §3º esses votos são considerados
     # nulos na apuração oficial. Motor os remove ANTES de qualquer
     # cálculo pra não emitir "eleito" num candidato cassado/retirado.
+    votos_nao_ativos = sum(c.votos for c in candidatos if c.situacao != "ativo")
     candidatos = [c for c in candidatos if c.situacao == "ativo"]
     if not candidatos:
         return []
+    # AJUSTE DE DENOMINADOR: qt_votos_validos vem do parser que soma TODOS
+    # os cand.vap (ativos + sub judice/indeferidos) pra proteger contra o
+    # TSE separar sub judice do v.vv (bug RJ Gov 05/10/2026). Mas quando
+    # algum candidato vira CASSADO/CANCELADO definitivamente, seus votos
+    # viram NULOS pela Lei 9.504 art. 175 §3º — precisa descontar do
+    # denominador. Senão o pct de maioria absoluta fica subestimado e o
+    # engine deixa de emitir ELEITO_1T quando devia.
+    #
+    # Caso real RJ Gov pós-julgamento Garotinho (09/10/2026): com Garotinho
+    # ativo (sub judice), válidos = 8.669.038 → líder 49,27%, vai pra 2T.
+    # Com Garotinho CANCELADO (recurso rejeitado), seus 274k votos saem do
+    # denominador → válidos = 8.394.627 → líder 50,88% → ELEITO_1T.
+    if votos_nao_ativos > 0:
+        validos_ajustados = max(
+            totais.qt_votos_validos - votos_nao_ativos,
+            sum(c.votos for c in candidatos),
+        )
+        totais = TotaisResumo(
+            qt_secoes_total=totais.qt_secoes_total,
+            qt_secoes_totalizadas=totais.qt_secoes_totalizadas,
+            qt_eleitorado_apto=totais.qt_eleitorado_apto,
+            qt_eleitorado_apto_totalizadas=totais.qt_eleitorado_apto_totalizadas,
+            qt_votos_validos=validos_ajustados,
+        )
     # 2º turno é uma máquina separada — só faz sentido pra cargos que
     # exigem maioria absoluta no 1T (Presidente, Governador).
     if turno == 2:
