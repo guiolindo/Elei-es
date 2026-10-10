@@ -294,16 +294,15 @@ $("form-urna").addEventListener("submit", async (e) => {
 function render(d) {
   const resp = $("resp");
   if (!d.disponivel) {
-    resp.innerHTML = `<div class="urna-erro">
-      <strong>Verificação direto no TSE</strong>
-      ${d.motivo || "A seção pode não ter sido totalizada ainda, ou os códigos estão incorretos."}
-      ${d.url_tse_spa ? `<br><br><a class="urna-img-link" href="${d.url_tse_spa}" target="_blank" rel="noopener">
-        🔍 Abrir boletim da minha seção no TSE →
-      </a>` : ""}
-      ${d.url_imagem_bu ? `<br><a class="urna-img-link" href="${d.url_imagem_bu}" target="_blank" rel="noopener">
-        Tentar a imagem JPEG do BU direto (pode retornar 404) →
-      </a>` : ""}
-    </div>`;
+    resp.innerHTML = `<div class="urna-resp-head">
+      <div>
+        <h2>Seção ${d.secao} · Zona ${d.zona}</h2>
+        <div class="urna-resp-sub">${state.municipio.nome} — ${d.uf} · ${nomeCargo(d.cargo)}</div>
+      </div>
+    </div>
+    <a class="urna-img-link urna-btn-primario-link" href="${d.url_tse_spa}" target="_blank" rel="noopener">
+      Ver boletim da minha seção no TSE →
+    </a>`;
     return;
   }
   const t = d.totais || {};
@@ -332,12 +331,9 @@ function render(d) {
     </div>
     <div class="urna-stats">${stats}</div>
     ${cands ? `<div class="urna-cands"><h3>Votos por candidato</h3>${cands}</div>` : ""}
-    ${d.url_tse_spa ? `<a class="urna-img-link" href="${d.url_tse_spa}" target="_blank" rel="noopener">
-      🔍 Ver no app oficial do TSE (interface completa) →
+    ${d.url_tse_spa ? `<a class="urna-img-link urna-btn-primario-link" href="${d.url_tse_spa}" target="_blank" rel="noopener">
+      Ver boletim oficial no TSE →
     </a>` : ""}
-    <a class="urna-img-link" href="${d.url_imagem_bu}" target="_blank" rel="noopener">
-      Baixar imagem JPEG do BU assinada pelo TSE →
-    </a>
   `;
 }
 

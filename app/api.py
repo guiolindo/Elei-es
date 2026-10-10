@@ -2102,13 +2102,6 @@ async def apuracao_bu(
     if not j:
         return {
             "disponivel": False,
-            "motivo": (
-                "O TSE não publica mais o JSON individual do BU no formato "
-                "antigo em 2026 — os arquivos agora vêm assinados com JWS "
-                "atrás de um índice por UF que o TSE libera apenas dias "
-                "após a apuração. O botão abaixo abre o boletim oficial da "
-                "sua seção direto no app do TSE (fonte primária)."
-            ),
             "url_tse_spa": url_tse_spa,
             "url_imagem_bu": url_bu_img,
             "uf": uf_up,
