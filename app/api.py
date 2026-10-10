@@ -2084,18 +2084,39 @@ async def apuracao_bu(
     # Imagem assinada do BU: /dados_bu_imgbu/{uf}/{mun}/{zona}/{secao}/o{cod}-{mun}{zona}{secao}-bu.jpeg
     url_bu_img = f"{base}/{cod}/dados_bu_imgbu/{uf}/{uf}{mu}/{zn}/{se}/o{cod_pad}-{mu}{zn}{se}-bu.jpeg"
 
+    # Link direto pro SPA do TSE naquela seção/cargo/turno. Fonte oficial
+    # pra verificação visual do BU. Em 2026 o TSE assinou os BUs com JWS
+    # e os arquivos individuais ficam atrás de um `cs.json` de UF que o
+    # TSE só publica dias depois da apuração oficial (e às vezes nunca
+    # pros arquivos individuais). O caminho confiável pro cidadão é
+    # abrir o SPA do TSE com os parâmetros certos — ele resolve a URL
+    # assinada por conta própria.
+    uf_up = uf.upper()
+    url_tse_spa = (
+        f"https://resultados.tse.jus.br/oficial/app/index.html#/eleicao/{cod}"
+        f"/uf/{uf}/mu/{mu.lstrip('0') or '0'}/zn/{zn}/cargo/{cargo}"
+        f"/vis/nominal/se/{se}/dados-de-urna/boletim-de-urna"
+    )
+
     j = await _fetch_tse_json(url_json)
     if not j:
         return {
             "disponivel": False,
             "motivo": (
-                "BU não encontrado. Causas comuns: (1) a seção ainda não "
-                "foi totalizada (BUs só saem a partir das 17h de domingo "
-                "do dia D); (2) o código do município/zona/seção está "
-                "incorreto — confira em tse.jus.br/eleitor/onde-votar."
+                "O TSE não publica mais o JSON individual do BU no formato "
+                "antigo em 2026 — os arquivos agora vêm assinados com JWS "
+                "atrás de um índice por UF que o TSE libera apenas dias "
+                "após a apuração. O botão abaixo abre o boletim oficial da "
+                "sua seção direto no app do TSE (fonte primária)."
             ),
-            "url_tentada": url_json,
+            "url_tse_spa": url_tse_spa,
             "url_imagem_bu": url_bu_img,
+            "uf": uf_up,
+            "municipio": mu.lstrip("0") or "0",
+            "zona": zn.lstrip("0") or "0",
+            "secao": se.lstrip("0") or "0",
+            "cargo": cargo,
+            "turno": turno,
         }
 
     # TSE devolve estrutura específica pro BU com cargos agrupados.
@@ -2116,6 +2137,7 @@ async def apuracao_bu(
         "turno": turno,
         "url_imagem_bu": url_bu_img,
         "url_json_bu": url_json,
+        "url_tse_spa": url_tse_spa,
         "totais": {
             "eleitorado_apto": tot.qt_eleitorado_apto if tot else 0,
             "comparecimento": tot.qt_comparecimento if tot else 0,

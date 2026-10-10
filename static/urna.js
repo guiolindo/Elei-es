@@ -295,9 +295,14 @@ function render(d) {
   const resp = $("resp");
   if (!d.disponivel) {
     resp.innerHTML = `<div class="urna-erro">
-      <strong>Não encontrado</strong>
+      <strong>Verificação direto no TSE</strong>
       ${d.motivo || "A seção pode não ter sido totalizada ainda, ou os códigos estão incorretos."}
-      ${d.url_imagem_bu ? `<br><br><a class="urna-img-link" href="${d.url_imagem_bu}" target="_blank" rel="noopener">Tentar a imagem direto no TSE →</a>` : ""}
+      ${d.url_tse_spa ? `<br><br><a class="urna-img-link" href="${d.url_tse_spa}" target="_blank" rel="noopener">
+        🔍 Abrir boletim da minha seção no TSE →
+      </a>` : ""}
+      ${d.url_imagem_bu ? `<br><a class="urna-img-link" href="${d.url_imagem_bu}" target="_blank" rel="noopener">
+        Tentar a imagem JPEG do BU direto (pode retornar 404) →
+      </a>` : ""}
     </div>`;
     return;
   }
@@ -327,8 +332,11 @@ function render(d) {
     </div>
     <div class="urna-stats">${stats}</div>
     ${cands ? `<div class="urna-cands"><h3>Votos por candidato</h3>${cands}</div>` : ""}
+    ${d.url_tse_spa ? `<a class="urna-img-link" href="${d.url_tse_spa}" target="_blank" rel="noopener">
+      🔍 Ver no app oficial do TSE (interface completa) →
+    </a>` : ""}
     <a class="urna-img-link" href="${d.url_imagem_bu}" target="_blank" rel="noopener">
-      Ver a imagem assinada do BU original (JPEG do TSE) →
+      Baixar imagem JPEG do BU assinada pelo TSE →
     </a>
   `;
 }
