@@ -83,6 +83,12 @@ _ALVOS_2T: list[AlvoColeta] = (
 )
 
 
+# Cutoff da auto-reativação do modo "off": a partir desse instante,
+# POLL_TURNO=off passa a se comportar como POLL_TURNO=2 automaticamente.
+# 25/10/2026 00h BRT = 25/10/2026 03h UTC. Víspera do 2T (26/10 17h BRT).
+_OFF_AUTO_REATIVACAO_UTC = datetime(2026, 10, 25, 3, 0, 0, tzinfo=timezone.utc)
+
+
 def _alvos_segundo_turno_env() -> list[AlvoColeta]:
     """Monta a lista de alvos conforme a env var POLL_TURNO.
 
@@ -91,15 +97,20 @@ def _alvos_segundo_turno_env() -> list[AlvoColeta]:
       - "1":   só alvos de 1º turno.
       - "2":   só alvos de 2º turno.
       - "off": NADA — poller fica dormente, zero tráfego pro TSE.
-               Útil entre 05/10 e 26/10/2026 pra economizar créditos
+               Útil entre 05/10 e 25/10/2026 pra economizar créditos
                Railway enquanto o 2T não começa a apurar. A UI/API
                continuam servindo dados históricos do banco normalmente.
+               A partir de 25/10/2026 00h BRT, auto-reativa pra alvos
+               de 2º turno (sem precisar trocar a env var).
 
     Snapshots já coletados ficam no DB em qualquer modo — nada é apagado.
     """
     settings = get_settings()
     turno = (getattr(settings, "poll_turno", "all") or "all").lower()
     if turno == "off":
+        # Auto-reativação: entrou na véspera do 2T → vira "2" sozinho
+        if datetime.now(timezone.utc) >= _OFF_AUTO_REATIVACAO_UTC:
+            return list(_ALVOS_2T)
         return []
     if turno == "1":
         return list(_ALVOS_1T)
@@ -519,15 +530,24 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
         # Modo "off": nenhum alvo → zero tráfego pro TSE. Skip criação do
         # cliente HTTP (que é cheap mas abre socket TLS). Dorme mais pra
         # não ocupar CPU em loop no-op.
+        # IMPORTANTE: re-avalia a cada ciclo pra pegar auto-reativação
+        # pela data (25/10 00h BRT) sem precisar reiniciar o container.
         t_ini = time.perf_counter()
         if not alvos:
-            # heartbeat info só pra ficar visível em /api/poller-status
-            _poller_info["ciclo_atual"] = ciclo + 1
-            _poller_info["ultimo_ciclo_em"] = datetime.now(timezone.utc)
-            _poller_info["ultimo_ciclo_duracao_s"] = 0.0
-            ciclo += 1
-            await asyncio.sleep(300)  # 5 min quando dormente — zero tráfego
-            continue
+            alvos_recheck = _alvos_segundo_turno_env()
+            if alvos_recheck:
+                # Auto-reativação disparou — adota a nova lista e segue o
+                # ciclo normal já neste turno
+                alvos = alvos_recheck
+                _poller_info["alvos_total"] = len(alvos)
+                log.info("poller auto-reativado: %d alvos (cutoff 25/10 00h BRT atingido)", len(alvos))
+            else:
+                _poller_info["ciclo_atual"] = ciclo + 1
+                _poller_info["ultimo_ciclo_em"] = datetime.now(timezone.utc)
+                _poller_info["ultimo_ciclo_duracao_s"] = 0.0
+                ciclo += 1
+                await asyncio.sleep(300)  # 5 min quando dormente — zero tráfego
+                continue
         # Recria o cliente a cada ciclo pra permitir troca de proxy quando um cair
         async with await cliente_tse() as client:
             await asyncio.gather(*[_um(client, a) for a in alvos])
