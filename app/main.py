@@ -195,6 +195,23 @@ def create_app() -> FastAPI:
             )
         return resp
 
+    @app.middleware("http")
+    async def _visitas(request: Request, call_next):
+        resp = await call_next(request)
+        # Loga só GETs 200 de páginas (não API, não static)
+        from app.visitas import deve_logar, registrar
+        if (request.method == "GET" and resp.status_code == 200
+                and deve_logar(request.url.path)):
+            ip = request.client.host if request.client else "unknown"
+            # fire-and-forget: não bloqueia a resposta
+            asyncio.create_task(registrar(
+                path=request.url.path,
+                ip=ip,
+                referrer=request.headers.get("referer"),
+                user_agent=request.headers.get("user-agent"),
+            ))
+        return resp
+
     @app.get("/health")
     async def health():
         from sqlalchemy import text
@@ -261,6 +278,10 @@ def create_app() -> FastAPI:
     @app.get("/urna")
     async def urna_page():
         return _servir_html_com_versao("static/urna.html")
+
+    @app.get("/admin/visitas")
+    async def visitas_page():
+        return _servir_html_com_versao("static/admin-visitas.html")
 
     return app
 

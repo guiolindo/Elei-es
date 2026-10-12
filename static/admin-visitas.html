@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Visitas · Admin</title>
+<link rel="stylesheet" href="/static/app.css" />
+<style>
+  body { padding: 20px; max-width: 1100px; margin: 0 auto; }
+  h1 { margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .controles { display: flex; gap: 10px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+  .controles input, .controles select { padding: 8px 12px; min-height: 44px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .kpi { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .kpi-lab { font-size: 11px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; }
+  .kpi-val { font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  .painel { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .painel h3 { margin: 0 0 12px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  .lista-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .lista-item:last-child { border-bottom: none; }
+  .lista-path { font-family: monospace; color: var(--fg); overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+  .lista-n { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .graf-barra { display: flex; align-items: flex-end; gap: 2px; height: 160px; margin-top: 12px; }
+  .graf-barra .bar { flex: 1; background: var(--brand); border-radius: 3px 3px 0 0; min-height: 2px; position: relative; }
+  .graf-barra .bar:hover { background: var(--brand-hover, #f0b429); }
+  .vazio { text-align: center; color: var(--muted); padding: 40px 0; }
+  .erro { background: #4a1515; border: 1px solid #ef4444; padding: 12px; border-radius: 8px; color: #fecaca; }
+</style>
+</head>
+<body>
+  <h1>📊 Visitas</h1>
+  <p class="sub">LGPD-safe · IP com hash SHA-256 · sem cookies · sem terceiros</p>
+
+  <div class="controles">
+    <label>Token admin: <input type="password" id="tok" placeholder="X-Admin-Token" autocomplete="off" style="width:280px"></label>
+    <label>Janela:
+      <select id="janela">
+        <option value="1">Última hora</option>
+        <option value="24" selected>24h</option>
+        <option value="168">7 dias</option>
+        <option value="720">30 dias</option>
+      </select>
+    </label>
+    <button class="btn-primary" id="btn-carregar">Carregar</button>
+  </div>
+
+  <div id="resp"></div>
+
+<script>
+const fmt = (n) => new Intl.NumberFormat("pt-BR").format(n);
+const $ = (id) => document.getElementById(id);
+
+// Persiste o token em localStorage pra não digitar toda vez
+try { const t = localStorage.getItem("admin-tok"); if (t) $("tok").value = t; } catch(e) {}
+
+$("btn-carregar").onclick = carregar;
+$("janela").onchange = carregar;
+
+async function carregar() {
+  const tok = $("tok").value.trim();
+  if (!tok) { $("resp").innerHTML = `<div class="erro">Token obrigatório.</div>`; return; }
+  try { localStorage.setItem("admin-tok", tok); } catch(e) {}
+  const j = $("janela").value;
+  $("resp").innerHTML = `<div class="vazio">Carregando…</div>`;
+  let d;
+  try {
+    const r = await fetch(`/api/admin/visitas?janela_h=${j}`, {
+      headers: { "X-Admin-Token": tok },
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    d = await r.json();
+  } catch(err) {
+    $("resp").innerHTML = `<div class="erro">Erro: ${err.message}</div>`;
+    return;
+  }
+  render(d);
+}
+
+function render(d) {
+  const maxH = Math.max(1, ...d.por_hora.map(h => h.n));
+  const barras = d.por_hora.map(h => {
+    const alt = (h.n / maxH * 100).toFixed(1);
+    const data = new Date(h.h).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit" });
+    return `<div class="bar" style="height:${alt}%" title="${data}: ${fmt(h.n)} visitas · ${fmt(h.u)} únicos"></div>`;
+  }).join("");
+
+  $("resp").innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-lab">Visitas</div><div class="kpi-val">${fmt(d.total)}</div></div>
+      <div class="kpi"><div class="kpi-lab">Únicos</div><div class="kpi-val">${fmt(d.unicos)}</div></div>
+      <div class="kpi"><div class="kpi-lab">Bots</div><div class="kpi-val">${fmt(d.bots)}</div></div>
+      <div class="kpi"><div class="kpi-lab">Média/visitante</div><div class="kpi-val">${d.unicos ? (d.total/d.unicos).toFixed(1) : "0"}</div></div>
+    </div>
+    <div class="painel">
+      <h3>Visitas por hora (${d.janela_h}h)</h3>
+      ${d.por_hora.length ? `<div class="graf-barra">${barras}</div>` : `<div class="vazio">Sem dados nesta janela.</div>`}
+    </div>
+    <div class="cols">
+      <div class="painel">
+        <h3>Páginas mais vistas</h3>
+        ${d.top_paths.length ? d.top_paths.map(p =>
+          `<div class="lista-item"><span class="lista-path">${p.path || "/"}</span><span class="lista-n">${fmt(p.n)}</span></div>`
+        ).join("") : `<div class="vazio">—</div>`}
+      </div>
+      <div class="painel">
+        <h3>Navegadores</h3>
+        ${d.top_ua.length ? d.top_ua.map(u =>
+          `<div class="lista-item"><span>${u.ua}</span><span class="lista-n">${fmt(u.n)}</span></div>`
+        ).join("") : `<div class="vazio">—</div>`}
+      </div>
+    </div>
+    <div class="painel">
+      <h3>De onde vieram (referrer)</h3>
+      ${d.top_referrers.length ? d.top_referrers.map(r =>
+        `<div class="lista-item"><span class="lista-path">${r.ref}</span><span class="lista-n">${fmt(r.n)}</span></div>`
+      ).join("") : `<div class="vazio">Nenhum referrer — tudo acesso direto ou com referrer ocultado.</div>`}
+    </div>
+  `;
+}
+
+// Auto-carrega se o token já estiver preenchido
+if ($("tok").value) carregar();
+</script>
+</body>
+</html>

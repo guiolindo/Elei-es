@@ -1151,6 +1151,91 @@ async def push_subscribe(
     return {"ok": True}
 
 
+@router.get("/admin/visitas", dependencies=[Depends(_exigir_admin)])
+async def api_admin_visitas(
+    janela_h: int = Query(24, ge=1, le=720, description="Janela retroativa em horas (1-720=30d)"),
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Analytics: contagem de visitas e visitantes únicos na janela.
+
+    Bots filtrados por default. Visitante único = IP-hash distinto na janela.
+    Dados agregados server-side; não devolve IPs nem linhas individuais.
+    """
+    from datetime import timedelta
+    from sqlalchemy import func, text
+    from app.models import Visita
+
+    agora = datetime.now(timezone.utc)
+    desde = agora - timedelta(hours=janela_h)
+
+    base = select(Visita).where(
+        Visita.ocorreu_em >= desde,
+        Visita.is_bot.is_(False),
+    )
+
+    # Totais
+    total = (await sess.execute(
+        select(func.count()).select_from(base.subquery())
+    )).scalar_one()
+    unicos = (await sess.execute(
+        select(func.count(func.distinct(Visita.ip_hash))).where(
+            Visita.ocorreu_em >= desde, Visita.is_bot.is_(False)
+        )
+    )).scalar_one()
+    bots = (await sess.execute(
+        select(func.count()).where(Visita.ocorreu_em >= desde, Visita.is_bot.is_(True))
+    )).scalar_one()
+
+    # Top páginas
+    r = await sess.execute(
+        select(Visita.path, func.count().label("n"))
+        .where(Visita.ocorreu_em >= desde, Visita.is_bot.is_(False))
+        .group_by(Visita.path).order_by(func.count().desc()).limit(10)
+    )
+    top_paths = [{"path": row.path, "n": row.n} for row in r.all()]
+
+    # Por hora (últimas N horas, bucket de 1h)
+    r = await sess.execute(text("""
+        SELECT date_trunc('hour', ocorreu_em) AS h,
+               COUNT(*) AS n,
+               COUNT(DISTINCT ip_hash) AS u
+        FROM visitas
+        WHERE ocorreu_em >= :desde AND is_bot = false
+        GROUP BY 1 ORDER BY 1
+    """), {"desde": desde})
+    por_hora = [{"h": row.h.isoformat(), "n": row.n, "u": row.u} for row in r.all()]
+
+    # Top navegadores
+    r = await sess.execute(
+        select(Visita.ua_familia, func.count().label("n"))
+        .where(Visita.ocorreu_em >= desde, Visita.is_bot.is_(False))
+        .group_by(Visita.ua_familia).order_by(func.count().desc()).limit(8)
+    )
+    top_ua = [{"ua": row.ua_familia or "outro", "n": row.n} for row in r.all()]
+
+    # Top referrers (fonte do tráfego)
+    r = await sess.execute(
+        select(Visita.referrer, func.count().label("n"))
+        .where(Visita.ocorreu_em >= desde, Visita.is_bot.is_(False),
+               Visita.referrer.isnot(None))
+        .group_by(Visita.referrer).order_by(func.count().desc()).limit(10)
+    )
+    top_ref = [{"ref": row.referrer, "n": row.n} for row in r.all()]
+
+    return {
+        "janela_h": janela_h,
+        "desde": desde.isoformat(),
+        "ate": agora.isoformat(),
+        "total": total,
+        "unicos": unicos,
+        "bots": bots,
+        "top_paths": top_paths,
+        "por_hora": por_hora,
+        "top_ua": top_ua,
+        "top_referrers": top_ref,
+    }
+
+
 @router.get("/admin/status", dependencies=[Depends(_exigir_admin)])
 async def admin_status(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Diagnóstico rápido: quantos candidatos há por cargo/UF e último snapshot."""

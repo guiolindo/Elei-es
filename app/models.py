@@ -178,3 +178,22 @@ class PushSubscription(Base):
     endpoint: Mapped[str] = mapped_column(Text, unique=True)
     p256dh: Mapped[str] = mapped_column(Text)
     auth: Mapped[str] = mapped_column(Text)
+
+
+class Visita(Base):
+    """Analytics minimalista — uma linha por request HTTP não-API/estática.
+    IP vai como SHA-256(ip + VISITAS_SALT) → irreversível, LGPD-safe
+    (não guarda nenhum PII). Sem cookies, sem fingerprint, sem terceiros.
+    """
+    __tablename__ = "visitas"
+    __table_args__ = (
+        Index("ix_vis_ocorreu_em", "ocorreu_em"),
+        Index("ix_vis_path_ocorreu", "path", "ocorreu_em"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ocorreu_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    path: Mapped[str] = mapped_column(String(256))
+    ip_hash: Mapped[str] = mapped_column(CHAR(64))  # sha256 hex
+    referrer: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    ua_familia: Mapped[str | None] = mapped_column(String(32), nullable=True)  # "Chrome", "Safari", "bot"
+    is_bot: Mapped[bool] = mapped_column(Boolean, default=False)
