@@ -85,12 +85,22 @@ _ALVOS_2T: list[AlvoColeta] = (
 
 def _alvos_segundo_turno_env() -> list[AlvoColeta]:
     """Monta a lista de alvos conforme a env var POLL_TURNO.
-    Default "all" mantém o comportamento antigo (1T + 2T). "1" ou "2"
-    restringe pro turno correspondente. Útil pra desligar o polling
-    de 1T entre 05/10 e 26/10/2026 sem perder os dados já coletados
-    (os snapshots ficam no DB, só não refresca)."""
+
+    Valores:
+      - "all" (default): 1T + 2T (comportamento antigo).
+      - "1":   só alvos de 1º turno.
+      - "2":   só alvos de 2º turno.
+      - "off": NADA — poller fica dormente, zero tráfego pro TSE.
+               Útil entre 05/10 e 26/10/2026 pra economizar créditos
+               Railway enquanto o 2T não começa a apurar. A UI/API
+               continuam servindo dados históricos do banco normalmente.
+
+    Snapshots já coletados ficam no DB em qualquer modo — nada é apagado.
+    """
     settings = get_settings()
     turno = (getattr(settings, "poll_turno", "all") or "all").lower()
+    if turno == "off":
+        return []
     if turno == "1":
         return list(_ALVOS_1T)
     if turno == "2":
@@ -506,8 +516,19 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
         _stats_ciclo["falhas"] = 0
         _stats_ciclo["retrocesso"] = 0
         _stats_ciclo["nao_publicado"] = 0
-        # Recria o cliente a cada ciclo pra permitir troca de proxy quando um cair
+        # Modo "off": nenhum alvo → zero tráfego pro TSE. Skip criação do
+        # cliente HTTP (que é cheap mas abre socket TLS). Dorme mais pra
+        # não ocupar CPU em loop no-op.
         t_ini = time.perf_counter()
+        if not alvos:
+            # heartbeat info só pra ficar visível em /api/poller-status
+            _poller_info["ciclo_atual"] = ciclo + 1
+            _poller_info["ultimo_ciclo_em"] = datetime.now(timezone.utc)
+            _poller_info["ultimo_ciclo_duracao_s"] = 0.0
+            ciclo += 1
+            await asyncio.sleep(300)  # 5 min quando dormente — zero tráfego
+            continue
+        # Recria o cliente a cada ciclo pra permitir troca de proxy quando um cair
         async with await cliente_tse() as client:
             await asyncio.gather(*[_um(client, a) for a in alvos])
         ciclo += 1
