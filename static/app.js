@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261016c";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261016c";
+import { renderMapa } from "/static/mapa-br.js?v=20261016d";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261016d";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -196,7 +196,136 @@ function iniciarRelogio() {
   setTimeout(() => {
     tickRelogio();
     setInterval(tickRelogio, 1000);
+    // Toda vez que o relógio tica, atualiza o "há X" do último dado.
+    // Barato (texto curto, mesma frequência). Separa o PROPÓSITO: relógio
+    // acima = hora LOCAL agora; último-dado = quando o TSE gerou o
+    // snapshot (que pode estar atrasado minutos).
+    setInterval(tickUltimoRelativo, 1000);
   }, msAteProximoSegundo);
+}
+
+// "há N s/min/h" relativo a agora. Null em menos de 2s pra não piscar
+// "há 0s". `tsIso` pode ser null → retorna null (chamador decide o texto).
+function tempoRelativo(tsIso) {
+  if (!tsIso) return null;
+  const d = new Date(tsIso);
+  if (isNaN(d.getTime())) return null;
+  const diffS = Math.round((Date.now() - d.getTime()) / 1000);
+  if (diffS < 2) return "agora mesmo";
+  if (diffS < 60) return `há ${diffS}s`;
+  if (diffS < 3600) return `há ${Math.round(diffS / 60)} min`;
+  if (diffS < 86400) return `há ${Math.round(diffS / 3600)} h`;
+  const dias = Math.round(diffS / 86400);
+  return `há ${dias} ${dias === 1 ? "dia" : "dias"}`;
+}
+
+// Classifica staleness por idade (seg). Thresholds alinhados ao intervalo
+// real do poller (default 20s): até 1 min = fresh; até 5 min = warn;
+// mais que isso = stale. Usado pra pintar o indicador do "último dado".
+function classeStaleness(tsIso) {
+  if (!tsIso) return "stale-sem";
+  const diffS = (Date.now() - new Date(tsIso).getTime()) / 1000;
+  if (diffS < 60) return "stale-fresh";
+  if (diffS < 300) return "stale-warn";
+  return "stale-stale";
+}
+
+// ============ Painel de status da coleta (pré-apuração) ============
+// Em pré-apuração, o espaço do "Gráfico aparece quando apuração começar"
+// vira um painel real com o estado do poller + última coleta. Dados
+// vêm de /api/poller-status (já público, sem admin token).
+//
+// Estados possíveis (classifica por ultimo_ciclo + alvos_total):
+//   - aguardando    : alvos=0 (modo off), ou nunca rodou
+//   - coletando     : último ciclo < intervalo×3 e falhas=0
+//   - atrasado      : último ciclo entre intervalo×3 e 5 min
+//   - erro          : último ciclo > 5 min OU falhas > 0 persistente
+let _statusColetaCache = null;
+let _statusColetaTimer = null;
+
+async function renderPainelStatusColeta() {
+  const grid = document.getElementById("status-coleta-grid");
+  const tit = document.getElementById("status-coleta-titulo");
+  const dot = document.getElementById("status-dot");
+  const rodape = document.getElementById("status-coleta-rodape");
+  if (!grid || !tit) return;
+  let s;
+  try {
+    s = await get("/api/poller-status");
+    _statusColetaCache = s;
+  } catch (e) {
+    s = _statusColetaCache || null;
+  }
+  if (!s) {
+    tit.textContent = "Não foi possível checar o status";
+    dot.className = "status-dot stale-sem";
+    grid.innerHTML = "";
+    rodape.textContent = "Tente recarregar a página.";
+    return;
+  }
+  const ultimoIso = s.ultimo_ciclo_em || null;
+  const intervalo = s.intervalo_s || 20;
+  const diffUltimo = ultimoIso ? (Date.now() - new Date(ultimoIso).getTime()) / 1000 : null;
+  const alvos = s.alvos_total || 0;
+  const falhas = s.ultimo?.falhas || 0;
+
+  let estado, textoEstado;
+  if (alvos === 0) {
+    estado = "stale-warn";
+    textoEstado = "Coleta pausada (dormente até véspera do 2T)";
+  } else if (diffUltimo == null) {
+    estado = "stale-sem";
+    textoEstado = "Iniciando coleta…";
+  } else if (diffUltimo <= intervalo * 3 && falhas === 0) {
+    estado = "stale-fresh";
+    textoEstado = `Coletando dados do TSE a cada ${intervalo}s`;
+  } else if (diffUltimo <= 300) {
+    estado = "stale-warn";
+    textoEstado = "Coleta atrasada — próxima tentativa a caminho";
+  } else {
+    estado = "stale-stale";
+    textoEstado = "Dados possivelmente desatualizados";
+  }
+  tit.textContent = textoEstado;
+  dot.className = "status-dot " + estado;
+
+  const linhas = [
+    ["Ciclos de coleta", s.ciclo_atual != null ? fmtNum(s.ciclo_atual) : "—"],
+    ["Alvos monitorados", alvos ? fmtNum(alvos) : "nenhum"],
+    ["Última coleta", ultimoIso ? tempoRelativo(ultimoIso) : "aguardando"],
+    ["Duração do ciclo", s.ultimo_ciclo_duracao_s != null
+      ? `${s.ultimo_ciclo_duracao_s.toFixed(2)}s` : "—"],
+    ["Novos snapshots (último ciclo)", s.ultimo?.novos != null ? fmtNum(s.ultimo.novos) : "—"],
+    ["Falhas (último ciclo)", s.ultimo?.falhas != null ? fmtNum(s.ultimo.falhas) : "—"],
+  ];
+  grid.innerHTML = linhas.map(([lab, val]) =>
+    `<div class="status-coleta-item"><div class="status-coleta-lab">${lab}</div><div class="status-coleta-val">${val}</div></div>`
+  ).join("");
+  rodape.textContent = ultimoIso
+    ? `Última verificação do poller: ${new Date(ultimoIso).toLocaleTimeString("pt-BR")}`
+    : "";
+
+  // Auto-refresh a cada 30s enquanto o painel estiver visível
+  if (_statusColetaTimer) clearTimeout(_statusColetaTimer);
+  _statusColetaTimer = setTimeout(() => {
+    if (document.getElementById("status-coleta")?.offsetParent) renderPainelStatusColeta();
+  }, 30000);
+}
+
+function tickUltimoRelativo() {
+  const el = document.getElementById("ultimo-rel");
+  if (!el) return;
+  const iso = document.getElementById("ultimo")?.dataset?.iso;
+  if (!iso) { el.textContent = "—"; return; }
+  const txt = tempoRelativo(iso);
+  if (txt) {
+    el.textContent = txt;
+    const parent = el.closest(".stat-ultimo");
+    if (parent) {
+      parent.classList.remove("stale-fresh", "stale-warn", "stale-stale", "stale-sem");
+      parent.classList.add(classeStaleness(iso));
+    }
+  }
 }
 
 // Navegação por setas do controle remoto em modo TV. Os cards de
@@ -1697,10 +1826,12 @@ async function atualizarGrafHome() {
   if (!container) return;
   const snap = state.ultimoSnapshot;
   const pctApur = snap?.totais?.pct_apurado || 0;
-  // Antes de 1% apurado, não há dados reais ainda
+  // Antes de 1% apurado, não há dados reais ainda. Mostra painel de
+  // status da coleta no lugar do "aguardando" vago.
   if (!snap?.disponivel || pctApur < 0.5) {
     vazio?.classList.remove("oculto");
     if (_grafHome) { _grafHome.clear(); }
+    renderPainelStatusColeta();
     return;
   }
   // Top N do snapshot (só ativos, não retirados — já ordenados por posicao).
@@ -2351,7 +2482,7 @@ function renderFaixaVencedor(eventos) {
 // ============ UX: troféu grande + confete ao eleger ============
 // Mostra MODAL DE VITÓRIA ocupando a tela inteira com foto, nome do
 // candidato, cargo + abrangência e % final. Fica até o usuário fechar
-// ou 25s. Dispara apenas pra ELEITO_* no cargo/abrangência que a pessoa
+// ou 10s. Dispara apenas pra ELEITO_* no cargo/abrangência que a pessoa
 // está acompanhando (WS já é canal-based, então garantido).
 function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
   const ficha = state.ficha[sq_candidato] || {};
@@ -2402,7 +2533,7 @@ function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
   modal.querySelector(".mv-back").onclick = fechar;
   const onKey = (e) => { if (e.key === "Escape") { fechar(); document.removeEventListener("keydown", onKey); } };
   document.addEventListener("keydown", onKey);
-  setTimeout(fechar, 25000);
+  setTimeout(fechar, 10000);
 }
 
 function comemorar(nome, cor = "#f0b429") {

@@ -800,6 +800,65 @@ body.is-tv .pag-btn { min-width: 32px; height: 32px; font-size: 12px; }
 }
 .home-graf-vazio.oculto { display: none !important; }
 
+/* ============ Painel de status da coleta (pré-apuração) ============
+   Substitui a mensagem vazia "Gráfico aparece quando apuração começar"
+   por um dashboard real do poller. */
+.status-coleta {
+  width: 100%;
+  padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.status-coleta-tit {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 15px; font-weight: 700;
+  color: var(--fg);
+}
+.status-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--muted); flex: 0 0 10px;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
+}
+.status-dot.stale-fresh { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.2); animation: pulse-fresh 2s infinite; }
+.status-dot.stale-warn  { background: #f0b429; box-shadow: 0 0 0 3px rgba(240,180,41,0.2); }
+.status-dot.stale-stale { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.2); }
+.status-dot.stale-sem   { background: #6b7280; }
+@keyframes pulse-fresh {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.stale-fresh { animation: none; }
+}
+.status-coleta-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 16px;
+}
+.status-coleta-item {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.status-coleta-lab {
+  font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+.status-coleta-val {
+  font-size: 15px; font-weight: 700; color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.status-coleta-rodape {
+  font-size: 11px; color: var(--muted);
+  padding-top: 8px; border-top: 1px solid var(--line);
+}
+/* TV ajusta tamanhos */
+body.is-tv .status-coleta { padding: 16px 20px; gap: 14px; }
+body.is-tv .status-coleta-tit { font-size: 17px; }
+body.is-tv .status-coleta-val { font-size: 17px; }
+
+/* ============ Staleness do "Último dado" ============ */
+.stat-ultimo .ultimo-rel { font-variant-numeric: tabular-nums; }
+.stat-ultimo.stale-fresh .ultimo-rel { color: #22c55e; }
+.stat-ultimo.stale-warn  .ultimo-rel { color: #f0b429; }
+.stat-ultimo.stale-stale .ultimo-rel { color: #ef4444; font-weight: 700; }
+
 /* ============ Tarja de status matemático ============
    Marca visual quando o candidato:
    - Foi matematicamente eleito → tarja verde com troféu
@@ -1168,6 +1227,49 @@ body.is-tv .relogio {
 }
 .timeline li:last-child { border-bottom: none; }
 .timeline li.vazio { color: var(--muted); font-style: italic; justify-content: center; }
+
+/* Timeline compacta em TV: faixa inferior deve ocupar MENOS vertical
+   (ChatGPT: "ocupa faixa inteira sem informação"). Linha horizontal
+   com scroll se necessário. Vazio: 1 linha discreta. */
+body.is-tv .timeline-secao {
+  margin: 0;
+  grid-area: eventos;
+  min-height: 0;
+  overflow: hidden;
+}
+body.is-tv .timeline-secao .page-header { display: none; }
+body.is-tv .timeline {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 10px;
+  padding: 8px 14px;
+  max-height: 56px;
+  scrollbar-width: thin;
+}
+body.is-tv .timeline li {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-bottom: none;
+  border-right: 1px solid var(--line);
+  gap: 8px;
+  align-items: center;
+}
+body.is-tv .timeline li:last-child { border-right: none; }
+body.is-tv .timeline li.vazio {
+  font-size: 11px;
+  padding: 4px 10px;
+  color: var(--muted);
+  justify-content: flex-start;
+  font-style: normal;
+  opacity: 0.7;
+}
+body.is-tv .timeline time { font-size: 11px; min-width: auto; }
+body.is-tv .timeline .ev-tipo { padding: 2px 6px; font-size: 10px; gap: 4px; }
+body.is-tv .timeline .ev-tipo svg { width: 12px; height: 12px; }
+body.is-tv .timeline .ev-texto { font-size: 12px; white-space: nowrap; }
 .timeline time {
   font-family: 'JetBrains Mono', monospace; font-size: 12px;
   color: var(--muted); min-width: 90px;
