@@ -85,8 +85,10 @@ _ALVOS_2T: list[AlvoColeta] = (
 
 # Cutoff da auto-reativação do modo "off": a partir desse instante,
 # POLL_TURNO=off passa a se comportar como POLL_TURNO=2 automaticamente.
-# 25/10/2026 00h BRT = 25/10/2026 03h UTC. Víspera do 2T (26/10 17h BRT).
-_OFF_AUTO_REATIVACAO_UTC = datetime(2026, 10, 25, 3, 0, 0, tzinfo=timezone.utc)
+# 24/10/2026 00h BRT = 24/10/2026 03h UTC. Véspera do 2T (25/10 17h BRT —
+# último domingo de outubro). Reativa com ~41h de antecedência, assim o
+# poller já pega os pré-dados do TSE (candidatos finalistas, totais zerados).
+_OFF_AUTO_REATIVACAO_UTC = datetime(2026, 10, 24, 3, 0, 0, tzinfo=timezone.utc)
 
 
 def _alvos_segundo_turno_env() -> list[AlvoColeta]:

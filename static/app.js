@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261009b";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261009b";
+import { renderMapa } from "/static/mapa-br.js?v=20261016a";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261016a";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -19,8 +19,9 @@ const MAX_SEL = 4;
 // Eleições Gerais 2026 — primeiro domingo de outubro, art. 1º da Lei 9.504/97.
 // 17h BRT = fechamento das urnas e início da apuração.
 const DIA_D = new Date("2026-10-04T17:00:00-03:00");
-// 2º turno 2026: 26/10/2026 (último domingo de outubro), 17h BRT.
-const DIA_D_2T = new Date("2026-10-26T17:00:00-03:00");
+// 2º turno 2026: 25/10/2026 (último domingo de outubro), 17h BRT.
+// (26/10 é segunda — eleição é sempre no último domingo do mês.)
+const DIA_D_2T = new Date("2026-10-25T17:00:00-03:00");
 const TITULO_BASE = "Apuração 2026 · Brasil";
 
 // Default do turno: depois do fechamento do 1T (04/10 17h BRT), o site
@@ -682,7 +683,7 @@ function renderLista() {
       : `${filtrados.length} de ${state.candidatos.length}`;
   if (state.candidatos.length === 0) {
     if (state.turno === 2) {
-      // Contexto diferente — 2T é em 26/10/2026 e normalmente só define
+      // Contexto diferente — 2T é em 25/10/2026 e normalmente só define
       // os candidatos depois que o 1T fecha matematicamente.
       const cargoNome = state.cargo === 3 ? "esta UF" : "a disputa nacional";
       el.innerHTML = `<div class="empty-state">
@@ -2194,7 +2195,7 @@ function atualizarContagemRegressiva() {
   // Qual DIA D exibir depende do turno escolhido no header
   const alvo = state.turno === 2 ? DIA_D_2T : DIA_D;
   const titulo = state.turno === 2 ? "2º turno começa em" : "Apuração começa em";
-  const dataStr = state.turno === 2 ? "· 26/10 17h BRT" : "· 4/10 17h BRT";
+  const dataStr = state.turno === 2 ? "· 25/10 17h BRT" : "· 4/10 17h BRT";
   const diff = alvo.getTime() - Date.now();
   if (diff <= 0) { el.classList.add("oculto"); return; }
   const dias = Math.floor(diff / 86_400_000);
