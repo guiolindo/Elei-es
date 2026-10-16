@@ -2393,14 +2393,32 @@ body.is-tv.turno-2 main.page > .grid-candidatos {
 }
 body.is-tv.turno-2 .candidato {
   padding: 10px 14px !important;
-  gap: 6px !important;
+  gap: 12px !important;
   min-height: 0;
   position: relative;
   border-left-width: 5px;
   flex-direction: row !important;
   align-items: center;
 }
-body.is-tv.turno-2 .cand-topo { gap: 10px; align-items: center; flex: 0 0 auto; }
+/* .cand-topo CRESCE pra ocupar o espaço livre, empurrando .cand-metricas
+   pro final do card. Antes era flex:0 0 auto que grudava metricas logo
+   após o pill — Lula ("13 ⭐") e Flavio ("22 [icon]") têm pills de
+   larguras diferentes → % saía em x's diferentes nos 2 cards.
+   min-width:0 permite shrink do nome longo sem explodir o card. */
+body.is-tv.turno-2 .cand-topo {
+  gap: 10px;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+/* Garante que metricas vá SEMPRE pro extremo direito, independente do
+   que .cand-topo faça. */
+body.is-tv.turno-2 .cand-metricas {
+  margin-left: auto;
+}
+/* .cand-rodape (botões de ação) não aparece em TV 2T head-to-head */
+body.is-tv.turno-2 .cand-rodape { display: none !important; }
 body.is-tv.turno-2 .cand-foto {
   width: 48px !important; height: 48px !important; flex: 0 0 48px;
   border: 2px solid var(--cor-partido);
