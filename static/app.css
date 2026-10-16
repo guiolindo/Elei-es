@@ -2327,21 +2327,25 @@ body.is-tv .rodape-tv {
   background: transparent; border: none; display: block;
 }
 body.is-tv .rodape-tv-dica { display: none !important; }
+/* Botão sair do modo TV discreto — antes era amarelo chamativo competindo
+   com o conteúdo principal. Agora: fundo transparente, borda e texto
+   sutis. Fica acessível (hover/focus destaca) mas não rouba atenção. */
 body.is-tv #btn-tv {
-  background: var(--brand) !important;
-  color: #17130b !important;
-  border: 2px solid var(--brand) !important;
-  font-weight: 800 !important;
-  font-size: 15px !important;
-  padding: 10px 18px !important;
+  background: rgba(255,255,255,.06) !important;
+  color: var(--muted) !important;
+  border: 1px solid rgba(255,255,255,.15) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 6px 12px !important;
   border-radius: 999px !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  box-shadow: none !important;
   cursor: pointer;
   display: inline-flex !important;
 }
 body.is-tv #btn-tv:focus-visible, body.is-tv #btn-tv:hover {
-  transform: scale(1.05);
-  box-shadow: 0 12px 32px rgba(0,0,0,.65);
+  background: rgba(255,255,255,.12) !important;
+  color: var(--fg) !important;
+  border-color: var(--brand) !important;
 }
 
 /* Foco visível pra navegação por setas */
@@ -2351,6 +2355,14 @@ body.is-tv *:focus-visible {
 }
 body.is-tv .candidato:focus-visible {
   box-shadow: 0 0 0 3px rgba(240,180,41,.6), 0 8px 24px rgba(0,0,0,.5);
+}
+/* Em TV 2T head-to-head o foco de teclado em volta do card inteiro era
+   confundido com "liderança" (ChatGPT apontou: borda amarela forte no
+   Lula sem explicação). Em 2T, foco vira traço fino lateral à esquerda
+   só, discreto, pra sinalizar navegação sem parecer destaque de resultado. */
+body.is-tv.turno-2 .candidato:focus-visible {
+  box-shadow: inset 3px 0 0 var(--brand), 0 4px 16px rgba(0,0,0,.3);
+  outline: none;
 }
 
 body.is-tv ::-webkit-scrollbar { width: 8px; height: 8px; }

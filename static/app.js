@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261016b";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261016b";
+import { renderMapa } from "/static/mapa-br.js?v=20261016c";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261016c";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -1994,8 +1994,11 @@ async function atualizarPlacar2T() {
   const diffPct = a.pct_validos - b.pct_validos;
   const diffNumEl = document.getElementById("tv2t-diff-num");
   const diffPctEl = document.getElementById("tv2t-diff-pct");
-  if (diffNumEl) diffNumEl.textContent = fmtNum(diffVotos);
-  if (diffPctEl) diffPctEl.textContent = `${diffPct.toFixed(2)} pontos`;
+  // Pré-apuração (0 votos): mostrar "—" é melhor que "0" + "0.00 pontos"
+  // que pareciam dado real de empate técnico.
+  const semVotos = (a.votos === 0 && b.votos === 0);
+  if (diffNumEl) diffNumEl.textContent = semVotos ? "—" : fmtNum(diffVotos);
+  if (diffPctEl) diffPctEl.textContent = semVotos ? "aguardando" : `${diffPct.toFixed(2)} pontos`;
   // Spread bar: % de A e % de B proporcional. Com 0 votos (pré-apuração)
   // 50/50 fica visualmente mentiroso — mostramos barra neutra "aguardando".
   const total = a.pct_validos + b.pct_validos;
@@ -2051,7 +2054,18 @@ async function atualizarPlacar2T() {
   const fill = document.getElementById("tv2t-progresso-fill");
   const lab = document.getElementById("tv2t-progresso-lab");
   if (fill) fill.style.width = Math.min(100, pctApur) + "%";
-  if (lab) lab.textContent = `${pctApur.toFixed(2)}% apurado · ${fmtNum(t.secoes_totalizadas || 0)} de ${fmtNum(t.secoes_total || 0)} seções`;
+  if (lab) {
+    // Estado explícito pré-apuração: "0 de 0 seções" era confuso (parecia
+    // dado faltante). Agora: antes da apuração mostra "Aguardando dia D";
+    // sem secoes_total mas com apuração começada: "Carregando total…".
+    if (!t.secoes_total) {
+      lab.textContent = pctApur > 0
+        ? "Carregando total de seções…"
+        : "Aguardando apuração começar";
+    } else {
+      lab.textContent = `${pctApur.toFixed(2)}% apurado · ${fmtNum(t.secoes_totalizadas || 0)} de ${fmtNum(t.secoes_total || 0)} seções`;
+    }
+  }
   // UFs lideradas (só Pres BR) — para Governador 2T uf-específico
   // o conceito não faz sentido, então mostra municípios liderados.
   const colA = document.getElementById("tv2t-ufs-a");
