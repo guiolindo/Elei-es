@@ -507,7 +507,7 @@ async def processar_alvo(
         if eventos_novos and not suspeito:
             try:
                 from notif.telegram_bot import enviar_notificacoes
-                await enviar_notificacoes(eventos_novos, alvo.cod_cargo, alvo.abrangencia)
+                await enviar_notificacoes(eventos_novos, alvo.cod_cargo, alvo.abrangencia, alvo.turno)
             except Exception:
                 log.exception("notificação telegram falhou")
 

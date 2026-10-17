@@ -14,12 +14,16 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 - **`POST /api/admin/reclassificar-suspeitos`** (dry-run por padrão).
 
 ### Corrigido
+- **Vitória do Presidente no 2º turno não aparecia**: o motor emite `ELEITO_2T`, mas site e bot só reconheciam `ELEITO_1T`/`ELEITO_MAJORITARIO`. Sem troféu, sem faixa "vencedor", sem tarja no card e sem alerta no Telegram. Site agora usa `TIPOS_ELEITO`; bot compara por família (`_deve_enviar`), então assinaturas feitas no 1º turno também recebem o vencedor do 2º.
+- **Toast "✓ fulano eleito(a)" em virada**: o handler do WebSocket caía num `else` genérico para VIRADA e ELIMINADO. Agora virada mostra "A passou B" e eliminado não gera toast.
+- **Bot do Telegram misturava turnos**: comandos pegavam o snapshot mais recente de qualquer turno. Agora filtram por turno (2º por padrão depois de 04/10 17h; `1t`/`2t` força), mostram o turno no título e, antes da apuração, os finalistas e o horário. `/eventos` filtrava SP sem pedir; `/vs`, `/candidato` e `/cola` misturavam cargos com o mesmo número; `/mapa` de Presidente mostrava só o Brasil; `/status` cortava o hash pela metade.
 - CTA "Montar minha cola" sumia depois do 1º turno; agora fica até o fechamento do 2º turno.
 - `/urna`: candidatos do boletim apareciam pelo `sq_candidato`; agora com número e nome. No 2º turno, só Presidente/Governador; turno padrão vira 2 após 25/10 17h; "ZZ" virou "Exterior".
 - `/sobre`: data do 1º turno (era 5/10, foi 4/10), seção de projeções reescrita para o modelo atual, política de privacidade cita a contagem de acessos e não cita mais Web Push (não usado).
 - Comparação: "Probabilidade matemática" (que mostrava uma margem, não uma probabilidade) virou "2º ainda pode passar o 1º?" com Sim/Não e os números.
 
 ### Alterado
+- Bot: no 2º turno o assistente de alertas oferece só Presidente e Governador (estados com 2º turno) e as opções "alguém eleito" e "virada"; textos de `/start`, `/help`, menu e alertas reescritos. Alertas trazem % dos válidos e % apurado. Testes em `tests/test_telegram_bot.py`.
 - Textos: cortadas frases genéricas e instruções óbvias em todo o site; nota do RJ reescrita em linguagem simples.
 
 ## 2026-10-05 / 2026-10-06 — Dia D (1T) + transição pro 2T

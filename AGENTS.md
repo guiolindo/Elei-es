@@ -40,7 +40,9 @@ Este documento é otimizado pra IAs e desenvolvedores novos que precisam entrar 
 - `loop_bot` — long polling principal
 - `enviar_notificacoes` — chamado pelo poller quando um evento novo é emitido
 
-**Testar mudança**: setar `TELEGRAM_BOT_TOKEN` no `.env` e conversar com o bot. Zero test suite pra ele (interação humana).
+**Testar mudança**: `tests/test_telegram_bot.py` cobre as regras puras (turno, família de alertas, nº → cargo). Fluxo completo: setar `TELEGRAM_BOT_TOKEN` no `.env` e conversar com o bot.
+
+**Turno**: depois de 04/10 17h os comandos mostram o 2º turno (`_turno_para`). Alertas casam por família (`_deve_enviar`) — o motor emite `ELEITO_2T` pro Presidente no 2T.
 
 ### ...ajustar frontend (design / animação)
 

@@ -3,39 +3,37 @@
 Arquitetura mínima: um único asyncio.Task com long-polling (getUpdates)
 direto via httpx contra a Bot API. Sem aiogram/PTB — cabe em ~500 linhas.
 
-Comandos (todos aparecem no menu do Telegram):
+Comandos (os principais aparecem no menu do Telegram):
 
   /start                 menu principal (inline keyboard)
   /help                  lista de comandos
 
-  Consulta rápida ao vivo:
+  Consulta ao vivo — todos aceitam `1t`/`2t` pra escolher o turno. Sem
+  isso, depois de 04/10 17h o padrão é o 2º turno (Presidente e os
+  Governadores que foram ao 2T); o resto cai no 1º.
+  /placar [cargo] [uf]   candidatos com barra
+  /lider [cargo] [uf]    quem lidera + diferença
   /pct [cargo] [uf]      % de seções apuradas
-  /placar [cargo] [uf]   top 5 candidatos com barra
-  /lider [cargo] [uf]    quem lidera agora + margem
-  /candidato <num> [uf]  ficha completa por número na urna
-  /vs <num1> <num2> [uf] compara dois candidatos lado a lado
-  /mapa [cargo]          líder por UF (Presidente=todas)
-  /proporcional <uf>     dep. federal por UF (QE + D'Hondt)
-  /estadual <uf>         dep. estadual por UF
-  /eventos [cargo] [uf]  últimos eventos matemáticos
-  /status                totais + hash do snapshot atual (verificável)
-  /tse                   link direto pra apuração oficial
+  /mapa [cargo]          líder por UF
+  /eventos [cargo] [uf]  últimos eventos do turno
+  /candidato <num> [uf]  ficha por número (nº de dígitos define o cargo)
+  /vs <num1> <num2> [uf] dois candidatos lado a lado
+  /cola <num> [uf]       foto + número (colinha pro dia da urna)
+  /proporcional <uf>     dep. federal (QE + D'Hondt), /estadual <uf>
+  /status                hash SHA-256 do último arquivo do TSE
+  /tse                   link da apuração oficial
 
-  Assinaturas (recebe notificações):
-  /assinar               assistente inline pra criar assinatura
+  Alertas:
+  /assinar               assistente inline
   /minhas                lista + botões pra remover
-  /pausar                pausa TODAS suas notificações (útil pra descanso)
-  /retomar               retoma
-  /silencio HH-HH        janela de silêncio diário (BRT). Ex.: /silencio 00-07
-  /silencio off          desativa a janela
+  /pausar · /retomar     pausa/retoma tudo
+  /silencio HH-HH|off    janela de silêncio diário (BRT)
   /apagar_tudo           remove tudo
-
-  Piada útil:
-  /cola <num> [uf]       manda a foto do candidato (colinha pro dia da urna)
 
 Quando o poller detecta um evento matemático novo, chama
 `enviar_notificacoes(eventos, cargo, abr)` que consulta as assinaturas
-casando por (cargo, abrangência, tipo) e envia a mensagem — respeitando
+casando por (cargo, abrangência) e família do tipo (`_deve_enviar`: quem
+assinou "eleito" recebe ELEITO_1T, ELEITO_2T e ELEITO_MAJORITARIO) — respeitando
 pausa e janela de silêncio.
 """
 from __future__ import annotations
@@ -69,14 +67,33 @@ UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
        "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"]
 TIPOS = {
     "ELEITO_1T": "🎉 Eleito no 1º turno",
-    "ELEITO_MAJORITARIO": "🏆 Eleito majoritário",
+    "ELEITO_2T": "🏆 Eleito no 2º turno",
+    "ELEITO_MAJORITARIO": "🏆 Eleito",
     "SEGUNDO_TURNO_DEFINIDO": "⚡ 2º turno definido",
     "VIRADA": "🔄 Virada",
-    "MATEMATICAMENTE_ELIMINADO": "❌ Matematicamente eliminado",
+    "MATEMATICAMENTE_ELIMINADO": "❌ Sem chance matemática",
 }
-EMOJI_TIPO = {"ELEITO_1T": "🎉", "ELEITO_MAJORITARIO": "🏆",
+EMOJI_TIPO = {"ELEITO_1T": "🎉", "ELEITO_2T": "🏆", "ELEITO_MAJORITARIO": "🏆",
               "SEGUNDO_TURNO_DEFINIDO": "⚡", "VIRADA": "🔄",
               "MATEMATICAMENTE_ELIMINADO": "❌"}
+# Todo tipo que declara vencedor. O motor usa ELEITO_2T pro Presidente no
+# 2º turno e ELEITO_MAJORITARIO pro Governador (1T e 2T) e Senador.
+TIPOS_ELEITO = {"ELEITO_1T", "ELEITO_2T", "ELEITO_MAJORITARIO"}
+# Opções do assistente de assinatura, por família. Quem marca "eleito"
+# recebe qualquer tipo de vitória — assim uma assinatura feita no 1º turno
+# (gravada com ELEITO_1T) também avisa o vencedor do 2º.
+OPCOES_ALERTA = {
+    "ELEITO": ("🏆 Alguém eleito", sorted(TIPOS_ELEITO)),
+    "VIRADA": ("🔄 Virada (troca de líder)", ["VIRADA"]),
+    "SEGUNDO_TURNO_DEFINIDO": ("⚡ 2º turno definido", ["SEGUNDO_TURNO_DEFINIDO"]),
+    "MATEMATICAMENTE_ELIMINADO": ("❌ Candidato sem chance matemática", ["MATEMATICAMENTE_ELIMINADO"]),
+}
+ROTULO_CURTO = {"ELEITO": "eleito", "VIRADA": "virada",
+                "SEGUNDO_TURNO_DEFINIDO": "2º turno definido",
+                "MATEMATICAMENTE_ELIMINADO": "sem chance matemática"}
+# 17h BRT dos dias de votação (fechamento das urnas).
+FIM_1T = datetime(2026, 10, 4, 20, 0, tzinfo=timezone.utc)
+INICIO_APURACAO_2T = datetime(2026, 10, 25, 20, 0, tzinfo=timezone.utc)
 SITE_URL = "https://elei-es-production.up.railway.app"
 
 # ================== helpers HTTP ==================
@@ -166,14 +183,72 @@ def _parse_hora_intervalo(s: str) -> tuple[int, int] | None:
     return None
 
 
+def _familia(tipo: str) -> str:
+    return "ELEITO" if tipo in TIPOS_ELEITO else tipo
+
+
+def _deve_enviar(tipos_assinados: Iterable[str] | None, tipo_evento: str, turno: int) -> bool:
+    """A assinatura cobre esse evento? Compara por família (ver OPCOES_ALERTA).
+    No 2º turno o "eliminado" é sempre o perdedor, que já aparece junto com o
+    alerta de eleito — mandar os dois seria repetir a mesma notícia."""
+    if turno == 2 and tipo_evento == "MATEMATICAMENTE_ELIMINADO":
+        return False
+    return _familia(tipo_evento) in {_familia(t) for t in (tipos_assinados or [])}
+
+
+def _turno_vigente(agora: datetime | None = None) -> int:
+    """Depois do fechamento das urnas do 1º turno, o assunto é o 2º."""
+    return 2 if (agora or datetime.now(timezone.utc)) >= FIM_1T else 1
+
+
+def _opcoes_do_turno(turno: int) -> list[str]:
+    return ["ELEITO", "VIRADA"] if turno == 2 else list(OPCOES_ALERTA)
+
+
+def _parse_turno(args: list[str]) -> int | None:
+    """`1t`/`2t` em qualquer posição força o turno. Ex.: /placar 1t"""
+    for a in args:
+        s = a.strip().lower().replace("º", "").replace("°", "")
+        if s in ("1t", "1turno"):
+            return 1
+        if s in ("2t", "2turno"):
+            return 2
+    return None
+
+
+def _cargo_por_numero(numero: int, uf: str) -> int:
+    """Nº de urna → cargo: 2 dígitos = Presidente/Governador, 3 = Senador,
+    4 = Dep. Federal, 5 = Dep. Estadual."""
+    n = len(str(numero))
+    if n <= 2:
+        return 1 if uf == "BR" else 3
+    return {3: 5, 4: 6}.get(n, 7)
+
+
+def _nome_abr(uf: str) -> str:
+    return "Brasil" if uf == "BR" else uf
+
+
+def _rotulo(cargo: int, uf: str, turno: int) -> str:
+    return f"{CARGOS.get(cargo, cargo)} · {_nome_abr(uf)} · {turno}º turno"
+
+
+def _fmt_int(n: int) -> str:
+    return f"{n:,}".replace(",", ".")
+
+
+def _fmt_pct(x: float, casas: int = 2) -> str:
+    return f"{x:.{casas}f}".replace(".", ",") + "%"
+
+
 # ================== keyboards ==================
 
 def _kb_principal() -> dict:
     return {"inline_keyboard": [
         [{"text": "📊 Placar agora", "callback_data": "menu:placar"}],
         [{"text": "🗺 Mapa por UF", "callback_data": "menu:mapa"}],
-        [{"text": "🔔 Nova assinatura", "callback_data": "sub:cargo"}],
-        [{"text": "📋 Minhas assinaturas", "callback_data": "menu:minhas"}],
+        [{"text": "🔔 Receber alertas", "callback_data": "sub:cargo"}],
+        [{"text": "📋 Meus alertas", "callback_data": "menu:minhas"}],
         [{"text": "⚙ Configurações", "callback_data": "menu:config"}],
         [{"text": "🌐 Abrir site", "url": SITE_URL},
          {"text": "📖 TSE oficial", "url": "https://resultados.tse.jus.br"}],
@@ -181,25 +256,32 @@ def _kb_principal() -> dict:
 
 
 def _kb_escolher_cargo(prefix: str, incluir_prop: bool = False) -> dict:
-    cargos = [(1, "Presidente"), (3, "Governador"), (5, "Senador")]
-    if incluir_prop:
-        cargos += [(6, "Dep. Federal"), (7, "Dep. Estadual")]
+    # No 2º turno só existem Presidente e Governador.
+    if _turno_vigente() == 2:
+        cargos = [(1, "Presidente"), (3, "Governador")]
+    else:
+        cargos = [(1, "Presidente"), (3, "Governador"), (5, "Senador")]
+        if incluir_prop:
+            cargos += [(6, "Dep. Federal"), (7, "Dep. Estadual")]
     kb = [[{"text": nome, "callback_data": f"{prefix}:{c}"}] for c, nome in cargos]
     kb.append([{"text": "‹ Menu", "callback_data": "menu:home"}])
     return {"inline_keyboard": kb}
 
 
-def _kb_escolher_uf(prefix: str, cargo: int) -> dict:
+def _kb_escolher_uf(prefix: str, cargo: int, ufs: list[str] | None = None) -> dict:
+    ufs = ufs or UFS
     linhas: list[list[dict]] = []
-    for i in range(0, len(UFS), 4):
-        linhas.append([{"text": u, "callback_data": f"{prefix}:{cargo}:{u}"} for u in UFS[i:i+4]])
+    for i in range(0, len(ufs), 4):
+        linhas.append([{"text": u, "callback_data": f"{prefix}:{cargo}:{u}"} for u in ufs[i:i+4]])
     linhas.append([{"text": "‹ Voltar", "callback_data": f"{prefix}back"}])
     return {"inline_keyboard": linhas}
 
 
-def _kb_tipos(marcados: list[str]) -> dict:
-    kb = [[{"text": ("✅ " if t in marcados else "◻ ") + rot,
-            "callback_data": f"tipo:{t}"}] for t, rot in TIPOS.items()]
+def _kb_tipos(marcados: list[str], turno: int | None = None) -> dict:
+    turno = turno or _turno_vigente()
+    marcadas = {_familia(t) for t in marcados}
+    kb = [[{"text": ("✅ " if f in marcadas else "◻ ") + OPCOES_ALERTA[f][0],
+            "callback_data": f"tipo:{f}"}] for f in _opcoes_do_turno(turno)]
     kb.append([{"text": "✓ Salvar", "callback_data": "sub:salvar"},
                {"text": "‹ Voltar", "callback_data": "sub:cargo"}])
     return {"inline_keyboard": kb}
@@ -215,7 +297,7 @@ def _kb_config(cfg: TelegramChatConfig | None) -> dict:
           "callback_data": "cfg:toggle_pausa"}],
         [{"text": f"🌙 Silêncio: {sil or 'off'}",
           "callback_data": "cfg:silencio"}],
-        [{"text": "🗑 Apagar todas as assinaturas",
+        [{"text": "🗑 Apagar todos os alertas",
           "callback_data": "cfg:apagar_tudo"}],
         [{"text": "‹ Menu", "callback_data": "menu:home"}],
     ]}
@@ -223,10 +305,10 @@ def _kb_config(cfg: TelegramChatConfig | None) -> dict:
 
 # ================== queries do banco ==================
 
-async def _snapshot_atual(sess, cargo: int, abr: str) -> tuple[Snapshot, SnapshotTotais, list[SnapshotCandidato]] | None:
+async def _snapshot_atual(sess, cargo: int, abr: str, turno: int) -> tuple[Snapshot, SnapshotTotais, list[SnapshotCandidato]] | None:
     q = (select(Snapshot)
          .where(and_(Snapshot.cod_cargo == cargo, Snapshot.abrangencia == abr,
-                     Snapshot.suspeito.is_(False)))
+                     Snapshot.turno == turno, Snapshot.suspeito.is_(False)))
          .order_by(Snapshot.coletado_em.desc()).limit(1))
     snap = (await sess.execute(q)).scalar_one_or_none()
     if not snap:
@@ -239,6 +321,60 @@ async def _snapshot_atual(sess, cargo: int, abr: str) -> tuple[Snapshot, Snapsho
         .order_by(SnapshotCandidato.posicao)
     )).scalars().all()
     return snap, tot, cands
+
+
+async def _ufs_gov_2t(sess) -> list[str]:
+    r = await sess.execute(
+        select(Evento.abrangencia).where(and_(
+            Evento.cod_cargo == 3, Evento.tipo == "SEGUNDO_TURNO_DEFINIDO")).distinct())
+    return sorted({u for u in r.scalars() if u})
+
+
+async def _turno_para(sess, cargo: int, uf: str, pedido: int | None) -> int:
+    """Turno a mostrar: o pedido (1t/2t) ou, no período do 2º turno, o 2º
+    pra Presidente e pros Governadores que foram ao 2º turno."""
+    if pedido:
+        return pedido
+    if cargo not in (1, 3) or _turno_vigente() == 1:
+        return 1
+    if cargo == 1:
+        return 2
+    return 2 if uf in await _ufs_gov_2t(sess) else 1
+
+
+async def _finalistas(sess, cargo: int, uf: str) -> tuple[str, str] | None:
+    ev = (await sess.execute(
+        select(Evento).where(and_(Evento.cod_cargo == cargo, Evento.abrangencia == uf,
+                                  Evento.tipo == "SEGUNDO_TURNO_DEFINIDO"))
+        .order_by(desc(Evento.ocorrido_em)).limit(1))).scalar_one_or_none()
+    if not ev or not ev.sq_candidato_b:
+        return None
+    return ev.sq_candidato_a, ev.sq_candidato_b
+
+
+def _pct_apurado(tot: SnapshotTotais) -> float:
+    return (tot.qt_secoes_totalizadas / tot.qt_secoes_total * 100) if tot.qt_secoes_total else 0.0
+
+
+async def _consultar(sess, cargo: int, uf: str, args: list[str]):
+    """Resolve turno e snapshot. Retorna (turno, res, msg_sem_dados): se
+    ainda não há voto apurado, `res` é None e a mensagem já vem pronta."""
+    turno = await _turno_para(sess, cargo, uf, _parse_turno(args))
+    res = await _snapshot_atual(sess, cargo, uf, turno)
+    if res and res[1].qt_secoes_totalizadas > 0:
+        return turno, res, None
+    if turno == 2:
+        linhas = [f"🗳 *{_rotulo(cargo, uf, 2)}*\n"]
+        fin = await _finalistas(sess, cargo, "BR" if cargo == 1 else uf)
+        if fin:
+            na, sa = await _nome_partido(sess, fin[0])
+            nb, sb = await _nome_partido(sess, fin[1])
+            linhas.append(f"*{na}* ({sa}) × *{nb}* ({sb})\n")
+        linhas.append("A apuração começa domingo, 25/10, às 17h (Brasília).")
+        extra = "" if uf == "BR" else f" {uf}"
+        linhas.append(f"Resultado do 1º turno: /placar {cargo}{extra} 1t")
+        return turno, None, "\n".join(linhas)
+    return turno, None, f"Sem votos apurados de {_rotulo(cargo, uf, turno)}."
 
 
 async def _nome_partido(sess, sq: str) -> tuple[str, str]:
@@ -264,98 +400,93 @@ def _barra(pct: float, largura: int = 12) -> str:
 async def cmd_pct(client, chat_id: int, args: list[str]) -> None:
     cargo, uf = _parse_cargo_uf(args)
     async with SessionLocal() as sess:
-        res = await _snapshot_atual(sess, cargo, uf)
-    if not res:
-        await _send(client, chat_id,
-                    f"Sem dados de {CARGOS[cargo]}/{uf} ainda. Apuração começa 4/10 17h BRT.")
+        turno, res, aviso = await _consultar(sess, cargo, uf, args)
+    if aviso:
+        await _send(client, chat_id, aviso)
         return
     snap, tot, _ = res
-    pct = (tot.qt_secoes_totalizadas / tot.qt_secoes_total * 100) if tot.qt_secoes_total else 0
+    pct = _pct_apurado(tot)
     await _send(client, chat_id,
-        f"📊 *{CARGOS[cargo]} · {uf}*\n"
-        f"Apurado: *{pct:.2f}%* ({tot.qt_secoes_totalizadas:,} / {tot.qt_secoes_total:,} seções)\n"
-        f"{_barra(pct, 16)}\n"
-        f"_Atualizado {snap.coletado_em.astimezone(BRT).strftime('%H:%M:%S')} BRT_"
-        .replace(",", "."))
+        f"📊 *{_rotulo(cargo, uf, turno)}*\n"
+        f"Apurado: *{_fmt_pct(pct)}* ({_fmt_int(tot.qt_secoes_totalizadas)} de "
+        f"{_fmt_int(tot.qt_secoes_total)} seções)\n"
+        f"`{_barra(pct, 16)}`\n"
+        f"_Atualizado às {snap.coletado_em.astimezone(BRT).strftime('%H:%M:%S')}_")
 
 
 async def cmd_placar(client, chat_id: int, args: list[str]) -> None:
     cargo, uf = _parse_cargo_uf(args)
     async with SessionLocal() as sess:
-        res = await _snapshot_atual(sess, cargo, uf)
-        if not res:
-            await _send(client, chat_id, f"Sem dados de {CARGOS[cargo]}/{uf} ainda.")
+        turno, res, aviso = await _consultar(sess, cargo, uf, args)
+        if aviso:
+            await _send(client, chat_id, aviso)
             return
         snap, tot, cands = res
-        pct_ap = (tot.qt_secoes_totalizadas / tot.qt_secoes_total * 100) if tot.qt_secoes_total else 0
-        linhas = [f"📊 *{CARGOS[cargo]} · {uf}* — {pct_ap:.1f}% apurado\n"]
+        linhas = [f"📊 *{_rotulo(cargo, uf, turno)}* — {_fmt_pct(_pct_apurado(tot), 1)} apurado\n"]
         for c in cands[:8]:
             nome, sigla = await _nome_partido(sess, c.sq_candidato)
             marca = ["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣"][min(c.posicao-1, 7)]
             linhas.append(
-                f"{marca} *{nome}* ({sigla}) — {float(c.pct_validos):.2f}%\n"
-                f"    `{_barra(float(c.pct_validos))}` {c.votos:,}".replace(",", "."))
-    linhas.append(f"\n_Atualizado {snap.coletado_em.astimezone(BRT).strftime('%H:%M:%S')} BRT_")
+                f"{marca} *{nome}* ({sigla}) — {_fmt_pct(float(c.pct_validos))}\n"
+                f"    `{_barra(float(c.pct_validos))}` {_fmt_int(c.votos)}")
+        if cargo == 3 and turno == 1 and _turno_vigente() == 2 and not _parse_turno(args):
+            linhas.append("\n_Decidido no 1º turno — não há 2º turno neste estado._")
+    linhas.append(f"\n_Atualizado às {snap.coletado_em.astimezone(BRT).strftime('%H:%M:%S')}_")
     await _send(client, chat_id, "\n".join(linhas))
 
 
 async def cmd_lider(client, chat_id: int, args: list[str]) -> None:
     cargo, uf = _parse_cargo_uf(args)
     async with SessionLocal() as sess:
-        res = await _snapshot_atual(sess, cargo, uf)
-        if not res:
-            await _send(client, chat_id, f"Sem dados de {CARGOS[cargo]}/{uf} ainda.")
+        turno, res, aviso = await _consultar(sess, cargo, uf, args)
+        if aviso:
+            await _send(client, chat_id, aviso)
             return
         snap, tot, cands = res
         if not cands:
-            await _send(client, chat_id, "Sem candidatos no snapshot.")
+            await _send(client, chat_id, f"Sem votos apurados de {_rotulo(cargo, uf, turno)}.")
             return
         a = cands[0]
         nome_a, sig_a = await _nome_partido(sess, a.sq_candidato)
-        texto = (f"👑 *Líder — {CARGOS[cargo]} · {uf}*\n\n"
-                 f"*{nome_a}* ({sig_a})\n"
-                 f"{a.votos:,} votos · {float(a.pct_validos):.2f}% dos válidos".replace(",", "."))
+        texto = (f"👑 *{_rotulo(cargo, uf, turno)}* — {_fmt_pct(_pct_apurado(tot), 1)} apurado\n\n"
+                 f"Lidera: *{nome_a}* ({sig_a})\n"
+                 f"{_fmt_int(a.votos)} votos · {_fmt_pct(float(a.pct_validos))} dos válidos")
         if len(cands) >= 2:
             b = cands[1]
             nome_b, sig_b = await _nome_partido(sess, b.sq_candidato)
-            diff = a.votos - b.votos
-            texto += (f"\n\n2º: *{nome_b}* ({sig_b}) · {float(b.pct_validos):.2f}%\n"
-                      f"Margem: {diff:,} votos ({float(a.pct_validos) - float(b.pct_validos):.2f} p.p.)"
-                      .replace(",", "."))
+            texto += (f"\n\n2º: *{nome_b}* ({sig_b}) · {_fmt_pct(float(b.pct_validos))}\n"
+                      f"Diferença: {_fmt_int(a.votos - b.votos)} votos")
     await _send(client, chat_id, texto)
 
 
 async def cmd_candidato(client, chat_id: int, args: list[str]) -> None:
-    if not args:
+    if not args or not args[0].isdigit():
         await _send(client, chat_id, "Uso: /candidato <número> [uf]\nEx.: /candidato 22 SP")
         return
-    numero = args[0]
+    numero = int(args[0])
     uf = args[1].upper() if len(args) > 1 and args[1].upper() in UFS else "BR"
-    if not numero.isdigit():
-        await _send(client, chat_id, "Número inválido.")
-        return
+    cargo = _cargo_por_numero(numero, uf)
     async with SessionLocal() as sess:
-        q = select(Candidato).where(Candidato.numero == int(numero))
-        if uf != "BR":
+        q = select(Candidato).where(and_(Candidato.numero == numero, Candidato.cod_cargo == cargo))
+        if cargo != 1:
             q = q.where(Candidato.uf == uf)
-        else:
-            q = q.where(Candidato.cod_cargo == 1)  # presidente é BR
-        r = await sess.execute(q)
-        cs = r.scalars().all()
+        cs = (await sess.execute(q)).scalars().all()
     if not cs:
-        await _send(client, chat_id,
-                    f"Não achei candidato número {numero} em {uf}.")
+        dica = "" if uf != "BR" or len(str(numero)) <= 2 else " Informe o estado: /candidato <número> <uf>"
+        await _send(client, chat_id, f"Não achei o número {numero} para {CARGOS[cargo]} · {_nome_abr(uf)}.{dica}")
         return
     partes = []
     for c in cs[:5]:
         raw = c.raw_divulga or {}
-        p = raw.get("partido") or {}
+        async with SessionLocal() as sess:
+            _, sigla = await _nome_partido(sess, c.sq_candidato)
+        sigla = sigla or _md_escape((raw.get("partido") or {}).get("sigla", "?"))
         situacao = raw.get("descricaoSituacao") or "?"
         ocupacao = raw.get("ocupacao") or "?"
         nasc = raw.get("dataDeNascimento") or "?"
         partes.append(
-            f"*{_md_escape(c.nome_urna)}* ({_md_escape(p.get('sigla', '?'))}, {c.numero})\n"
-            f"{CARGOS.get(c.cod_cargo, c.cod_cargo)} · {c.uf or 'BR'}\n"
+            f"*{_md_escape(c.nome_urna)}* ({sigla}, {c.numero})\n"
+            f"{CARGOS.get(c.cod_cargo, c.cod_cargo)} · {_nome_abr(c.uf or 'BR')}\n"
             f"Nome: {_md_escape(c.nome)}\n"
             f"Ocupação: {_md_escape(ocupacao)}\nNasc.: {nasc}\nSituação: {_md_escape(situacao)}"
         )
@@ -363,72 +494,73 @@ async def cmd_candidato(client, chat_id: int, args: list[str]) -> None:
 
 
 async def cmd_vs(client, chat_id: int, args: list[str]) -> None:
-    if len(args) < 2:
-        await _send(client, chat_id, "Uso: /vs <n1> <n2> [uf]\nEx.: /vs 13 22 BR")
-        return
-    if not args[0].isdigit() or not args[1].isdigit():
-        await _send(client, chat_id, "Números inválidos.")
+    if len(args) < 2 or not args[0].isdigit() or not args[1].isdigit():
+        await _send(client, chat_id, "Uso: /vs <n1> <n2> [uf]\nEx.: /vs 13 22")
         return
     n1, n2 = int(args[0]), int(args[1])
     uf = args[2].upper() if len(args) > 2 and args[2].upper() in UFS else "BR"
+    cargo = _cargo_por_numero(n1, uf)
     async with SessionLocal() as sess:
-        q = select(Candidato).where(Candidato.numero.in_([n1, n2]))
-        if uf != "BR":
+        q = select(Candidato).where(and_(Candidato.numero.in_([n1, n2]), Candidato.cod_cargo == cargo))
+        if cargo != 1:
             q = q.where(Candidato.uf == uf)
         cs = (await sess.execute(q)).scalars().all()
-        if len(cs) < 2:
-            await _send(client, chat_id, "Não achei os dois candidatos.")
+        por_num = {c.numero: c for c in cs}
+        if n1 not in por_num or n2 not in por_num:
+            await _send(client, chat_id, f"Não achei os dois números para {CARGOS[cargo]} · {_nome_abr(uf)}.")
             return
-        # Pega snapshot atual do cargo dos candidatos
-        cargo = cs[0].cod_cargo
-        abr = uf
-        res = await _snapshot_atual(sess, cargo, abr)
-        placar = {}
-        if res:
-            _, _, sc = res
-            placar = {c.sq_candidato: c for c in sc}
-        linhas = [f"⚔ *Comparação — {CARGOS.get(cargo)} · {uf}*\n"]
-        for c in cs[:2]:
+        c1, c2 = por_num[n1], por_num[n2]
+        abr = "BR" if cargo == 1 else uf
+        turno, res, _ = await _consultar(sess, cargo, abr, args)
+        placar = {c.sq_candidato: c for c in res[2]} if res else {}
+        linhas = [f"⚔ *{_rotulo(cargo, abr, turno)}*"
+                  + (f" — {_fmt_pct(_pct_apurado(res[1]), 1)} apurado" if res else "") + "\n"]
+        for c in (c1, c2):
             _, sig = await _nome_partido(sess, c.sq_candidato)
             sc = placar.get(c.sq_candidato)
             nome_esc = _md_escape(c.nome_urna)
             if sc:
                 linhas.append(
                     f"*{nome_esc}* ({sig}, {c.numero})\n"
-                    f"  {sc.votos:,} votos · {float(sc.pct_validos):.2f}%\n"
-                    f"  `{_barra(float(sc.pct_validos))}`".replace(",", "."))
+                    f"  {_fmt_int(sc.votos)} votos · {_fmt_pct(float(sc.pct_validos))}\n"
+                    f"  `{_barra(float(sc.pct_validos))}`")
             else:
-                linhas.append(f"*{nome_esc}* ({sig}, {c.numero}) — sem dados")
-        if len(cs) >= 2 and all(c.sq_candidato in placar for c in cs[:2]):
-            a = placar[cs[0].sq_candidato]; b = placar[cs[1].sq_candidato]
+                linhas.append(f"*{nome_esc}* ({sig}, {c.numero}) — sem votos apurados")
+        if c1.sq_candidato in placar and c2.sq_candidato in placar:
+            a, b = placar[c1.sq_candidato], placar[c2.sq_candidato]
             diff = a.votos - b.votos
-            lider = cs[0] if diff > 0 else cs[1]
-            linhas.append(f"\n👑 Lidera: *{lider.nome_urna}* por {abs(diff):,} votos"
-                          .replace(",", "."))
+            if diff:
+                lider = c1 if diff > 0 else c2
+                linhas.append(f"\n👑 *{_md_escape(lider.nome_urna)}* na frente por {_fmt_int(abs(diff))} votos")
     await _send(client, chat_id, "\n".join(linhas))
 
 
 async def cmd_mapa(client, chat_id: int, args: list[str]) -> None:
     cargo, _ = _parse_cargo_uf(args, default_cargo=1)
+    pedido = _parse_turno(args)
     async with SessionLocal() as sess:
-        linhas = [f"🗺 *Líderes por UF — {CARGOS.get(cargo)}*\n"]
-        contas: dict[str, int] = {}  # sigla → n_ufs
-        for uf in (["BR"] if cargo == 1 else UFS):
-            res = await _snapshot_atual(sess, cargo, uf if cargo != 1 else "BR")
-            if not res:
+        if cargo == 3 and (pedido or _turno_vigente()) == 2:
+            ufs, turno = await _ufs_gov_2t(sess), 2
+        else:
+            ufs = UFS
+            turno = pedido or (_turno_vigente() if cargo == 1 else 1)
+        linhas = [f"🗺 *Quem lidera em cada estado — {CARGOS.get(cargo)} · {turno}º turno*\n"]
+        contas: dict[str, int] = {}
+        for uf in ufs:
+            res = await _snapshot_atual(sess, cargo, uf, turno)
+            if not res or not res[2] or res[1].qt_secoes_totalizadas == 0:
                 continue
-            snap, tot, cands = res
-            if not cands:
-                continue
+            _, tot, cands = res
             top = cands[0]
             nome, sig = await _nome_partido(sess, top.sq_candidato)
-            contas[sig] = contas.get(sig, 0) + 1
-            linhas.append(f"`{uf}` {nome} ({sig}) · {float(top.pct_validos):.1f}%")
+            contas[nome] = contas.get(nome, 0) + 1
+            linhas.append(f"`{uf}` {nome} ({sig}) · {_fmt_pct(float(top.pct_validos), 1)}"
+                          f" · {_fmt_pct(_pct_apurado(tot), 0)} apurado")
         if len(linhas) <= 1:
-            linhas.append("Sem dados ainda.")
-        elif contas:
-            resumo = " · ".join(f"{s}: {n}" for s, n in sorted(contas.items(), key=lambda x: -x[1]))
-            linhas.append(f"\n_Contagem: {resumo}_")
+            linhas.append("Sem votos apurados ainda.")
+        elif cargo == 1 and len(contas) > 1:
+            resumo = " · ".join(f"{n}: {k} UF" for n, k in sorted(contas.items(), key=lambda x: -x[1]))
+            linhas.append(f"\n_{resumo}_")
     await _send(client, chat_id, "\n".join(linhas))
 
 
@@ -443,7 +575,7 @@ async def cmd_proporcional(client, chat_id: int, args: list[str], cargo: int = 6
         await _send(client, chat_id, "Motor proporcional indisponível.")
         return
     async with SessionLocal() as sess:
-        res = await _snapshot_atual(sess, cargo, uf)
+        res = await _snapshot_atual(sess, cargo, uf, 1)
         if not res:
             await _send(client, chat_id, f"Sem dados de {CARGOS[cargo]} · {uf}.")
             return
@@ -475,72 +607,90 @@ async def cmd_proporcional(client, chat_id: int, args: list[str], cargo: int = 6
     await _send(client, chat_id, "\n".join(linhas))
 
 
+def _texto_evento(tipo: str, a: str, b: str, turno: int) -> str:
+    """Frase curta do evento. `a`/`b` já formatados (nome + sigla)."""
+    if tipo == "VIRADA":
+        return f"{a} passou {b}"
+    if tipo == "SEGUNDO_TURNO_DEFINIDO":
+        return f"2º turno: {a} × {b}"
+    if tipo == "MATEMATICAMENTE_ELIMINADO":
+        return f"{a} sem chance matemática"
+    if tipo in TIPOS_ELEITO:
+        quando = " no 1º turno" if tipo == "ELEITO_1T" else (" no 2º turno" if turno == 2 else "")
+        return f"{a} eleito(a){quando}"
+    return a
+
+
 async def cmd_eventos(client, chat_id: int, args: list[str]) -> None:
-    cargo, uf = _parse_cargo_uf(args, default_cargo=0)
+    cargo, _ = _parse_cargo_uf(args, default_cargo=0)
+    # UF só filtra se veio explícita (_parse_cargo_uf assume SP pra cargo≠1).
+    uf = next((x.upper() for x in args if x.upper() in UFS), "BR")
+    turno = _parse_turno(args) or _turno_vigente()
     async with SessionLocal() as sess:
-        q = select(Evento).order_by(desc(Evento.ocorrido_em)).limit(15)
+        q = (select(Evento).join(Snapshot, Snapshot.id == Evento.snapshot_id)
+             .where(Snapshot.turno == turno)
+             .order_by(desc(Evento.ocorrido_em)).limit(15))
         if cargo:
             q = q.where(Evento.cod_cargo == cargo)
         if uf != "BR":
             q = q.where(Evento.abrangencia == uf)
-        r = await sess.execute(q)
-        evs = r.scalars().all()
+        evs = (await sess.execute(q)).scalars().all()
         if not evs:
-            await _send(client, chat_id, "Sem eventos matemáticos ainda.")
+            outro = 1 if turno == 2 else 2
+            await _send(client, chat_id,
+                        f"Nenhum evento no {turno}º turno ainda. Do {outro}º turno: /eventos {outro}t")
             return
-        linhas = ["🕐 *Últimos eventos matemáticos:*\n"]
+        linhas = [f"🕐 *Últimos eventos · {turno}º turno*\n"]
         for e in evs:
-            hora = e.ocorrido_em.astimezone(BRT).strftime("%H:%M")
-            nome, sig = await _nome_partido(sess, e.sq_candidato_a)
+            hora = e.ocorrido_em.astimezone(BRT).strftime("%d/%m %H:%M")
+            na, sa = await _nome_partido(sess, e.sq_candidato_a)
+            fb = ""
+            if e.sq_candidato_b:
+                nb, sb = await _nome_partido(sess, e.sq_candidato_b)
+                fb = f"*{nb}* ({sb})"
             emo = EMOJI_TIPO.get(e.tipo, "🔔")
-            onde = f"{CARGOS.get(e.cod_cargo, '?')}·{e.abrangencia}"
-            linhas.append(f"`{hora}` {emo} *{nome}* ({sig}) — {onde}")
+            onde = f"{CARGOS.get(e.cod_cargo, '?')} · {_nome_abr(e.abrangencia)}"
+            linhas.append(f"`{hora}` {emo} {_texto_evento(e.tipo, f'*{na}* ({sa})', fb, turno)} — {onde}")
     await _send(client, chat_id, "\n".join(linhas))
 
 
 async def cmd_status(client, chat_id: int) -> None:
+    turno = _turno_vigente()
     async with SessionLocal() as sess:
-        r = await sess.execute(
-            select(Snapshot).order_by(desc(Snapshot.coletado_em)).limit(1)
-        )
-        snap = r.scalar_one_or_none()
-        if not snap:
-            await _send(client, chat_id, "Ainda não há snapshots. Aguardando TSE.")
-            return
-        n = (await sess.execute(
-            select(func.count(Snapshot.id))
-        )).scalar_one()
-        ne = (await sess.execute(
-            select(func.count(Evento.id))
-        )).scalar_one()
+        res = await _snapshot_atual(sess, 1, "BR", turno)
+    if not res:
+        await _send(client, chat_id, f"Ainda não há dados do {turno}º turno.")
+        return
+    snap, tot, _ = res
     await _send(client, chat_id,
-        f"🔍 *Status da apuração*\n\n"
-        f"Snapshots coletados: *{n:,}*\n".replace(",", ".") +
-        f"Eventos matemáticos: *{ne}*\n"
-        f"Último snapshot: {snap.coletado_em.astimezone(BRT).strftime('%d/%m %H:%M:%S')} BRT\n\n"
-        f"*Hash do snapshot:*\n`{snap.hash_conteudo[:32]}…`\n"
-        f"_Verifique contra o JSON original do TSE em resultados.tse.jus.br_")
+        f"🔍 *{_rotulo(1, 'BR', turno)}*\n"
+        f"Apurado: {_fmt_pct(_pct_apurado(tot))}\n"
+        f"Último arquivo do TSE recebido às {snap.coletado_em.astimezone(BRT).strftime('%d/%m %H:%M:%S')}\n\n"
+        f"Código de verificação (SHA-256 do arquivo original do TSE):\n`{snap.hash_conteudo}`\n\n"
+        f"_Baixe o mesmo arquivo em resultados.tse.jus.br e calcule o SHA-256: tem que dar igual._")
 
 
 async def cmd_cola(client, chat_id: int, args: list[str]) -> None:
     if not args or not args[0].isdigit():
-        await _send(client, chat_id, "Uso: /cola <número> [uf]")
+        await _send(client, chat_id, "Uso: /cola <número> [uf]\nEx.: /cola 13 · /cola 22 DF")
         return
     numero = int(args[0])
     uf = args[1].upper() if len(args) > 1 and args[1].upper() in UFS else "BR"
+    cargo = _cargo_por_numero(numero, uf)
     async with SessionLocal() as sess:
-        q = select(Candidato).where(Candidato.numero == numero)
-        if uf != "BR":
+        q = select(Candidato).where(and_(Candidato.numero == numero, Candidato.cod_cargo == cargo))
+        if cargo != 1:
             q = q.where(Candidato.uf == uf)
         c = (await sess.execute(q)).scalars().first()
     if not c:
-        await _send(client, chat_id, "Não achei esse candidato.")
+        await _send(client, chat_id, f"Não achei o número {numero} para {CARGOS[cargo]} · {_nome_abr(uf)}.")
         return
     settings = get_settings()
     foto = (f"https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img/"
             f"{settings.eleicao_cod_divulga}/{c.sq_candidato}/{c.uf or 'BR'}")
     await _send(client, chat_id,
-                f"🗳 *{_md_escape(c.nome_urna)}* — {c.numero}\n_{_md_escape(c.nome)}_",
+                f"🗳 *{_md_escape(c.nome_urna)}* — {c.numero}\n"
+                f"{CARGOS.get(c.cod_cargo)} · {_nome_abr(c.uf or 'BR')}\n_{_md_escape(c.nome)}_",
                 foto=foto)
 
 
@@ -552,10 +702,10 @@ async def _tratar_assinar_start(client, chat_id: int, msg_id: int | None = None)
     kb = _kb_escolher_cargo("subc")
     if msg_id:
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                   text="🔔 *Nova assinatura* — escolha o cargo:",
+                   text="🔔 *Alertas* — de qual cargo?",
                    parse_mode="Markdown", reply_markup=kb)
     else:
-        await _send(client, chat_id, "🔔 *Nova assinatura* — escolha o cargo:", keyboard=kb)
+        await _send(client, chat_id, "🔔 *Alertas* — de qual cargo?", keyboard=kb)
 
 
 async def _listar_assinaturas(client, chat_id: int, msg_id: int | None = None) -> None:
@@ -566,14 +716,16 @@ async def _listar_assinaturas(client, chat_id: int, msg_id: int | None = None) -
         )
         subs = r.scalars().all()
     if not subs:
-        texto = "Você ainda não tem assinaturas.\nUse /assinar ou o botão do menu."
+        texto = "Nenhum alerta ativo. /assinar para escolher."
         kb = _kb_principal()
     else:
-        linhas = ["📋 *Suas assinaturas:*\n"]
+        linhas = ["📋 *Seus alertas*\n"]
         kb_rows = []
         for s in subs:
-            rot = f"{CARGOS.get(s.cod_cargo, s.cod_cargo)} · {s.abrangencia}"
-            linhas.append(f"• {rot} — {len(s.tipos_evento or [])} evento(s)")
+            rot = f"{CARGOS.get(s.cod_cargo, s.cod_cargo)} · {_nome_abr(s.abrangencia)}"
+            fams = [f for f in OPCOES_ALERTA if f in {_familia(t) for t in (s.tipos_evento or [])}]
+            nomes = ", ".join(ROTULO_CURTO[f] for f in fams)
+            linhas.append(f"• {rot}: {nomes or 'nenhum alerta'}")
             kb_rows.append([{"text": f"🗑 {rot}", "callback_data": f"rm:{s.id}"}])
         kb_rows.append([{"text": "‹ Menu", "callback_data": "menu:home"}])
         texto = "\n".join(linhas); kb = {"inline_keyboard": kb_rows}
@@ -675,29 +827,37 @@ async def _tratar_callback(client, cb: dict) -> None:
         est["cargo"] = cod
         if cod == 1:
             est["uf"] = "BR"
-            est["tipos"] = ["ELEITO_1T", "SEGUNDO_TURNO_DEFINIDO", "VIRADA"]
+            est["tipos"] = _opcoes_do_turno(_turno_vigente())
+            if "MATEMATICAMENTE_ELIMINADO" in est["tipos"]:
+                est["tipos"].remove("MATEMATICAMENTE_ELIMINADO")
             await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                       text="Presidente · BR — quais eventos?",
+                       text="Presidente · Brasil — avisar quando:",
                        reply_markup=_kb_tipos(est["tipos"]))
         else:
+            ufs = None
+            if cod == 3 and _turno_vigente() == 2:
+                async with SessionLocal() as sess:
+                    ufs = await _ufs_gov_2t(sess)
+            texto = (f"{CARGOS[cod]} — estados com 2º turno:" if ufs
+                     else f"{CARGOS[cod]} — escolha o estado:")
             await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                       text=f"{CARGOS[cod]} — escolha o estado:",
-                       reply_markup=_kb_escolher_uf("subu", cod))
+                       text=texto, reply_markup=_kb_escolher_uf("subu", cod, ufs))
         return
     if data.startswith("subu:"):
         _, cargo, uf = data.split(":")
         await ack()
         est = _ESTADOS.setdefault(chat_id, {"tipos": [], "cargo": None, "uf": None})
         est["cargo"] = int(cargo); est["uf"] = uf
-        est["tipos"] = ["ELEITO_MAJORITARIO", "VIRADA"]
+        est["tipos"] = ["ELEITO", "VIRADA"]
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                   text=f"{CARGOS[int(cargo)]} · {uf} — quais eventos?",
+                   text=f"{CARGOS[int(cargo)]} · {uf} — avisar quando:",
                    reply_markup=_kb_tipos(est["tipos"]))
         return
     if data.startswith("tipo:"):
-        t = data.split(":")[1]
+        t = _familia(data.split(":")[1])  # botões antigos traziam o tipo concreto
         await ack()
         est = _ESTADOS.setdefault(chat_id, {"tipos": [], "cargo": None, "uf": None})
+        est["tipos"] = [_familia(x) for x in est["tipos"]]
         if t in est["tipos"]:
             est["tipos"].remove(t)
         else:
@@ -708,22 +868,26 @@ async def _tratar_callback(client, cb: dict) -> None:
     if data == "sub:salvar":
         est = _ESTADOS.get(chat_id) or {}
         if not est.get("cargo") or not est.get("uf") or not est.get("tipos"):
-            await ack("Falta escolher cargo/UF/evento", alert=True)
+            await ack("Marque pelo menos um alerta", alert=True)
             return
         await ack()
+        # Grava os tipos concretos que o motor emite (ver OPCOES_ALERTA).
+        tipos: list[str] = []
+        for f in dict.fromkeys(_familia(t) for t in est["tipos"]):
+            tipos += OPCOES_ALERTA.get(f, ("", [f]))[1]
         async with SessionLocal() as sess:
             stmt = pg_insert(TelegramSubscription).values(
                 criado_em=datetime.now(timezone.utc),
                 chat_id=chat_id, cod_cargo=est["cargo"],
-                abrangencia=est["uf"], tipos_evento=est["tipos"],
+                abrangencia=est["uf"], tipos_evento=tipos,
             ).on_conflict_do_update(
                 index_elements=["chat_id", "cod_cargo", "abrangencia"],
-                set_={"tipos_evento": est["tipos"]},
+                set_={"tipos_evento": tipos},
             )
             await sess.execute(stmt); await sess.commit()
-        rot = f"{CARGOS[est['cargo']]} · {est['uf']}"
+        rot = f"{CARGOS[est['cargo']]} · {_nome_abr(est['uf'])}"
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                   text=f"✅ Salvo: *{rot}* ({len(est['tipos'])} evento(s))",
+                   text=f"✅ Alertas ativados: *{rot}*",
                    parse_mode="Markdown", reply_markup=_kb_principal())
         _ESTADOS.pop(chat_id, None)
         return
@@ -770,7 +934,7 @@ async def _tratar_callback(client, cb: dict) -> None:
             )
             await sess.commit()
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                   text="🗑 Todas as suas assinaturas foram removidas.",
+                   text="🗑 Seus alertas foram removidos.",
                    reply_markup=_kb_principal())
         return
 
@@ -787,34 +951,36 @@ async def _tratar_mensagem(client, msg: dict) -> None:
     cmd = partes[0].lower().split("@")[0]
     args = partes[1:]
     if cmd in ("/start", "/menu"):
+        quando = ("2º turno: domingo, 25/10 · resultados a partir das 17h (Brasília)."
+                  if _turno_vigente() == 2 else "1º turno: domingo, 4/10 · resultados a partir das 17h.")
         await _send(client, chat_id,
-            f"🗳 *Apuração 2026 · Brasil*\n\n"
-            f"Consulte a apuração ao vivo e receba alertas quando "
-            f"um candidato é matematicamente eleito.\n\n"
-            f"Digite /help pra ver todos os comandos ou use o menu:",
+            f"🗳 *Apuração 2026*\n{quando}\n\n"
+            f"Placar ao vivo e aviso quando alguém é eleito — "
+            f"só quando os votos que faltam não mudam mais o resultado.",
             keyboard=_kb_principal())
     elif cmd == "/help":
         await _send(client, chat_id,
-            "*Consulta ao vivo:*\n"
-            "/pct — % apurado\n"
-            "/placar — top 8 candidatos\n"
-            "/lider — quem lidera + margem\n"
-            "/candidato <nº> [uf] — ficha completa\n"
-            "/vs <n1> <n2> [uf] — comparar dois\n"
-            "/mapa [cargo] — líder por UF\n"
-            "/proporcional <uf> — dep. federal\n"
-            "/estadual <uf> — dep. estadual\n"
-            "/eventos — últimos eventos matemáticos\n"
-            "/status — totais + hash (verificável)\n"
-            "/cola <nº> [uf] — foto do candidato\n\n"
-            "*Alertas:*\n"
-            "/assinar — nova assinatura (guiado)\n"
-            "/minhas — suas assinaturas\n"
-            "/pausar · /retomar — pausa/retoma tudo\n"
-            "/silencio HH-HH — janela sem alertas\n"
-            "/apagar_tudo — remove todas\n\n"
-            "*Info:*\n"
-            "/tse — apuração oficial")
+            "*Apuração*\n"
+            "/placar — candidatos e %\n"
+            "/lider — quem lidera e a diferença\n"
+            "/pct — quanto já foi apurado\n"
+            "/mapa — quem lidera em cada estado\n"
+            "/eventos — viradas e eleitos\n"
+            "Ex.: `/placar governador DF` · `/placar 1t` (1º turno)\n\n"
+            "*Candidatos*\n"
+            "/candidato <nº> [uf] — ficha\n"
+            "/vs <nº> <nº> [uf] — lado a lado\n"
+            "/cola <nº> [uf] — foto e número\n\n"
+            "*Alertas*\n"
+            "/assinar — escolher o que acompanhar\n"
+            "/minhas — ver e remover\n"
+            "/pausar · /retomar\n"
+            "/silencio 00-07 — sem alertas nesse horário\n"
+            "/apagar\\_tudo — remove seus dados\n\n"
+            "*Outros*\n"
+            "/status — código de verificação do TSE\n"
+            "/proporcional <uf> · /estadual <uf> — deputados (1º turno)\n"
+            "/tse — site oficial")
     elif cmd == "/pct":            await cmd_pct(client, chat_id, args)
     elif cmd == "/placar":         await cmd_placar(client, chat_id, args)
     elif cmd == "/lider":          await cmd_lider(client, chat_id, args)
@@ -835,11 +1001,11 @@ async def _tratar_mensagem(client, msg: dict) -> None:
                "/privacidade": "privacidade"}.get(cmd, "")
         url = f"{SITE_URL}/sobre" + (f"#{pag}" if pag else "")
         await _send(client, chat_id,
-            "📖 *Sobre este site*\n\n"
+            "📖 *Sobre*\n\n"
             "Site independente, *não é o TSE*. Fonte oficial: "
             "resultados.tse.jus.br.\n\n"
-            "Não coletamos dados pessoais além do necessário. "
-            "Ver FAQ, termos, privacidade e metodologia completa:",
+            "O bot guarda só o número deste chat e suas escolhas de alerta. "
+            "/apagar\\_tudo remove tudo.",
             keyboard={"inline_keyboard": [
                 [{"text": "📖 Ler página completa", "url": url}],
                 [{"text": "🏛 TSE oficial", "url": "https://resultados.tse.jus.br"}],
@@ -892,10 +1058,10 @@ async def _tratar_mensagem(client, msg: dict) -> None:
                 delete(TelegramSubscription).where(TelegramSubscription.chat_id == chat_id)
             )
             await sess.commit()
-        await _send(client, chat_id, "🗑 Todas as suas assinaturas foram removidas.")
+        await _send(client, chat_id, "🗑 Seus alertas foram removidos.")
     else:
         await _send(client, chat_id,
-            "Não entendi. Digite /help pra ver os comandos ou /start pro menu.")
+            "Não conheço esse comando. /help lista todos.")
 
 
 async def _processar_update(client, upd: dict) -> None:
@@ -932,16 +1098,16 @@ async def loop_bot() -> None:
         try:
             await _api(client, "setMyCommands", commands=[
                 {"command": "start", "description": "Menu principal"},
-                {"command": "placar", "description": "Placar ao vivo"},
-                {"command": "lider", "description": "Quem lidera agora"},
-                {"command": "pct", "description": "% apurado"},
+                {"command": "placar", "description": "Candidatos e %"},
+                {"command": "lider", "description": "Quem lidera e a diferença"},
+                {"command": "pct", "description": "Quanto já foi apurado"},
+                {"command": "mapa", "description": "Quem lidera em cada estado"},
+                {"command": "eventos", "description": "Viradas e eleitos"},
+                {"command": "assinar", "description": "Receber alertas"},
+                {"command": "minhas", "description": "Meus alertas"},
                 {"command": "candidato", "description": "Ficha por número"},
                 {"command": "vs", "description": "Comparar dois candidatos"},
-                {"command": "mapa", "description": "Líder por UF"},
-                {"command": "eventos", "description": "Eventos matemáticos"},
-                {"command": "status", "description": "Totais + hash"},
-                {"command": "assinar", "description": "Nova assinatura"},
-                {"command": "minhas", "description": "Minhas assinaturas"},
+                {"command": "status", "description": "Código de verificação do TSE"},
                 {"command": "help", "description": "Todos os comandos"},
             ])
         except Exception:
@@ -975,30 +1141,43 @@ def _em_silencio(cfg: TelegramChatConfig | None) -> bool:
     return h >= ini or h < fim
 
 
-async def _formatar_mensagem(sess, ev: dict, cargo: int, uf: str) -> str:
+def _titulo_alerta(tipo: str, turno: int) -> str:
+    if tipo in TIPOS_ELEITO:
+        if tipo == "ELEITO_1T":
+            return "Eleito no 1º turno"
+        return "Eleito no 2º turno" if turno == 2 else "Eleito"
+    return TIPOS.get(tipo, tipo).split(" ", 1)[-1]
+
+
+async def _formatar_mensagem(sess, ev: dict, cargo: int, uf: str, turno: int = 1) -> str:
     tipo = ev["tipo"]
     a = ev.get("sq_candidato_a"); b = ev.get("sq_candidato_b")
     emo = EMOJI_TIPO.get(tipo, "🔔")
-    titulo = TIPOS.get(tipo, tipo).lstrip("🎉🏆⚡🔄❌ ")
-    onde = f"{CARGOS.get(cargo, cargo)} · {uf}"
     async def _fmt(sq: str) -> str:
         if not sq: return ""
         nome, sig = await _nome_partido(sess, sq)
-        return f"*{nome}* ({sig})"
-    corpo = f"{emo} *{titulo}*\n{onde}\n\n"
+        return f"*{nome}* ({sig})" if sig else f"*{nome}*"
     fa = await _fmt(a)
     fb = await _fmt(b) if b else ""
-    if tipo == "VIRADA":
-        corpo += f"{fa} passou {fb}"
-    elif tipo == "SEGUNDO_TURNO_DEFINIDO":
-        corpo += f"Vão pro 2º turno: {fa} × {fb}"
-    else:
-        corpo += fa
+    corpo = (f"{emo} *{_titulo_alerta(tipo, turno)}*\n"
+             f"{CARGOS.get(cargo, cargo)} · {_nome_abr(uf)}\n\n")
+    corpo += _texto_evento(tipo, fa, fb, turno) if tipo not in TIPOS_ELEITO else fa
+    # Números do momento: % do(s) candidato(s) e quanto já foi apurado.
+    res = await _snapshot_atual(sess, cargo, uf, turno)
+    if res:
+        _, tot, cands = res
+        pcts = {c.sq_candidato: float(c.pct_validos) for c in cands}
+        ps = [pcts[x] for x in (a, b) if x and x in pcts]
+        if ps:
+            corpo += ("\n" + " × ".join(_fmt_pct(p) for p in ps)
+                      + f" dos válidos · {_fmt_pct(_pct_apurado(tot), 1)} apurado")
+    if tipo in TIPOS_ELEITO:
+        corpo += "\n_Os votos que faltam não mudam mais o resultado._"
     corpo += f"\n\n🔗 {SITE_URL}"
     return corpo
 
 
-async def enviar_notificacoes(eventos: list[dict], cargo: int, uf: str) -> None:
+async def enviar_notificacoes(eventos: list[dict], cargo: int, uf: str, turno: int = 1) -> None:
     if not eventos or not _api_base():
         return
     async with SessionLocal() as sess:
@@ -1026,7 +1205,7 @@ async def enviar_notificacoes(eventos: list[dict], cargo: int, uf: str) -> None:
         for ev in eventos:
             k = _ev_key(ev)
             if k not in mensagens:
-                mensagens[k] = await _formatar_mensagem(sess, ev, cargo, uf)
+                mensagens[k] = await _formatar_mensagem(sess, ev, cargo, uf, turno)
     # Bot API do Telegram tem limite de 30 msgs/s pra bots. Enviar
     # serial pra 1000+ chats travaria o poller por dezenas de segundos.
     # Paralelismo com semáforo controla concorrência sem estourar rate.
@@ -1047,7 +1226,7 @@ async def enviar_notificacoes(eventos: list[dict], cargo: int, uf: str) -> None:
             texto = mensagens[_ev_key(ev)]
             tarefas = []
             for s in subs:
-                if ev["tipo"] not in (s.tipos_evento or []):
+                if not _deve_enviar(s.tipos_evento, ev["tipo"], turno):
                     continue
                 cfg = cfg_map.get(s.chat_id)
                 if cfg and cfg.pausado_global:

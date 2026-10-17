@@ -2024,8 +2024,12 @@ function renderLegenda(leg, dados, texto) {
 // ============ eventos ============
 // Ícones referenciam o sprite SVG em index.html (#i-trophy, #i-bolt, etc).
 // Nada de emoji — cor + tipografia carregam a hierarquia.
+// Tipos de evento que declaram vencedor. ELEITO_2T é o do Presidente no
+// 2º turno (Governador no 2T usa ELEITO_MAJORITARIO) — math_engine/engine.py.
+const TIPOS_ELEITO = new Set(["ELEITO_1T", "ELEITO_2T", "ELEITO_MAJORITARIO"]);
 const TIPOS_EVENTO = {
   ELEITO_1T:                 { label: "Eleito 1T", classe: "ok",     ico: "trophy" },
+  ELEITO_2T:                 { label: "Eleito 2T", classe: "ok",     ico: "trophy" },
   ELEITO_MAJORITARIO:        { label: "Eleito",    classe: "ok",     ico: "trophy" },
   SEGUNDO_TURNO_DEFINIDO:    { label: "2º Turno",  classe: "warn",   ico: "bolt" },
   VIRADA:                    { label: "Virada",    classe: "warn",   ico: "arrow-up" },
@@ -2048,8 +2052,7 @@ function _absorverEventoNoState(ev) {
   }
   if (ev.tipo === "MATEMATICAMENTE_ELIMINADO" && ev.sq_candidato_a) {
     state.eliminados.add(ev.sq_candidato_a);
-  } else if ((ev.tipo === "ELEITO_1T" || ev.tipo === "ELEITO_MAJORITARIO")
-             && ev.sq_candidato_a) {
+  } else if (TIPOS_ELEITO.has(ev.tipo) && ev.sq_candidato_a) {
     state.eleitos.add(ev.sq_candidato_a);
   } else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
     if (ev.sq_candidato_a) state.segundoTurno.add(ev.sq_candidato_a);
@@ -2106,6 +2109,8 @@ async function carregarEventos() {
       texto = `<strong>${nome}</strong> matematicamente eliminado`;
     } else if (ev.tipo === "ELEITO_1T") {
       texto = `<strong>${nome}</strong> eleito(a) no 1º turno`;
+    } else if (ev.tipo === "ELEITO_2T") {
+      texto = `<strong>${nome}</strong> eleito(a) no 2º turno`;
     } else {
       texto = `<strong>${nome}</strong> eleito(a)`;
     }
@@ -2441,7 +2446,7 @@ function conectarWS() {
         const nome = state.ficha[ev.sq_candidato_a]?.nome_urna || ev.sq_candidato_a;
         const num = state.ficha[ev.sq_candidato_a]?.partido;
         const cor = num ? corDoPartido(num) : "#f0b429";
-        if (ev.tipo === "ELEITO_1T" || ev.tipo === "ELEITO_MAJORITARIO") {
+        if (TIPOS_ELEITO.has(ev.tipo)) {
           comemorar(nome, cor);
           abrirModalVitoria(ev.sq_candidato_a, cor);
           toast(`${nome} eleito(a)!`, "ok");
@@ -2449,8 +2454,10 @@ function conectarWS() {
           toast(`2º turno matematicamente definido`, "ok");
           // Nova UF com 2T de Gov → refresca o dropdown pra ela aparecer
           carregarUfsGov2T().then(() => ajustarUFParaCargo());
-        } else {
-          toast(`✓ ${nome} eleito(a)`, "ok");
+        } else if (ev.tipo === "VIRADA") {
+          // Antes caía num "✓ eleito(a)" genérico — virada não é vitória.
+          const b = state.ficha[ev.sq_candidato_b]?.nome_urna || ev.sq_candidato_b;
+          toast(`${nome} passou ${b}`, "warn");
         }
       }
       await carregarEventos();
@@ -2661,7 +2668,7 @@ function renderFaixaVencedor(eventos) {
   if (prev) prev.remove();
   if (state.cargo === 6 || state.cargo === 7) return;  // proporcional não tem "o vencedor"
   const eleito = (eventos || []).find(e =>
-    (e.tipo === "ELEITO_1T" || e.tipo === "ELEITO_MAJORITARIO") && e.sq_candidato_a
+    TIPOS_ELEITO.has(e.tipo) && e.sq_candidato_a
   );
   if (!eleito) return;
   const ficha = state.ficha[eleito.sq_candidato_a] || {};
