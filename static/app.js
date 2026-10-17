@@ -1884,7 +1884,7 @@ async function atualizarMapa() {
     });
     renderLegenda(leg, dadosPorUF, {
       tituloVazio: "Mapa por UF",
-      tituloCheio: "Líderes por UF",
+      tituloCheio: "Líderes por UF", unidade: "UF",
       dica: "Sem votos apurados ainda.",
     });
     return;
@@ -1929,7 +1929,7 @@ async function atualizarMapa() {
   });
   renderLegenda(leg, dadosPorMun, {
     tituloVazio: `Municípios de ${state.abrangencia}`,
-    tituloCheio: `Líderes por município (${state.abrangencia})`,
+    tituloCheio: `Líderes por município (${state.abrangencia})`, unidade: "mun.",
     dica: "Sem votos apurados nos municípios ainda.",
   });
 }
@@ -2070,14 +2070,20 @@ async function atualizarGrafHome() {
 }
 
 function renderLegenda(leg, dados, texto) {
+  // Quantas áreas (UFs ou municípios) cada um lidera — o placar do mapa.
   const nomes = new Map();
   for (const d of Object.values(dados)) {
-    if (d.nome_lider) nomes.set(d.nome_lider, d.cor);
+    if (!d.nome_lider) continue;
+    const atual = nomes.get(d.nome_lider) || { cor: d.cor, n: 0 };
+    atual.n += 1;
+    nomes.set(d.nome_lider, atual);
   }
   if (nomes.size) {
+    const un = texto.unidade || "";
     leg.innerHTML = `<h3>${texto.tituloCheio}</h3>` +
-      Array.from(nomes.entries()).map(([n, c]) =>
-        `<div class="leg-item"><span class="leg-cor" style="background:${c}"></span>${n}</div>`
+      Array.from(nomes.entries()).sort((a, b) => b[1].n - a[1].n).map(([n, { cor, n: k }]) =>
+        `<div class="leg-item"><span class="leg-cor" style="background:${cor}"></span>${n}`
+        + (un ? `<span class="leg-n">${k} ${un}</span>` : "") + `</div>`
       ).join("") +
       `<div class="leg-item"><span class="leg-cor" style="background:#1e2531"></span>Sem dados</div>`;
   } else {
@@ -2718,6 +2724,23 @@ function renderDuelo() {
     + (hora ? ` · atualizado às ${hora}` : "");
 }
 
+// TV antes da apuração: o painel do gráfico (vazio) vira uma contagem
+// regressiva grande — é o que interessa a quem olha a TV de longe.
+function tickContagemTV() {
+  const grid = $("status-coleta-grid");
+  if (!grid || !document.body.classList.contains("is-tv")) return;
+  const alvo = state.turno === 2 ? DIA_D_2T : DIA_D;
+  const diff = alvo.getTime() - Date.now();
+  if (diff <= 0 || !$("status-coleta")?.offsetParent) { grid.querySelector(".tv-cd")?.remove(); return; }
+  const d = Math.floor(diff / 86_400_000), h = Math.floor(diff % 86_400_000 / 3_600_000),
+        m = Math.floor(diff % 3_600_000 / 60_000), sg = Math.floor(diff % 60_000 / 1000);
+  const p2 = n => String(n).padStart(2, "0");
+  let el = grid.querySelector(".tv-cd");
+  if (!el) { el = document.createElement("div"); el.className = "tv-cd"; el.setAttribute("aria-hidden", "true"); grid.appendChild(el); }
+  el.innerHTML = (d ? `<b>${d}</b><small>${d === 1 ? "dia" : "dias"}</small> ` : "")
+    + `<b>${p2(h)}</b><small>h</small> <b>${p2(m)}</b><small>min</small> <b>${p2(sg)}</b><small>s</small>`;
+}
+
 function tickDuelo() {
   const el = $("duelo-cd");
   if (!el || $("duelo")?.hidden) return;
@@ -3324,7 +3347,7 @@ async function boot() {
   $("btn-ajuda")?.addEventListener("click", abrirAjuda);
 
   // Countdown regressivo enquanto TSE não abre a apuração
-  setInterval(() => { atualizarContagemRegressiva(); esconderColaSeFechado(); tickDuelo(); }, 1000);
+  setInterval(() => { atualizarContagemRegressiva(); esconderColaSeFechado(); tickDuelo(); tickContagemTV(); }, 1000);
   atualizarContagemRegressiva();
   esconderColaSeFechado();
 
