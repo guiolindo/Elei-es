@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261017f";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017f";
+import { renderMapa } from "/static/mapa-br.js?v=20261017j";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017j";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -154,6 +154,7 @@ function alternarModoTV() {
       // ficavam "0% apurado · 0 de 0 seções" até o próximo snapshot.
       try { atualizarPlacar2T(); } catch(e) {}
       try { renderProjecaoTV(); } catch(e) {}
+      try { renderProjecaoPainel(); } catch(e) {}
       window.dispatchEvent(new Event("resize"));
     }, 120);
   });
@@ -208,14 +209,40 @@ function iniciarRelogio() {
   }, msAteProximoSegundo);
 }
 
+// ============ Contraste de cores de partido como TEXTO ============
+// Cores oficiais (ex.: azul-escuro PL #1e3a8a) somem no fundo escuro:
+// 1,66:1. Mistura com branco o mínimo necessário pra atingir 4,5:1
+// (WCAG AA). Barras/bordas seguem com a cor original.
+function _lum(hex) {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map(x => x + x).join("") : h;
+  return [0, 2, 4].map(i => parseInt(n.slice(i, i + 2), 16) / 255)
+    .map(c => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+    .reduce((acc, c, i) => acc + c * [0.2126, 0.7152, 0.0722][i], 0);
+}
+function _contraste(a, b) {
+  const [l1, l2] = [_lum(a), _lum(b)].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+const _cacheCorLegivel = new Map();
+function corLegivel(cor, fundo = "#161b24", alvo = 4.5) {
+  if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(cor || "")) return cor;
+  const k = cor + fundo;
+  if (_cacheCorLegivel.has(k)) return _cacheCorLegivel.get(k);
+  const h = cor.length === 4 ? "#" + cor.slice(1).split("").map(x => x + x).join("") : cor;
+  const rgb = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  let out = h;
+  for (let t = 0; t <= 1.0001 && _contraste(out, fundo) < alvo; t += 0.05) {
+    out = "#" + rgb.map(c => Math.round(c + (255 - c) * t).toString(16).padStart(2, "0")).join("");
+  }
+  _cacheCorLegivel.set(k, out);
+  return out;
+}
+
 // ============ Projeção estatística do 2T ============
 function projecaoAplicavel() {
   return state.turno === 2 &&
     ((state.cargo === 1 && state.abrangencia === "BR") || state.cargo === 3);
-}
-function projecaoDoCandidato(sq) {
-  if (!projecaoAplicavel() || !state.projecao?.disponivel) return null;
-  return state.projecao.candidatos.find(c => c.sq_candidato === sq) || null;
 }
 const fmtPct1 = (x) => `${x.toFixed(1)}%`;
 // Nunca "100%" de chance: o modelo é estatístico; certeza só vem da
@@ -894,6 +921,7 @@ function renderLista() {
     // mapa quando o candidato é líder de UF/município. Casando o visual
     // o usuário identifica "aquela cor do mapa é esse candidato".
     div.style.setProperty("--cor-partido", corPartido(c.partido));
+    div.style.setProperty("--cor-partido-txt", corLegivel(corPartido(c.partido)));
     // Modo TV: card recebe tabindex pra receber foco via setas do controle
     if (document.body.classList.contains("is-tv")) div.tabIndex = 0;
     div.style.setProperty("--sel-cor", sel >= 0 ? PALETA[sel] : "");
@@ -1427,6 +1455,9 @@ function baseOpts(title) {
 
 function graf(id) {
   if (state.graficos[id]) state.graficos[id].dispose();
+  // Sem ECharts (CDN falhou, rede ruim): objeto inerte em vez de erro que
+  // derrubaria o resto da comparação.
+  if (typeof echarts === "undefined") return { setOption() {}, resize() {}, dispose() {} };
   const c = echarts.init($(id), null, { renderer: "canvas" });
   state.graficos[id] = c;
   window.addEventListener("resize", () => c.resize());
@@ -1704,16 +1735,10 @@ async function atualizarPainelTotais() {
       // é o cálculo proporcional (QE/QP/sobras) que define a vaga.
       const L = c.projecao_linear, T = c.projecao_tendencia;
       const Tp = c.projecao_pct_tendencia;  // só vem pra majoritários
-      const projEst = projecaoDoCandidato(c.sq_candidato);
+      // No 2T a projeção vive no painel #proj-painel (e no placar da TV).
       const mostra = !projecaoAplicavel() && pctApur >= 30 && pctApur < 100 && L;
       let projTxt = "";
-      let tooltipProj = null;
-      if (projEst) {
-        projTxt = `Projeção final: ${fmtPct1(projEst.pct)} (entre ${fmtPct1(projEst.ic95[0])} e ${fmtPct1(projEst.ic95[1])})`
-          + (projEst.p_vitoria != null ? ` · ${textoChance(projEst.p_vitoria)}` : "");
-        tooltipProj = "Projeção estatística própria, por estado, com intervalo de 95%. "
-          + "Calculada só com a apuração parcial oficial do TSE. Não é pesquisa nem resultado oficial.";
-      } else if (mostra) {
+      if (mostra) {
         // Votos: faixa L↔T quando divergem
         const vTxt = (T != null && T !== L)
           ? `${fmtNum(Math.min(L, T))}–${fmtNum(Math.max(L, T))}`
@@ -1729,10 +1754,10 @@ async function atualizarPainelTotais() {
         }
         projTxt = ` · ~ ${vTxt}${pTxt} proj.`;
       }
-      const tooltip = tooltipProj || ("Projeção aritmética — faixa entre extrapolação linear e "
+      const tooltip = "Projeção aritmética — faixa entre extrapolação linear e "
         + "janela móvel das últimas 15 atualizações. Não considera composição "
         + "regional das urnas faltantes. Projeção de % só em cargos majoritários. "
-        + "Some ao atingir 100%.");
+        + "Some ao atingir 100%.";
       // % passou a ser o número hero do card. Formato:
       //   48,50<span class="cand-pct-sub"> dos válidos</span>
       // Visual: 48,50 é o grande (herda font-size do .cand-pct), "dos
@@ -1848,6 +1873,7 @@ function mostrarVazioGrafico(msg) {
   const vazio = $("home-graf-vazio");
   if (!vazio) return;
   vazio.classList.remove("oculto");
+  $("home-graf-secao")?.classList.add("graf-vazio");
   const painel = $("status-coleta");
   const txt = $("home-graf-msg");
   if (painel) painel.hidden = msg != null;
@@ -1894,6 +1920,11 @@ async function atualizarGrafHome() {
     return;
   }
   vazio?.classList.add("oculto");
+  if (typeof echarts === "undefined") {
+    mostrarVazioGrafico("Não foi possível carregar o gráfico. Verifique a conexão e recarregue a página.");
+    return;
+  }
+  $("home-graf-secao")?.classList.remove("graf-vazio");
   if (!_grafHome) {
     _grafHome = echarts.init(container, null, { renderer: "canvas" });
     // ECharts captura width/height no init(). Se o container tava escondido
@@ -2151,13 +2182,7 @@ async function refreshApuracao() {
     try { atualizarPlacar2T(); } catch(e) {}
   }
   try { renderProjecaoTV(); } catch(e) {}
-  const av = $("aviso-projecao");
-  if (av) {
-    av.hidden = !state.projecao?.disponivel;
-    av.textContent = state.projecao?.disponivel
-      ? `ⓘ ${state.projecao.aviso} A chance de vitória aparece a partir de 30% do eleitorado apurado.`
-      : "";
-  }
+  try { renderProjecaoPainel(); } catch(e) {}
 }
 
 // Bloco "Projeção para 100%" do placar TV 2T. Mostra % projetado,
@@ -2169,16 +2194,32 @@ function renderProjecaoTV() {
   if (!box) return;
   const snap = state.ultimoSnapshot;
   const pctApur = snap?.totais?.pct_apurado || 0;
-  if (!projecaoAplicavel() || !snap?.disponivel || pctApur >= 100) {
-    box.hidden = true;
-    return;
-  }
+  const mostrar = projecaoAplicavel() && snap?.disponivel && pctApur < 100;
+  renderBlocoProjecao(box, $("tv2t-proj-linhas"), $("tv2t-proj-aviso"), mostrar);
+}
+
+// Mesmo bloco da TV, fora dela (computador e celular): painel acima da
+// lista de candidatos. Some antes da apuração começar (não há o que
+// projetar) e com 100% (resultado é oficial, não projeção).
+function renderProjecaoPainel() {
+  const box = $("proj-painel");
+  if (!box) return;
+  const snap = state.ultimoSnapshot;
+  const pctApur = snap?.totais?.pct_apurado || 0;
+  const mostrar = projecaoAplicavel() && snap?.disponivel && pctApur > 0 && pctApur < 100
+    && !document.body.classList.contains("is-tv");
+  renderBlocoProjecao(box, $("proj-painel-linhas"), $("proj-painel-aviso"), mostrar);
+}
+
+// % projetado ± margem (IC95) e chance de vitória por candidato. Quem já
+// foi eleito matematicamente vê "Eleito" no lugar da chance (certeza
+// aritmética > estatística).
+function renderBlocoProjecao(box, linhas, aviso, mostrar) {
+  if (!mostrar) { box.hidden = true; return; }
   box.hidden = false;
-  const linhas = $("tv2t-proj-linhas");
-  const aviso = $("tv2t-proj-aviso");
   const pj = state.projecao;
   if (!pj?.disponivel) {
-    linhas.innerHTML = `<div class="tv2t-proj-vazio">Aparece com 10% do eleitorado apurado</div>`;
+    linhas.innerHTML = `<div class="tv2t-proj-vazio">A projeção aparece quando 10% do eleitorado estiver apurado.</div>`;
     aviso.textContent = "";
     return;
   }
@@ -2197,9 +2238,9 @@ function renderProjecaoTV() {
     } else {
       chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 30%</span>`;
     }
-    return `<div class="tv2t-proj-linha" style="--cor:${cor}">
+    return `<div class="tv2t-proj-linha" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
       <span class="tv2t-proj-nome">${nome}</span>
-      <span class="tv2t-proj-pct">${fmtPct1(c.pct)}<small> ±${margem.toFixed(1)}</small></span>
+      <span class="tv2t-proj-pct" aria-label="${fmtPct1(c.pct)}, margem de ${margem.toFixed(1)} pontos">${fmtPct1(c.pct)}<small> ±${margem.toFixed(1)}</small></span>
       ${chance}
     </div>`;
   }).join("");

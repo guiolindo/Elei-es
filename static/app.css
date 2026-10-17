@@ -272,7 +272,7 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 }
 @media (max-width: 768px) {
   .turno-toggle { margin-left: 0; order: 10; }
-  .turno-btn { padding: 5px 10px; font-size: 11px; }
+  .turno-btn { padding: 8px 14px; font-size: 13px; min-height: 36px; }
   /* Esconde a versão desktop no mobile (está dentro do .nav escondido),
      mostra a versão específica do mobile (dentro do m-chips zone). */
   .turno-toggle-desktop { display: none !important; }
@@ -741,7 +741,7 @@ body.is-tv .pag-btn { min-width: 32px; height: 32px; font-size: 12px; }
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.05;
-  color: var(--cor-partido);
+  color: var(--cor-partido-txt, var(--cor-partido));
   font-variant-numeric: tabular-nums;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -1962,7 +1962,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
     min-width: 50px; padding: 5px 8px;
     border-radius: 10px;
   }
-  .m-icon-lab { font-size: 10px; font-weight: 700; letter-spacing: 0.2px;
+  .m-icon-lab { font-size: 11px; font-weight: 700; letter-spacing: 0.2px;
     line-height: 1; color: inherit; opacity: 0.95; }
   .m-icon-btn.m-icon-cta.m-labeled {
     background: rgba(240,180,41,.14);
@@ -2016,7 +2016,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
     min-height: 52px;
   }
   .m-chip:active { background: rgba(255,255,255,.10); }
-  .m-chip-lab { font-size: 10px; color: var(--muted, #94a3b8);
+  .m-chip-lab { font-size: 11px; color: var(--muted, #94a3b8);
     text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
   .m-chip-val { font-size: 15px; font-weight: 700;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -2037,7 +2037,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
     background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);
     display: flex; flex-direction: column; gap: 4px; min-width: 0;
     transition: padding .22s, gap .22s; }
-  .m-stat-lab { font-size: 10px; color: var(--muted, #94a3b8);
+  .m-stat-lab { font-size: 11px; color: var(--muted, #94a3b8);
     text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
     transition: font-size .22s, opacity .22s; }
   .m-stat-val { font-size: 18px; font-weight: 700; color: var(--gold, #f0b429);
@@ -2052,7 +2052,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
   body.scrolled .m-stats { padding: 4px 12px; gap: 6px; }
   body.scrolled .m-stat { padding: 4px 10px; gap: 1px; flex-direction: row;
     align-items: center; justify-content: space-between; }
-  body.scrolled .m-stat-lab { font-size: 9px; opacity: 0.7; }
+  body.scrolled .m-stat-lab { font-size: 10px; opacity: 0.85; }
   body.scrolled .m-stat-val { font-size: 13px; }
   body.scrolled .m-stat-bar { height: 2px; margin-top: 0;
     position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0; }
@@ -2113,7 +2113,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
     transition: color .15s ease;
   }
   .m-nav-ico { font-size: 22px; line-height: 1; }
-  .m-nav-lab { font-size: 10px; font-weight: 600; letter-spacing: 0.2px; }
+  .m-nav-lab { font-size: 11px; font-weight: 600; letter-spacing: 0.2px; }
   .m-nav-item.ativo { color: var(--gold, #f0b429); }
   .m-nav-item.ativo .m-nav-ico { transform: scale(1.08); transition: transform .2s; }
   .m-nav-item:active { transform: scale(0.92); }
@@ -2568,7 +2568,7 @@ body.is-tv.turno-2 .cand-pct {
   font-weight: 900 !important;
   line-height: 1;
   margin: 0 !important;
-  color: var(--cor-partido);
+  color: var(--cor-partido-txt, var(--cor-partido));
   text-align: right;
 }
 body.is-tv.turno-2 .cand-pct-sub {
@@ -2907,7 +2907,7 @@ body.is-tv .rodape-tv .btn-ghost {
   padding-left: 8px; border-left: 3px solid var(--cor);
 }
 .tv2t-proj-nome { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tv2t-proj-pct { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--cor); text-align: right; }
+.tv2t-proj-pct { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--cor-txt, var(--cor)); text-align: right; }
 .tv2t-proj-pct small { font-size: 11px; font-weight: 600; color: var(--muted); }
 .tv2t-proj-barra { display: block; height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
 .tv2t-proj-barra > span { display: block; height: 100%; border-radius: 3px; }
@@ -2930,8 +2930,6 @@ body.is-tv .rodape-tv .btn-ghost {
 body.is-tv.turno-2 .cand-proj { display: none; }
 .status-coleta[hidden] { display: none; }
 .home-graf-msg { margin: 0; padding: 24px; color: var(--muted); font-size: 14px; text-align: center; }
-.aviso-projecao { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
-body.is-tv .aviso-projecao { display: none; }
 /* TV 1360px: subs das estatísticas não quebram em 3 linhas */
 body.is-tv .stat-mini .stat-sub, body.is-tv .stat-mini .stat-label { white-space: nowrap; }
 body.is-tv .stat-ultimo #conexao { display: none; }
@@ -2953,3 +2951,42 @@ body.is-tv .stat-secundarias { min-width: 0; }
 .status-dot-inline.stale-fresh { background: #22c55e; }
 .status-dot-inline.stale-warn { background: #f0b429; }
 .status-coleta-rodape { font-size: 12px; }
+
+/* ============ Projeção (computador e celular) ============
+   Mesmo bloco do placar da TV, como card acima da lista. Na TV some
+   (lá ela já está no placar e uma section extra quebraria o grid). */
+.proj-painel {
+  display: flex; flex-direction: column; gap: 10px;
+  margin: 0 0 16px; padding: 16px 18px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.proj-painel[hidden], body.is-tv .proj-painel { display: none !important; }
+.proj-painel .tv2t-proj-tit { margin: 0; font-size: 12px; }
+.proj-painel .tv2t-proj-linhas { display: flex; flex-direction: column; gap: 12px; }
+.proj-painel .tv2t-proj-nome { font-size: 16px; }
+.proj-painel .tv2t-proj-pct { font-size: 24px; }
+.proj-painel .tv2t-proj-chance, .proj-painel .tv2t-proj-eleito { font-size: 13px; }
+.proj-painel .tv2t-proj-aviso { margin: 0; font-size: 12px; }
+@media (max-width: 768px) {
+  main.page.m-tab-placar > .proj-painel:not([hidden]) { display: flex; }
+  .proj-painel { padding: 14px; margin: 4px 0 14px; }
+  .proj-painel .tv2t-proj-linha { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .proj-painel .tv2t-proj-linha > .tv2t-proj-barra,
+  .proj-painel .tv2t-proj-linha > .tv2t-proj-chance,
+  .proj-painel .tv2t-proj-linha > .tv2t-proj-eleito { grid-column: 1 / -1; grid-row: auto; margin-top: 0; }
+  .proj-painel .tv2t-proj-nome { font-size: 15px; }
+  .proj-painel .tv2t-proj-pct { font-size: 22px; }
+}
+
+/* Celular: alvos de toque do rodapé (aba "Mais") tinham < 24px de altura */
+@media (max-width: 768px) {
+  .rodape-linha a { display: inline-block; padding: 10px 4px; }
+  .rodape-legal a, .rodape-aviso a { display: inline-block; padding: 8px 0; }
+  .cta-sub, .rodape-aviso, .rodape-legal { font-size: 12px; }
+  .proj-painel .tv2t-proj-pct small { font-size: 12px; }
+}
+/* Gráfico ainda sem série: não ocupa meia tela (no celular empurrava o
+   mapa pra baixo da dobra na aba Mapa). */
+body:not(.is-tv) .home-graf-secao.graf-vazio .home-graf-wrap { min-height: 0; }
+body:not(.is-tv) .home-graf-secao.graf-vazio #graf-home { display: none; }
+body:not(.is-tv) .home-graf-secao.graf-vazio .home-graf-vazio { position: static; }

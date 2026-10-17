@@ -89,6 +89,10 @@ async function init(container, abrangencia) {
  * @param {Object} opts { onClickArea?: (name) => void }
  */
 export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts = {}) {
+  if (typeof echarts === "undefined") {
+    container.innerHTML = '<p class="home-graf-msg">Não foi possível carregar o mapa. Verifique a conexão e recarregue a página.</p>';
+    return;
+  }
   await init(container, abrangencia);
 
   let mapKey, url, nameProperty, labelFormatter, roam, zoom;
