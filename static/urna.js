@@ -14,7 +14,8 @@ const state = {
   zona: null,       // string
   secao: null,      // string
   cargo: "1",
-  turno: "1",
+  // Depois das 17h do 2º turno, o boletim que interessa é o do 2º turno.
+  turno: Date.now() >= new Date("2026-10-25T17:00:00-03:00").getTime() ? "2" : "1",
   cidades: [],
   zonas: [],        // [{codigo, secoes:[...]}]
 };
@@ -140,7 +141,7 @@ function renderUFs() {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "urna-uf-btn" + (state.uf === uf ? " ativo" : "");
-    b.textContent = uf;
+    b.textContent = uf === "ZZ" ? "Exterior" : uf;
     b.addEventListener("click", () => selecionarUF(uf));
     wrap.appendChild(b);
   }
@@ -158,7 +159,7 @@ async function selecionarUF(uf) {
   $("s2").scrollIntoView({ behavior: "smooth", block: "center" });
 
   if (uf === "ZZ") {
-    $("mu-hint").textContent = "Para o exterior, use o site oficial do TSE.";
+    $("mu-hint").innerHTML = `Seções no exterior: consulte no <a href="https://resultados.tse.jus.br/oficial/app/index.html" target="_blank" rel="noopener">site do TSE</a>.`;
     return;
   }
   $("mu-hint").textContent = "Carregando municípios...";
@@ -167,7 +168,7 @@ async function selecionarUF(uf) {
     const j = await r.json();
     state.cidades = j.municipios || [];
     if (state.cidades.length) {
-      $("mu-hint").textContent = `${state.cidades.length} municípios disponíveis em ${uf}.`;
+      $("mu-hint").textContent = "";
     } else {
       $("mu-hint").textContent = j.erro || "TSE ainda não publicou a lista.";
     }
@@ -265,7 +266,13 @@ $("btn-secao").addEventListener("click", () => {
 
 // ============ Passo 4: Cargo + Turno ============
 $("cargo").addEventListener("change", (e) => { state.cargo = e.target.value; atualizarUI(); });
-$("turno").addEventListener("change", (e) => { state.turno = e.target.value; atualizarUI(); });
+// No 2º turno só há Presidente e Governador.
+function sincronizarCargosDoTurno() {
+  const so2t = state.turno === "2";
+  for (const o of $("cargo").options) o.disabled = so2t && !["1", "3"].includes(o.value);
+  if (so2t && !["1", "3"].includes(state.cargo)) { state.cargo = "1"; $("cargo").value = "1"; }
+}
+$("turno").addEventListener("change", (e) => { state.turno = e.target.value; sincronizarCargosDoTurno(); atualizarUI(); });
 
 // ============ Submit ============
 $("form-urna").addEventListener("submit", async (e) => {
@@ -318,7 +325,7 @@ function render(d) {
   ).join("");
   const cands = (d.candidatos || []).slice(0, 20).map(c =>
     `<div class="urna-cand">
-      <span class="urna-cand-sq">${c.sq_candidato}</span>
+      <span class="urna-cand-sq">${c.numero ? c.numero + " · " : ""}${c.nome_urna || c.sq_candidato}</span>
       <span class="urna-cand-votos">${fmt(c.votos)} · ${c.pct_validos.toFixed(1)}%</span>
     </div>`
   ).join("");
@@ -338,5 +345,7 @@ function render(d) {
 }
 
 // ============ Boot ============
+$("turno").value = state.turno;
+sincronizarCargosDoTurno();
 renderUFs();
 atualizarUI();

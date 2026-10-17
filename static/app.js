@@ -1360,8 +1360,8 @@ async function atualizarComparacao() {
   if (!dados?.disponivel) {
     $("dif-abs").textContent = "—";
     $("dif-pct").textContent = "—";
-    $("dif-prob").textContent = "Sem dados";
-    $("dif-prob-hint").textContent = "Aguardando primeiro snapshot.";
+    $("dif-prob").textContent = "—";
+    $("dif-prob-hint").textContent = "";
     return;
   }
   const map = new Map(dados.candidatos.map(c => [c.sq_candidato, c]));
@@ -1384,24 +1384,22 @@ async function atualizarComparacao() {
     const dif = ordenados[0].votos - ordenados[1].votos;
     animarNumero($("dif-abs"), dif);
     $("dif-pct").textContent = (ordenados[0].pct_validos - ordenados[1].pct_validos).toFixed(2) + " pp";
-    // Margem de segurança = quanto o líder pode perder e ainda vencer
     const restantes = Math.max(0, (dados.totais.eleitorado_apto || 0) - (dados.totais.eleitorado_apto_totalizadas || 0));
-    const margem = ordenados[0].votos > 0
-      ? Math.max(-100, Math.min(100, (ordenados[0].votos - (ordenados[1].votos + restantes)) / ordenados[0].votos * 100))
-      : 0;
-    const pctApurado = dados.totais.pct_apurado || 0;
-    if (pctApurado < 20) {
-      $("dif-prob").textContent = "EM DISPUTA";
-      $("dif-prob-hint").textContent = `Motor matemático silenciado (< 20% apurado)`;
-    } else if (margem <= 0) {
-      $("dif-prob").textContent = "NO FIO";
-      $("dif-prob-hint").textContent = `Diferença menor que os votos que faltam`;
-    } else if (margem > 50) {
-      $("dif-prob").textContent = "DEFINIDO";
-      $("dif-prob-hint").textContent = `Líder folgado — margem ${margem.toFixed(1)}%`;
+    // Pergunta aritmética simples entre os dois mais votados da seleção:
+    // a diferença cabe nos votos que ainda faltam? (teto: eleitores aptos
+    // das seções não totalizadas — conservador, mesmo critério do motor).
+    if (!(dados.totais.pct_apurado > 0) || ordenados[0].votos === 0) {
+      $("dif-prob").textContent = "—";
+      $("dif-prob-hint").textContent = "";
+    } else if (restantes === 0) {
+      $("dif-prob").textContent = "Não";
+      $("dif-prob-hint").textContent = "Apuração encerrada";
+    } else if (dif < restantes) {
+      $("dif-prob").textContent = "Sim";
+      $("dif-prob-hint").textContent = `Faltam até ${fmtNum(restantes)} votos; a diferença é ${fmtNum(dif)}`;
     } else {
-      $("dif-prob").textContent = `~${margem.toFixed(0)}%`;
-      $("dif-prob-hint").textContent = `Margem de segurança sobre 2º`;
+      $("dif-prob").textContent = "Não";
+      $("dif-prob-hint").textContent = `Diferença maior que os ${fmtNum(restantes)} votos que faltam`;
     }
   }
 }
@@ -1825,7 +1823,7 @@ async function atualizarMapa() {
     renderLegenda(leg, dadosPorUF, {
       tituloVazio: "Mapa por UF",
       tituloCheio: "Líderes por UF",
-      dica: "Clique num estado para ver os municípios.",
+      dica: "Sem votos apurados ainda.",
     });
     return;
   }
@@ -1848,7 +1846,7 @@ async function atualizarMapa() {
     if (Object.keys(mun).length === 0) {
       renderLegenda(leg, {}, {
         tituloVazio: `Carregando municípios de ${state.abrangencia}…`,
-        tituloCheio: "", dica: "Puxando dados direto do TSE em paralelo. Pode levar alguns segundos.",
+        tituloCheio: "", dica: "Pode levar alguns segundos.",
       });
       try {
         await fetch(`/api/apuracao/popular-municipios?cargo=${state.cargo}&uf=${state.abrangencia}&turno=${state.turno}`, { method: "POST" });
@@ -1870,7 +1868,7 @@ async function atualizarMapa() {
   renderLegenda(leg, dadosPorMun, {
     tituloVazio: `Municípios de ${state.abrangencia}`,
     tituloCheio: `Líderes por município (${state.abrangencia})`,
-    dica: "Cada município colorido pelo candidato líder. Volte para 'Brasil' para ver o mapa nacional.",
+    dica: "Sem votos apurados nos municípios ainda.",
   });
 }
 
@@ -2229,7 +2227,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
   box.hidden = false;
   const pj = state.projecao;
   if (!pj?.disponivel) {
-    linhas.innerHTML = `<div class="tv2t-proj-vazio">A projeção aparece quando 10% do eleitorado estiver apurado.</div>`;
+    linhas.innerHTML = `<div class="tv2t-proj-vazio">Estimativa a partir de 10% apurado.</div>`;
     aviso.textContent = "";
     return;
   }
@@ -2514,10 +2512,10 @@ function atualizarContagemRegressiva() {
 }
 
 // Esconde o CTA "Montar minha cola eleitoral" (e variantes no header)
-// depois do fechamento das urnas — não faz sentido fazer cola depois que
-// votou. Chamado no boot e também pelo tick da contagem regressiva.
+// depois do fechamento das urnas do 2º turno — a última votação de 2026.
+// Chamado no boot e também pelo tick da contagem regressiva.
 function esconderColaSeFechado() {
-  if (Date.now() < DIA_D.getTime()) return;
+  if (Date.now() < DIA_D_2T.getTime()) return;
   document.querySelectorAll(
     ".cta-brand, .m-icon-cta, .d-topnav-cta, #btn-cola-cta"
   ).forEach(el => el.classList.add("oculto"));
@@ -2617,8 +2615,8 @@ function atualizarTituloAba(dados) {
 const NOTAS_CONTEXTO = [
   {
     cargo: 3, uf: "RJ", turno: 1,
-    titulo: "Decisão atípica — cassação pós-apuração",
-    corpo: "A disputa pelo Governo do RJ só ficou decidida no 1º turno depois do TSE julgar a cassação de ANTHONY GAROTINHO (REP 10) em 09/10/2026. Durante a apuração, ele estava com registro INDEFERIDO em prazo recursal — pela Lei 9.504 art. 16-A, votos a candidato sub judice contam como válidos enquanto roda o recurso. Com os 274.411 votos dele dentro: líder tinha 49,27% → iria pro 2T. Com a cassação mantida, esses votos viraram NULOS (Lei 9.504 art. 175 §3º) → denominador caiu de 8.669.038 pra 8.394.627 → DOUGLAS RUAS passou pra 50,88% → eleito no 1º turno.",
+    titulo: "Resultado alterado pelo TSE em 09/10",
+    corpo: "Anthony Garotinho (Republicanos) concorreu com o registro sob recurso, e os votos dele contaram como válidos durante a apuração — por isso Douglas Ruas aparecia com 49,27%, abaixo da maioria. O TSE manteve a cassação, os 274.411 votos de Garotinho foram anulados e Ruas ficou com 50,88% dos válidos: eleito no 1º turno, sem 2º turno no RJ.",
     link: "https://www.tse.jus.br/comunicacao/noticias/2026/Outubro/tse-decide-pela-retotalizacao-dos-votos-para-governador-no-rio-de-janeiro",
   },
 ];
@@ -2845,11 +2843,10 @@ function abrirAjuda() {
         <tr><td><kbd>c</kbd></td><td>Comparar selecionados</td></tr>
         <tr><td><kbd>n</kbd></td><td>Ativar notificações</td></tr>
         <tr><td><kbd>s</kbd></td><td>Compartilhar</td></tr>
-        <tr><td><kbd>f</kbd></td><td>Modo TV (foco no líder)</td></tr>
+        <tr><td><kbd>f</kbd></td><td>Modo TV</td></tr>
         <tr><td><kbd>?</kbd></td><td>Esta ajuda</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Fechar</td></tr>
       </table>
-      <p class="ajuda-sub">Todos os cálculos usam desigualdades estritas — só chamamos eleição quando é matematicamente impossível reverter.</p>
     </div>`;
   const modal = $("modal-cand");
   const card = $("modal-card");
@@ -2938,7 +2935,7 @@ function trocarTabMobile(tab) {
   if (!page) return;
   // Se for compare mas nada selecionado, avisa e mantém no placar
   if (tab === "comparar" && state.selecionados.length < 2) {
-    toast("Escolha pelo menos 2 candidatos no placar antes.", "warn");
+    toast("Marque 2 ou mais candidatos no placar para comparar.", "warn");
     return;
   }
   // Transição visual: fade+slide na section entrando

@@ -84,13 +84,13 @@
   </details>
 
   <details class="faq-item">
-    <summary>Quando começa a apuração?</summary>
-    <p>As urnas fecham às 17h (horário de Brasília) de domingo, <strong>5 de outubro de 2026</strong>. A totalização começa imediatamente e os primeiros resultados costumam sair minutos depois. O contador regressivo no topo do site marca o horário exato.</p>
+    <summary>Quando começa a apuração do 2º turno?</summary>
+    <p>As urnas fecham às 17h (horário de Brasília) de <strong>domingo, 25 de outubro de 2026</strong>, e os primeiros resultados saem minutos depois. No 2º turno há votação para presidente em todo o país e para governador em AC, AM, DF, ES, RN e TO. O 1º turno foi em 4 de outubro.</p>
   </details>
 
   <details class="faq-item">
     <summary>O que significa "matematicamente eleito"?</summary>
-    <p>Significa que, mesmo se todos os votos ainda não computados fossem para o adversário mais próximo, ele ainda assim não conseguiria alcançar o líder. Usamos desigualdades <em>estritas</em> — se houver qualquer possibilidade de empate ou reversão, o motor não chama a eleição.</p>
+    <p>Que, mesmo se todos os votos que faltam fossem para o 2º colocado, ele não alcançaria o líder. Se ainda houver qualquer chance de empate ou virada, o site não declara ninguém eleito.</p>
   </details>
 
   <details class="faq-item">
@@ -98,12 +98,13 @@
     <p>Para <strong>Presidente (1º turno)</strong>: o líder é declarado eleito se <code>votos_líder × 2 &gt; votos_válidos_atuais + votos_restantes_máximos</code>, garantindo maioria absoluta dos válidos (art. 77 §2º da Constituição).<br>
     Para <strong>Governador/Senador (majoritário)</strong>: eleito se <code>votos_2º + restantes &lt; votos_1º</code>.<br>
     Para <strong>2º turno definido</strong>: se <code>votos_3º + restantes &lt; votos_2º</code>.<br>
+    No <strong>2º turno</strong> (dois candidatos): eleito se <code>votos_2º + restantes &lt; votos_1º</code>.<br>
     Todos os cálculos são conservadores — chamamos tarde se houver dúvida.</p>
   </details>
 
   <details class="faq-item">
-    <summary>Por que o número ainda diverge do TSE em alguns segundos?</summary>
-    <p>Nosso poller consulta o TSE a cada 20 segundos. Se você atualizar o site logo depois do TSE publicar um novo snapshot, há uma latência de até 20s até nós termos os novos dados.</p>
+    <summary>Por que às vezes o número fica alguns segundos atrás do TSE?</summary>
+    <p>Durante a apuração o site busca os dados do TSE a cada 20 segundos. Uma atualização recém-publicada pode levar esse tempo para aparecer aqui.</p>
   </details>
 
   <details class="faq-item">
@@ -174,18 +175,15 @@
   <p>Fornecemos o serviço "no estado em que se encontra". Não há garantia de disponibilidade 24/7, precisão instantânea, ou continuidade. Podemos suspender ou encerrar o serviço a qualquer momento, sem aviso prévio.</p>
 
   <h3>4.5. Projeções e estimativas</h3>
-  <p>O site exibe uma <strong>faixa de projeção</strong> do total final por candidato, rotulada com <code>~</code> e opacidade reduzida pra deixar claro que é <strong>estimativa aritmética</strong>, não predição do resultado:</p>
+  <p>No 2º turno, para presidente e governador, o site mostra uma <strong>estimativa do resultado com 100% apurado</strong>, sempre marcada como <em>não oficial</em> e abaixo dos números do TSE.</p>
   <ul>
-    <li>Limite 1 — <strong>extrapolação linear</strong>: votos atuais × seções totais ÷ seções apuradas. Assume que o restante das urnas vai votar como as já apuradas.</li>
-    <li>Limite 2 — <strong>janela móvel</strong>: usa o ritmo das últimas 15 atualizações. Reflete o comportamento recente, mas não necessariamente o das urnas que ainda faltam apurar.</li>
+    <li><strong>Como é feita</strong>: para presidente, cada estado (e o exterior) é estimado separadamente — a parte já apurada é somada ao que falta, projetado a partir do voto daquele estado no 1º turno, ajustado pela mudança observada no resto do país. Para governador, o mesmo dentro do estado.</li>
+    <li><strong>Margem (±)</strong>: intervalo de 95%. Fica mais estreita conforme a apuração avança.</li>
+    <li><strong>Chance de vencer</strong>: probabilidade calculada a partir dessa margem, limitada entre 1% e 99%.</li>
+    <li><strong>Quando aparece</strong>: a estimativa a partir de 10% apurado; a chance, a partir de 30%. Some quando a apuração termina.</li>
   </ul>
-  <p>Quando as duas convergem, mostramos um número só. Quando divergem, mostramos a faixa — ela reflete a incerteza real do momento (o ritmo mudou nas últimas urnas).</p>
-  <p><strong>Limitações importantes</strong>:</p>
-  <ul>
-    <li>Nenhuma das projeções modela composição regional das urnas que faltam. Se as urnas restantes forem de uma região com perfil muito diferente das já apuradas, as duas projeções podem estar erradas.</li>
-    <li>Só aparecem após 30% apurado (abaixo disso qualquer extrapolação é ruído) e somem automaticamente ao atingir 100% (resultado final conhecido).</li>
-    <li>Não substituem o resultado oficial do TSE. Decisões eleitorais devem se basear nos boletins de urna assinados e no total consolidado publicado pelo Tribunal.</li>
-  </ul>
+  <p>Ela pode errar — por exemplo, se as urnas que faltam forem de regiões que mudaram de voto muito mais que as já apuradas. Não substitui o resultado do TSE.</p>
+  <p>No 1º turno, os cartões mostravam uma faixa aritmética (<code>~</code>) a partir de 30% apurado: o ritmo atual extrapolado para todas as seções.</p>
 
   <h3>4.6. Alterações</h3>
   <p>Estes termos podem ser atualizados a qualquer momento. A versão vigente é sempre a exibida nesta página.</p>
@@ -197,8 +195,8 @@
   <h3>5.1. O que coletamos no site</h3>
   <ul>
     <li><strong>Nada de dados pessoais.</strong> O site é público, não exige login, não usa cookies de rastreio nem analytics de terceiros.</li>
+    <li><strong>Contagem de acessos</strong>: a cada página aberta guardamos horário, página, site de origem (referrer), tipo de navegador e o IP <em>transformado em código irreversível</em> (hash SHA-256 com chave secreta) — serve só para contar visitantes únicos. Apagado após 90 dias.</li>
     <li>Logs técnicos padrão do provedor (Railway) — endereço IP, user-agent, horário — retidos por até 30 dias apenas para fins de segurança e diagnóstico.</li>
-    <li>Se você habilitar notificações Web Push no navegador, armazenamos <em>apenas</em> o endpoint anônimo gerado pelo seu navegador (não é seu IP, não identifica você).</li>
   </ul>
 
   <h3>5.2. O que coletamos no bot do Telegram</h3>
@@ -266,7 +264,7 @@
   <!-- ===================== CONTATO ===================== -->
   <h2 id="contato">8. Contato</h2>
   <p>Para reportar erros, solicitar remoção de dados ou tirar dúvidas legais, entre em contato via GitHub Issues do repositório do projeto.</p>
-  <p><small>Última atualização: 29 de setembro de 2026.</small></p>
+  <p><small>Última atualização: 17 de outubro de 2026.</small></p>
 </main>
 
 </body>

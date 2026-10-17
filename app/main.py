@@ -57,7 +57,8 @@ async def _cleanup_snapshots_loop():
     """
     from sqlalchemy import select, delete, func
     from app.db import SessionLocal
-    from app.models import Snapshot, SnapshotTotais, SnapshotCandidato, SnapshotMunicipio, Evento
+    from app.models import Snapshot, SnapshotTotais, SnapshotCandidato, SnapshotMunicipio, Evento, Visita
+    from datetime import datetime, timedelta, timezone
     settings = get_settings()
     N = settings.snapshots_retention_per_key
     await asyncio.sleep(120)
@@ -115,7 +116,11 @@ async def _cleanup_snapshots_loop():
                         await sess.execute(delete(tabela).where(tabela.snapshot_id.in_(ids_antigos)))
                     await sess.execute(delete(Snapshot).where(Snapshot.id.in_(ids_antigos)))
                     total_apagado += len(ids_antigos)
-                if total_apagado or ids_zero:
+                # Visitas (contagem de acessos, IP já em hash) vivem 90 dias —
+                # é o que a política de privacidade promete em /sobre §5.1.
+                r_vis = await sess.execute(delete(Visita).where(
+                    Visita.ocorreu_em < datetime.now(timezone.utc) - timedelta(days=90)))
+                if total_apagado or ids_zero or r_vis.rowcount:
                     await sess.commit()
         except Exception:
             log.exception("cleanup snapshots falhou")

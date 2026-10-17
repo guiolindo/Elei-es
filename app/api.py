@@ -2332,6 +2332,7 @@ async def apuracao_bu(
     secao: str = Query(..., min_length=1, max_length=5),
     cargo: int = Query(1, ge=1, le=7),
     turno: int = Query(1, ge=1, le=2),
+    sess: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Boletim de Urna de uma seção específica — baixa direto do TSE,
     sem persistir. Útil pra verificação: 'confere com a minha seção?'.
@@ -2424,6 +2425,15 @@ async def apuracao_bu(
             for c in (parsed.candidatos if parsed else [])
         ],
     }
+    # Nome e número de urna — sem isso a tela mostraria só o sq_candidato.
+    sqs = [c["sq_candidato"] for c in body["candidatos"]]
+    if sqs:
+        r_c = await sess.execute(select(Candidato).where(Candidato.sq_candidato.in_(sqs)))
+        fichas = {c.sq_candidato: c for c in r_c.scalars()}
+        for c in body["candidatos"]:
+            f = fichas.get(c["sq_candidato"])
+            c["nome_urna"] = f.nome_urna if f else None
+            c["numero"] = f.numero if f else None
     _CACHE_BU[chave] = (agora, body)
     return body
 

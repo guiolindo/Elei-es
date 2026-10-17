@@ -4,6 +4,24 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+## 2026-10-12 / 2026-10-17 — Preparação do 2º turno (25/10)
+
+### Adicionado
+- **Estimativa do 2º turno** (`math_engine/projecao.py`, `GET /api/apuracao/projecao`): estimativa para 100% apurado por estrato (27 UFs + exterior para presidente; a própria UF para governador), usando o 1º turno como base e o desvio nacional observado. Mostra ± (IC 95%) a partir de 10% apurado e chance de vencer a partir de 30% (limitada a 1–99%). Exibida como "não oficial", abaixo dos cartões oficiais, no desktop, no celular e no modo TV.
+- **Duelo no topo**: antes da apuração, a primeira tela mostra os dois finalistas e a contagem regressiva para 25/10 17h.
+- **Cola do 2º turno**: `/cola` com seletor de turno; no 2º turno só Governador (nas UFs com 2º turno) e Presidente, já listando os dois finalistas.
+- **Contagem de acessos** (`/admin/visitas`): IP em hash, apagada após 90 dias.
+- **`POST /api/admin/reclassificar-suspeitos`** (dry-run por padrão).
+
+### Corrigido
+- CTA "Montar minha cola" sumia depois do 1º turno; agora fica até o fechamento do 2º turno.
+- `/urna`: candidatos do boletim apareciam pelo `sq_candidato`; agora com número e nome. No 2º turno, só Presidente/Governador; turno padrão vira 2 após 25/10 17h; "ZZ" virou "Exterior".
+- `/sobre`: data do 1º turno (era 5/10, foi 4/10), seção de projeções reescrita para o modelo atual, política de privacidade cita a contagem de acessos e não cita mais Web Push (não usado).
+- Comparação: "Probabilidade matemática" (que mostrava uma margem, não uma probabilidade) virou "2º ainda pode passar o 1º?" com Sim/Não e os números.
+
+### Alterado
+- Textos: cortadas frases genéricas e instruções óbvias em todo o site; nota do RJ reescrita em linguagem simples.
+
 ## 2026-10-05 / 2026-10-06 — Dia D (1T) + transição pro 2T
 
 ### Corrigido
