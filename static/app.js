@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261017d";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017d";
+import { renderMapa } from "/static/mapa-br.js?v=20261017f";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017f";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -257,11 +257,6 @@ function classeStaleness(tsIso) {
 // vira um painel real com o estado do poller + última coleta. Dados
 // vêm de /api/poller-status (já público, sem admin token).
 //
-// Estados possíveis (classifica por ultimo_ciclo + alvos_total):
-//   - aguardando    : alvos=0 (modo off), ou nunca rodou
-//   - coletando     : último ciclo < intervalo×3 e falhas=0
-//   - atrasado      : último ciclo entre intervalo×3 e 5 min
-//   - erro          : último ciclo > 5 min OU falhas > 0 persistente
 let _statusColetaCache = null;
 let _statusColetaTimer = null;
 
@@ -291,41 +286,34 @@ async function renderPainelStatusColeta() {
   const alvos = s.alvos_total || 0;
   const falhas = s.ultimo?.falhas || 0;
 
-  let estado, textoEstado;
+  // Linguagem pra qualquer pessoa: o que importa é QUANDO começa e se o
+  // site está conectado. Detalhes técnicos do poller ficam em /verificacao.
+  let estado, textoConexao;
   if (alvos === 0) {
-    estado = "stale-warn";
-    textoEstado = "Coleta pausada (dormente até véspera do 2T)";
+    estado = "stale-sem";
+    textoConexao = "A atualização automática liga sozinha na véspera da eleição";
+  } else if (diffUltimo != null && diffUltimo <= intervalo * 3 && falhas === 0) {
+    estado = "stale-fresh";
+    textoConexao = "Conectado ao TSE";
   } else if (diffUltimo == null) {
     estado = "stale-sem";
-    textoEstado = "Iniciando coleta…";
-  } else if (diffUltimo <= intervalo * 3 && falhas === 0) {
-    estado = "stale-fresh";
-    textoEstado = `Coletando dados do TSE a cada ${intervalo}s`;
-  } else if (diffUltimo <= 300) {
-    estado = "stale-warn";
-    textoEstado = "Coleta atrasada — próxima tentativa a caminho";
+    textoConexao = "Conectando ao TSE…";
   } else {
-    estado = "stale-stale";
-    textoEstado = "Dados possivelmente desatualizados";
+    estado = "stale-warn";
+    textoConexao = "Conexão com o TSE instável — tentando de novo";
   }
-  tit.textContent = textoEstado;
+  const diaD = state.turno === 2 ? DIA_D_2T : DIA_D;
+  const nomeTurno = state.turno === 2 ? "do 2º turno" : "do 1º turno";
+  if (Date.now() < diaD.getTime()) {
+    const dataTxt = diaD.toLocaleDateString("pt-BR", { timeZone: TZ, weekday: "long", day: "2-digit", month: "2-digit" });
+    const horaTxt = diaD.toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+    tit.textContent = `A apuração ${nomeTurno} começa ${dataTxt}, às ${horaTxt}`;
+  } else {
+    tit.textContent = "A apuração vai começar em instantes";
+  }
   dot.className = "status-dot " + estado;
-
-  const linhas = [
-    ["Ciclos de coleta", s.ciclo_atual != null ? fmtNum(s.ciclo_atual) : "—"],
-    ["Alvos monitorados", alvos ? fmtNum(alvos) : "nenhum"],
-    ["Última coleta", ultimoIso ? tempoRelativo(ultimoIso) : "aguardando"],
-    ["Duração do ciclo", s.ultimo_ciclo_duracao_s != null
-      ? `${s.ultimo_ciclo_duracao_s.toFixed(2)}s` : "—"],
-    ["Novos snapshots (último ciclo)", s.ultimo?.novos != null ? fmtNum(s.ultimo.novos) : "—"],
-    ["Falhas (último ciclo)", s.ultimo?.falhas != null ? fmtNum(s.ultimo.falhas) : "—"],
-  ];
-  grid.innerHTML = linhas.map(([lab, val]) =>
-    `<div class="status-coleta-item"><div class="status-coleta-lab">${lab}</div><div class="status-coleta-val">${val}</div></div>`
-  ).join("");
-  rodape.textContent = ultimoIso
-    ? `Última verificação do poller: ${new Date(ultimoIso).toLocaleTimeString("pt-BR")}`
-    : "";
+  grid.innerHTML = `<p class="status-coleta-sub">Os resultados aparecem aqui sozinhos — não precisa recarregar a página.</p>`;
+  rodape.innerHTML = `<span class="status-dot-inline ${estado}"></span> ${textoConexao}`;
 
   // Auto-refresh a cada 30s enquanto o painel estiver visível
   if (_statusColetaTimer) clearTimeout(_statusColetaTimer);
@@ -344,8 +332,13 @@ function tickUltimoRelativo() {
     el.textContent = txt;
     const parent = el.closest(".stat-ultimo");
     if (parent) {
+      // Cor de atraso só faz sentido com a apuração ANDANDO. Antes dela o
+      // arquivo do TSE é de dias atrás (normal) e depois de 100% ele não
+      // muda mais — vermelho nesses casos só assusta.
+      const pct = state.ultimoSnapshot?.totais?.pct_apurado || 0;
+      const andando = pct > 0 && pct < 100;
       parent.classList.remove("stale-fresh", "stale-warn", "stale-stale", "stale-sem");
-      parent.classList.add(classeStaleness(iso));
+      parent.classList.add(andando ? classeStaleness(iso) : "stale-sem");
     }
   }
 }
@@ -842,7 +835,7 @@ function renderLista() {
         <h3>Sem 2º turno aqui</h3>
         <p>Ou ${cargoNome} foi decidida no 1º turno (vitória por maioria absoluta),
         ou o TSE ainda não publicou os candidatos do 2º turno.
-        Volte pro 1º turno no toggle acima pra ver o resultado final.</p>
+        Toque em "1º turno" no alto da página pra ver o resultado final.</p>
       </div>`;
     } else {
       el.innerHTML = `<div class="empty-state">
@@ -1014,7 +1007,7 @@ function renderLista() {
           </div>
           ${badgeProp}
         </div>
-        <button type="button" class="cand-check-vazio" data-comparar="${c.sq_candidato}" aria-label="${sel >= 0 ? 'Remover da comparação' : 'Adicionar à comparação'}" aria-pressed="${sel >= 0 ? 'true' : 'false'}"></button>
+        <button type="button" class="cand-check-vazio" data-comparar="${c.sq_candidato}" tabindex="-1" aria-hidden="true"></button>
       </div>
       <div class="cand-metricas">
         <div class="cand-pct" data-sq-pct="${c.sq_candidato}">0,00%<span class="cand-pct-sub"> dos válidos</span></div>

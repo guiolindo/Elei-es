@@ -270,7 +270,7 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   background: var(--brand);
   color: #17130b;
 }
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .turno-toggle { margin-left: 0; order: 10; }
   .turno-btn { padding: 5px 10px; font-size: 11px; }
   /* Esconde a versão desktop no mobile (está dentro do .nav escondido),
@@ -283,7 +283,7 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
   }
 }
 /* Desktop: esconde a versão mobile */
-@media (min-width: 641px) {
+@media (min-width: 769px) {
   .turno-toggle-mobile { display: none !important; }
 }
 body.is-tv .turno-toggle { margin-left: 10px; padding: 2px; }
@@ -1927,7 +1927,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
    chips clicáveis pra cargo/UF (bottom sheet), FAB de comparar.
    Em desktop tudo isso fica escondido — o layout original manda.
 ================================================================== */
-.m-top, .m-chips, .m-stats, .m-nav, .m-fab, .m-sheet { display: none; }
+.m-top, .m-tab-titulo, .m-chips, .m-stats, .m-nav, .m-fab, .m-sheet { display: none; }
 
 @media (max-width: 768px) {
   /* Esconde toda a chrome desktop */
@@ -1978,6 +1978,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
 
   /* --- Título da tab atual (fica bem visível) --- */
   .m-tab-titulo {
+    display: block;
     padding: 14px 16px 4px;
     font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
     color: #fff;
@@ -2889,7 +2890,7 @@ body.is-tv .rodape-tv .btn-ghost {
 .rodape-aviso { max-width: 720px; margin: 0 auto 8px; line-height: 1.6; }
 .rodape-aviso code { background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 3px;
   font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-.rodape-legal { max-width: 720px; margin: 0 auto; font-size: 11px; opacity: .7; line-height: 1.5; }
+.rodape-legal { max-width: 720px; margin: 0 auto; font-size: 12px; opacity: .9; line-height: 1.5; }
 .rodape-legal a { color: inherit; text-decoration: underline; }
 
 /* (bloco antigo "body.modo-tv" removido — era de iteração abandonada) */
@@ -2946,3 +2947,9 @@ body.is-tv .stat-secundarias { min-width: 0; }
   body.is-tv .stats { gap: 6px; }
   body.is-tv .stat-mini { padding: 4px 8px; }
 }
+.status-coleta-sub { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.5; }
+.status-coleta-tit { font-size: 17px; line-height: 1.35; }
+.status-dot-inline { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #6b7280; margin-right: 6px; vertical-align: middle; }
+.status-dot-inline.stale-fresh { background: #22c55e; }
+.status-dot-inline.stale-warn { background: #f0b429; }
+.status-coleta-rodape { font-size: 12px; }
