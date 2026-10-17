@@ -2223,7 +2223,8 @@ async function refreshApuracao() {
   // probabilidade). Só Presidente-BR e Governador; antes de 10% apurado
   // ou com 100% o backend devolve disponivel=false.
   state.projecao = null;
-  if (projecaoAplicavel()) {
+  // Abaixo de 10% o backend não projeta: nem pergunta (o quadro mostra a espera).
+  if (projecaoAplicavel() && (state.ultimoSnapshot?.totais?.pct_apurado || 0) >= 10) {
     try {
       const pj = await get(`/api/apuracao/projecao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=2`);
       if (pj.disponivel) state.projecao = pj;
@@ -2270,7 +2271,8 @@ function renderProjecaoTV() {
   if (!box) return;
   const snap = state.ultimoSnapshot;
   const pctApur = snap?.totais?.pct_apurado || 0;
-  const mostrar = projecaoAplicavel() && snap?.disponivel && pctApur > 0 && pctApur < 100;
+  // Desde 0%: o quadro fica no lugar (vazio) e não "pula" aos 10%.
+  const mostrar = projecaoAplicavel() && pctApur < 100;
   renderBlocoProjecao(box, $("tv2t-proj-linhas"), $("tv2t-proj-aviso"), mostrar);
 }
 
@@ -2282,7 +2284,7 @@ function renderProjecaoPainel() {
   if (!box) return;
   const snap = state.ultimoSnapshot;
   const pctApur = snap?.totais?.pct_apurado || 0;
-  const mostrar = projecaoAplicavel() && snap?.disponivel && pctApur > 0 && pctApur < 100
+  const mostrar = projecaoAplicavel() && pctApur < 100
     && !document.body.classList.contains("is-tv");
   renderBlocoProjecao(box, $("proj-painel-linhas"), $("proj-painel-aviso"), mostrar);
 }
@@ -2295,7 +2297,25 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
   box.hidden = false;
   const pj = state.projecao;
   if (!pj?.disponivel) {
-    linhas.innerHTML = `<div class="tv2t-proj-vazio">Estimativa a partir de 10% apurado.</div>`;
+    // Antes de 10% apurado: mesmo layout, sem número. Nunca um valor
+    // inventado — só "—" e quanto falta pra começar.
+    const pct = state.ultimoSnapshot?.totais?.pct_apurado || 0;
+    const fin = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo")
+      .sort((x, y) => (x.numero || 0) - (y.numero || 0));
+    const quando = pct > 0
+      ? `Começa com 10% apurado · agora ${dec(pct, 1)}%`
+      : "Começa com 10% apurado";
+    linhas.innerHTML = `<div class="tv2t-proj-espera">
+        <span>${quando}</span>
+        <span class="tv2t-proj-barra" aria-hidden="true"><span style="width:${Math.min(100, pct * 10)}%;background:var(--muted)"></span></span>
+      </div>` + fin.map(c => {
+        const cor = corPartido(c.partido);
+        return `<div class="tv2t-proj-linha tv2t-proj-pendente" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
+          <span class="tv2t-proj-nome">${c.nome_urna}</span>
+          <span class="tv2t-proj-pct" aria-label="Estimativa ainda não disponível">≈ —</span>
+          <span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 30%</span>
+        </div>`;
+      }).join("");
     aviso.textContent = "";
     return;
   }

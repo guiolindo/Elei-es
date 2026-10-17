@@ -3130,3 +3130,7 @@ body.duelo-2t:not(.is-tv) main.page > #lista-candidatos { display: none !importa
     text-align: left; text-decoration: none;
   }
 }
+/* Estimativa antes de 10% apurado: mesmo lugar, sem número. */
+.tv2t-proj-espera { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.tv2t-proj-espera .tv2t-proj-barra { height: 4px; }
+.tv2t-proj-pendente .tv2t-proj-pct { color: var(--muted); opacity: .7; }
