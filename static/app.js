@@ -251,9 +251,15 @@ function corLegivel(cor, fundo = "#161b24", alvo = 4.5) {
 }
 
 // ============ Projeção estatística do 2T ============
-function projecaoAplicavel() {
+function cargoComProjecao2T() {
   return state.turno === 2 &&
     ((state.cargo === 1 && state.abrangencia === "BR") || state.cargo === 3);
+}
+function projecaoAplicavel() {
+  // Com alguém matematicamente eleito a estimativa não acrescenta nada
+  // (e um "x% de chance" ao lado de "ELEITO" confunde): some.
+  const decidido = (state.ultimoSnapshot?.candidatos || []).some(c => state.eleitos.has(c.sq_candidato));
+  return cargoComProjecao2T() && !decidido;
 }
 // Decimal com vírgula (pt-BR). Ponto fica só como separador de milhar
 // (fmtNum) — "70.05%" ao lado de "313.655 seções" lia como milhar.
@@ -1014,7 +1020,7 @@ function renderLista() {
     } else if (eleito) {
       tarja = `<div class="cand-tarja tarja-eleito">
         <svg width="14" height="14" aria-hidden="true"><use href="#i-trophy"/></svg>
-        <span>Eleito(a) matematicamente</span>
+        <span>Eleito(a)</span>
       </div>`;
     } else if (segundoTurno) {
       tarja = `<div class="cand-tarja tarja-segundo-turno">
@@ -1790,7 +1796,7 @@ async function atualizarPainelTotais() {
       const L = c.projecao_linear, T = c.projecao_tendencia;
       const Tp = c.projecao_pct_tendencia;  // só vem pra majoritários
       // No 2T a projeção vive no painel #proj-painel (e no placar da TV).
-      const mostra = !projecaoAplicavel() && pctApur >= 30 && pctApur < 100 && L;
+      const mostra = !cargoComProjecao2T() && pctApur >= 30 && pctApur < 100 && L;
       let projTxt = "";
       if (mostra) {
         // Votos: faixa L↔T quando divergem
@@ -2500,7 +2506,6 @@ function conectarWS() {
         if (TIPOS_ELEITO.has(ev.tipo)) {
           comemorar(nome, cor);
           abrirModalVitoria(ev.sq_candidato_a, cor);
-          toast(`${nome} eleito(a)!`, "ok");
         } else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
           toast(`2º turno matematicamente definido`, "ok");
           // Nova UF com 2T de Gov → refresca o dropdown pra ela aparecer
@@ -2801,52 +2806,64 @@ function renderFaixaVencedor(eventos) {
 function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
   const ficha = state.ficha[sq_candidato] || {};
   const nome = ficha.nome_urna || "Vencedor(a)";
-  const foto = ficha.foto_url;
-  const partido = ficha.partido || "";
-  const numero = ficha.numero || "";
-  const lider = (state.ultimoSnapshot?.candidatos || []).find(c => c.sq_candidato === sq_candidato);
-  const pct = lider ? `${dec(lider.pct_validos, 2)}%` : "";
+  const foto = ficha.foto;
+  const snap = state.ultimoSnapshot;
+  const lider = (snap?.candidatos || []).find(c => c.sq_candidato === sq_candidato);
+  const pctApur = snap?.totais?.pct_apurado || 0;
   const cargoNome = { 1: "Presidente da República", 3: "Governador(a)", 5: "Senador(a)",
                       6: "Deputado(a) Federal", 7: "Deputado(a) Estadual" }[state.cargo] || "";
-  const abr = state.abrangencia === "BR" ? "do Brasil" : `de ${state.abrangencia}`;
+  const onde = state.abrangencia === "BR" ? "" : ` · ${state.abrangencia}`;
+  const selo = state.turno === 2 ? "Eleito no 2º turno" : "Eleito";
 
-  // Remove modal anterior se houver
   document.querySelectorAll(".modal-vitoria").forEach(el => el.remove());
-
   const modal = document.createElement("div");
   modal.className = "modal-vitoria";
   modal.setAttribute("role", "dialog");
   modal.setAttribute("aria-modal", "true");
-  modal.setAttribute("aria-label", `${nome} eleito ${cargoNome}`);
+  modal.setAttribute("aria-label", `${nome}, ${selo.toLowerCase()}, ${cargoNome}`);
   modal.style.setProperty("--cor-vencedor", cor);
+  modal.style.setProperty("--cor-vencedor-txt", corLegivel(cor, "#121722"));
   modal.innerHTML = `
     <div class="mv-back"></div>
     <div class="mv-card">
       <button class="mv-fechar" aria-label="Fechar">✕</button>
-      <div class="mv-trofeu" aria-hidden="true">
-        <svg width="72" height="72"><use href="#i-trophy"/></svg>
+      <div class="mv-trofeu" aria-hidden="true"><svg><use href="#i-trophy"/></svg></div>
+      <div class="mv-selo">${selo}</div>
+      <div class="mv-quem">
+        ${foto ? `<img class="mv-foto" src="${foto}" alt="">` : ""}
+        <div class="mv-nome">${nome}</div>
       </div>
-      <div class="mv-selo">VENCEDOR</div>
-      ${foto ? `<img class="mv-foto" src="${foto}" alt="" onerror="this.style.display='none'">` : ""}
-      <div class="mv-nome">${nome}</div>
-      <div class="mv-partido">${numero ? numero + " · " : ""}${partido}</div>
-      <div class="mv-cargo">${cargoNome} ${abr}</div>
-      ${pct ? `<div class="mv-pct"><span class="mv-pct-num">${pct}</span><span class="mv-pct-lab">dos votos válidos</span></div>` : ""}
-      <div class="mv-sub">Matematicamente eleito(a)</div>
+      <div class="mv-meta"><span class="cand-numero-tag">${ficha.numero || ""}</span>${ficha.partido ? badgePartidoHtml(ficha.partido) : ""}<span>${cargoNome}${onde}</span></div>
+      ${lider ? `<div class="mv-pct"><span class="mv-pct-num">${dec(lider.pct_validos, 2)}%</span>
+        <span class="mv-pct-lab">dos votos válidos, com ${dec(pctApur, 1)}% apurado</span></div>` : ""}
+      <p class="mv-sub">Os votos que faltam não mudam mais o resultado.</p>
       <button class="mv-ok">Continuar acompanhando</button>
-    </div>
-  `;
+      <div class="mv-tempo" aria-hidden="true"><span></span></div>
+    </div>`;
   document.body.appendChild(modal);
+  // Confete entre o fundo escuro e o cartão: em tela pequena ele caía por
+  // cima do texto.
+  const conf = document.querySelector("body > .confete");
+  if (conf) modal.insertBefore(conf, modal.querySelector(".mv-card"));
+  const img = modal.querySelector(".mv-foto");
+  if (img) anexarFotoComRetry(img, nome, ficha.partido);
 
+  let fechado = false;
   const fechar = () => {
+    if (fechado) return;
+    fechado = true;
+    document.removeEventListener("keydown", onKey);
     modal.classList.add("saindo");
     setTimeout(() => modal.remove(), 400);
   };
+  const onKey = (e) => { if (e.key === "Escape") fechar(); };
   modal.querySelector(".mv-fechar").onclick = fechar;
   modal.querySelector(".mv-ok").onclick = fechar;
   modal.querySelector(".mv-back").onclick = fechar;
-  const onKey = (e) => { if (e.key === "Escape") { fechar(); document.removeEventListener("keydown", onKey); } };
   document.addEventListener("keydown", onKey);
+  modal.querySelector(".mv-ok").focus({ preventScroll: true });
+  // Fecha sozinho em 10s; a barrinha no pé do cartão mostra o tempo. Depois
+  // fica o selo ELEITO no placar e a faixa "Vencedor" no topo.
   setTimeout(fechar, 10000);
 }
 
@@ -2886,14 +2903,6 @@ function comemorar(nome, cor = "#f0b429") {
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
-
-  // Banner grande com o nome
-  const banner = document.createElement("div");
-  banner.className = "banner-eleito";
-  banner.innerHTML = `<div class="be-ico" aria-hidden="true"><svg width="32" height="32"><use href="#i-trophy"/></svg></div><div class="be-nome">${nome}</div><div class="be-sub">Matematicamente eleito(a)</div>`;
-  document.body.appendChild(banner);
-  setTimeout(() => banner.classList.add("saindo"), 3500);
-  setTimeout(() => banner.remove(), 4200);
 
   // Beep discreto (só se navegador permitir e usuário já interagiu)
   try {

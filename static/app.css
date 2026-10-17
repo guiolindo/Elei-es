@@ -1531,153 +1531,139 @@ body.is-tv .timeline .ev-texto { font-size: 12px; white-space: nowrap; }
   .cd-sub { display: none; }
 }
 
-/* ============ UX: banner de eleito + confete ============ */
-.confete { position: fixed; inset: 0; pointer-events: none; z-index: 9999; }
-.banner-eleito {
-  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  padding: 28px 44px; border-radius: 20px;
-  background: linear-gradient(135deg, #f0b429, #f97316);
-  color: #0b0f19; text-align: center; z-index: 10000;
-  box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 60px rgba(240,180,41,0.4);
-  animation: banner-in 0.5s cubic-bezier(.2,1.5,.4,1);
-}
-.banner-eleito.saindo { animation: banner-out 0.6s ease-in forwards; }
-.be-ico {
-  width: 64px; height: 64px; margin: 0 auto 8px;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--brand);
-}
-.be-ico svg { width: 48px; height: 48px; stroke-width: 1.6; }
-.be-nome { font-size: 32px; font-weight: 800; margin-top: 4px; letter-spacing: -0.5px; }
-.be-sub { font-size: 14px; font-weight: 600; margin-top: 4px; opacity: 0.7;
-  text-transform: uppercase; letter-spacing: 1px; }
-@keyframes banner-in { from { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
-  to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
-@keyframes banner-out { to { transform: translate(-50%, -50%) scale(0.8); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .banner-eleito, .banner-eleito.saindo { animation: none; }
-  .confete { display: none; }
-}
+/* ============ Confete (canvas) ============ */
+.confete { position: fixed; inset: 0; pointer-events: none; z-index: 10002; }
+.modal-vitoria > .confete { z-index: auto; }
+@media (prefers-reduced-motion: reduce) { .confete { display: none; } }
 
 /* ============ Modal de VITÓRIA (troféu grande) ============
-   Dispara quando o cargo/abrangência que o usuário está acompanhando
-   tem um ELEITO_* ao vivo. Overlay fullscreen com foto, nome, cargo,
-   % final. Dismiss por ✕, ESC, backdrop ou botão. Auto-close 25s. */
+   Abre quando chega ao vivo um ELEITO_* do cargo/UF que a pessoa está
+   vendo. Troféu entra girando e assenta; o resto sobe em sequência.
+   Fecha em 10s (barra no pé), ✕, Esc, fundo ou botão. Só transform e
+   opacity animam (regra do projeto). */
 .modal-vitoria {
   position: fixed; inset: 0; z-index: 10001;
   display: flex; align-items: center; justify-content: center;
-  animation: mv-fade-in 0.35s ease-out;
+  animation: mv-fade-in 0.3s ease-out;
 }
 .modal-vitoria.saindo { animation: mv-fade-out 0.4s ease-in forwards; }
 .mv-back {
   position: absolute; inset: 0;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,0.65), rgba(0,0,0,0.9));
+  background: radial-gradient(ellipse at center, rgba(5,8,14,0.78), rgba(5,8,14,0.94));
   backdrop-filter: blur(6px);
 }
 .mv-card {
-  position: relative;
-  max-width: 460px; width: calc(100% - 32px);
-  padding: 36px 32px 28px;
-  background: linear-gradient(160deg,
-    color-mix(in oklab, var(--cor-vencedor, #f0b429) 22%, var(--bg)) 0%,
-    var(--surface-2) 55%);
+  position: relative; overflow: hidden;
+  max-width: 480px; width: calc(100% - 32px);
+  padding: 34px 28px 30px;
+  background: #121722;  /* opaco: nada da página aparece através */
   border: 2px solid var(--cor-vencedor, #f0b429);
-  border-radius: 24px;
-  text-align: center;
-  box-shadow: 0 40px 100px rgba(0,0,0,0.6),
-              0 0 80px color-mix(in oklab, var(--cor-vencedor, #f0b429) 40%, transparent);
-  animation: mv-pop 0.6s cubic-bezier(.2,1.5,.4,1);
+  border-radius: 24px; text-align: center;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+  animation: mv-pop 0.5s cubic-bezier(.2,1.4,.4,1);
+}
+.mv-card::before {  /* brilho atrás do troféu */
+  content: ""; position: absolute; left: 50%; top: -60px; width: 420px; height: 420px;
+  transform: translateX(-50%); pointer-events: none;
+  background: radial-gradient(circle, rgba(240,180,41,0.28), transparent 62%);
+  animation: mv-brilho 2.4s ease-in-out infinite;
 }
 .mv-fechar {
-  position: absolute; top: 12px; right: 12px;
-  width: 36px; height: 36px; border-radius: 50%;
+  position: absolute; top: 12px; right: 12px; z-index: 1;
+  width: 40px; height: 40px; border-radius: 50%;
   border: none; background: rgba(255,255,255,0.08); color: var(--fg);
   font-size: 18px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
 .mv-fechar:hover { background: rgba(255,255,255,0.15); }
 .mv-trofeu {
-  width: 92px; height: 92px; margin: 0 auto 10px;
+  position: relative;
+  width: 168px; height: 168px; margin: 0 auto 14px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f0b429, #f97316);
+  background: radial-gradient(circle at 35% 30%, #ffe08a, #f0b429 45%, #d9861a);
   display: flex; align-items: center; justify-content: center;
-  color: #0b0f19;
-  box-shadow: 0 10px 30px rgba(240,180,41,0.5);
-  animation: mv-trofeu-brilha 2s ease-in-out infinite;
+  color: #3a2300;
+  box-shadow: 0 18px 50px rgba(240,180,41,0.45), inset 0 -8px 18px rgba(0,0,0,0.18);
+  animation: mv-trofeu-entra 0.9s cubic-bezier(.2,1.5,.4,1) both,
+             mv-trofeu-flutua 3s ease-in-out 0.9s infinite;
 }
-.mv-trofeu svg { stroke-width: 1.5; }
+.mv-trofeu svg { width: 100px; height: 100px; stroke-width: 1.6; }
+.mv-selo, .mv-quem, .mv-meta, .mv-pct, .mv-sub, .mv-ok {
+  position: relative; animation: mv-sobe 0.45s ease-out both;
+}
+.mv-selo { animation-delay: .35s; }
+.mv-quem { animation-delay: .45s; }
+.mv-meta { animation-delay: .55s; }
+.mv-pct  { animation-delay: .65s; }
+.mv-sub  { animation-delay: .75s; }
+.mv-ok   { animation-delay: .85s; }
 .mv-selo {
   display: inline-block;
-  font-size: 11px; font-weight: 900; letter-spacing: 3px;
-  padding: 4px 14px; border-radius: 999px;
-  background: var(--cor-vencedor, #f0b429);
-  color: #0b0f19;
-  margin: 8px 0 14px;
+  font-size: 12px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 999px; background: #22c55e; color: #06210f;
+  margin-bottom: 12px;
 }
+.mv-quem { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .mv-foto {
-  width: 110px; height: 110px; border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid var(--cor-vencedor, #f0b429);
-  margin: 0 auto 12px;
-  display: block;
+  width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none;
+  border: 2px solid var(--cor-vencedor, #f0b429); background: var(--surface-3);
 }
-.mv-nome {
-  font-size: 28px; font-weight: 800; line-height: 1.1;
-  margin-bottom: 4px; letter-spacing: -0.5px;
+.mv-nome { font-size: 32px; font-weight: 900; line-height: 1.1; letter-spacing: -0.5px; overflow-wrap: anywhere; }
+.mv-meta {
+  display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px; font-size: 14px; color: var(--fg-2);
 }
-.mv-partido {
-  font-size: 13px; color: var(--muted); font-weight: 600;
-  letter-spacing: 0.3px; margin-bottom: 10px;
-}
-.mv-cargo {
-  font-size: 15px; color: var(--fg); font-weight: 500;
-  margin-bottom: 18px;
-}
-.mv-pct {
-  display: flex; flex-direction: column; align-items: center;
-  margin: 16px 0 10px;
-  padding: 14px 20px;
-  background: rgba(0,0,0,0.3);
-  border-radius: 14px;
-}
+.mv-pct { display: flex; flex-direction: column; align-items: center; margin: 18px 0 6px; }
 .mv-pct-num {
-  font-size: 44px; font-weight: 900;
-  color: var(--cor-vencedor, #f0b429);
-  line-height: 1; font-variant-numeric: tabular-nums;
+  font-size: 52px; font-weight: 900; line-height: 1; letter-spacing: -0.03em;
+  color: var(--cor-vencedor-txt, var(--fg)); font-variant-numeric: tabular-nums;
 }
-.mv-pct-lab {
-  font-size: 11px; color: var(--muted);
-  letter-spacing: 1.5px; text-transform: uppercase;
-  margin-top: 6px;
-}
-.mv-sub {
-  font-size: 11px; color: var(--muted); font-weight: 700;
-  letter-spacing: 2px; text-transform: uppercase;
-  margin: 10px 0 20px;
-}
+.mv-pct-lab { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.mv-sub { font-size: 14px; color: var(--fg-2); margin: 12px 0 20px; }
 .mv-ok {
-  padding: 12px 22px;
-  background: var(--cor-vencedor, #f0b429);
-  color: #0b0f19;
-  border: none; border-radius: 10px;
-  font-size: 14px; font-weight: 700;
-  cursor: pointer;
-  min-height: 44px;
+  padding: 12px 24px; min-height: 48px;
+  background: var(--brand); color: #17130b;
+  border: none; border-radius: 12px;
+  font-size: 15px; font-weight: 800; cursor: pointer;
 }
-.mv-ok:hover { filter: brightness(1.1); }
+.mv-ok:hover { filter: brightness(1.08); }
+.mv-ok:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.mv-tempo { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.06); }
+.mv-tempo > span {
+  display: block; height: 100%; background: var(--brand);
+  transform-origin: left; animation: mv-tempo 10s linear forwards;
+}
 @keyframes mv-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes mv-fade-out { to { opacity: 0; } }
-@keyframes mv-pop {
-  0% { transform: scale(0.3) rotate(-5deg); opacity: 0; }
-  60% { transform: scale(1.05) rotate(2deg); }
+@keyframes mv-pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes mv-trofeu-entra {
+  0%   { transform: translateY(-40px) scale(0.2) rotate(-25deg); opacity: 0; }
+  60%  { transform: translateY(0) scale(1.15) rotate(8deg); opacity: 1; }
+  80%  { transform: scale(0.96) rotate(-3deg); }
   100% { transform: scale(1) rotate(0); opacity: 1; }
 }
-@keyframes mv-trofeu-brilha {
-  0%, 100% { box-shadow: 0 10px 30px rgba(240,180,41,0.5); }
-  50% { box-shadow: 0 10px 50px rgba(240,180,41,0.9), 0 0 20px rgba(255,220,100,0.6); }
+@keyframes mv-trofeu-flutua { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes mv-brilho { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+@keyframes mv-sobe { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes mv-tempo { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (max-width: 480px) {
+  .mv-card { padding: 28px 18px 26px; }
+  .mv-trofeu { width: 128px; height: 128px; }
+  .mv-trofeu svg { width: 76px; height: 76px; }
+  .mv-nome { font-size: 26px; }
+  .mv-pct-num { font-size: 42px; }
 }
+/* TV: lido de longe */
+body.is-tv .mv-card { max-width: 640px; padding: 44px 40px 40px; }
+body.is-tv .mv-trofeu { width: 220px; height: 220px; }
+body.is-tv .mv-trofeu svg { width: 132px; height: 132px; }
+body.is-tv .mv-nome { font-size: 44px; }
+body.is-tv .mv-pct-num { font-size: 72px; }
+body.is-tv .mv-selo { font-size: 15px; }
+body.is-tv .mv-sub, body.is-tv .mv-meta { font-size: 18px; }
 @media (prefers-reduced-motion: reduce) {
-  .modal-vitoria, .mv-card, .mv-trofeu { animation: none !important; }
+  .modal-vitoria, .mv-card, .mv-card::before, .mv-trofeu,
+  .mv-selo, .mv-quem, .mv-meta, .mv-pct, .mv-sub, .mv-ok { animation: none !important; }
 }
 
 /* ============ Faixa persistente "VENCEDOR" no topo ============
