@@ -901,17 +901,26 @@ body.is-tv .status-coleta-val { font-size: 17px; }
   font-weight: 700;
   font-size: 15px;
   letter-spacing: 0.4px;
-  color: var(--brand, #f0b429);
+  color: var(--fg, #ecf0f7);
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(240,180,41,.08);
-  border: 1px solid rgba(240,180,41,.22);
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--line-2, rgba(255,255,255,.14));
   margin-right: 8px;
   white-space: nowrap;
 }
+/* Selo "BRT" no lugar do emoji: diz o fuso sem precisar de tooltip. */
 .relogio::before {
-  content: "🕐 ";
-  margin-right: 2px;
+  content: "BRT";
+  margin-right: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--brand, #f0b429);
+  color: #17130b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  vertical-align: 2px;
 }
 @media (max-width: 768px) {
   .relogio { font-size: 13px; padding: 4px 10px; }
