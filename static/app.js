@@ -151,7 +151,8 @@ function alternarModoTV() {
   const ativar = !document.body.classList.contains("is-tv");
   document.body.classList.toggle("is-tv", ativar);
   // O botão sempre prometeu "TV" — agora entra em tela cheia de verdade.
-  if (ativar) entrarTelaCheia(); else sairTelaCheia();
+  if (ativar) entrarTelaCheia();
+  else { sairTelaCheia(); try { localStorage.removeItem(FS_KEY); } catch (e) {} }
   try { localStorage.setItem(TV_KEY, ativar ? "1" : "0"); } catch(e) {}
   atualizarBotaoTV();
   // CSS do grid demora alguns ms pra aplicar; re-renderiza ECharts
@@ -3079,6 +3080,32 @@ function entrarTelaCheia() {
   if (!req || document.fullscreenElement) return;
   try { const r = req.call(el); if (r?.catch) r.catch(() => {}); } catch (e) {}
 }
+// Quem entrou em tela cheia pelo Modo TV quer continuar nela. Depois de um
+// recarregamento o navegador não deixa o site voltar sozinho, então o
+// primeiro toque/tecla/botão do controle em qualquer lugar volta.
+const FS_KEY = "elei-es:tv-tela-cheia";
+let _recarregandoPagina = false;
+["beforeunload", "pagehide"].forEach(t =>
+  window.addEventListener(t, () => { _recarregandoPagina = true; }));
+document.addEventListener("fullscreenchange", () => {
+  if (_recarregandoPagina) return;
+  try {
+    if (document.fullscreenElement) localStorage.setItem(FS_KEY, "1");
+    else localStorage.removeItem(FS_KEY);  // saiu por vontade própria (Esc)
+  } catch (e) {}
+});
+function prepararVoltaTelaCheia() {
+  let quer = false;
+  try { quer = localStorage.getItem(FS_KEY) === "1"; } catch (e) {}
+  if (!quer || !document.body.classList.contains("is-tv") || document.fullscreenElement) return;
+  const voltar = () => {
+    ["pointerdown", "keydown"].forEach(t => document.removeEventListener(t, voltar, true));
+    if (document.body.classList.contains("is-tv")) entrarTelaCheia();
+  };
+  ["pointerdown", "keydown"].forEach(t => document.addEventListener(t, voltar, true));
+  toast("Toque na tela ou aperte qualquer tecla para voltar à tela cheia", "");
+}
+
 function sairTelaCheia() {
   if (!document.fullscreenElement) return;
   try { const r = (document.exitFullscreen || document.webkitExitFullscreen).call(document); if (r?.catch) r.catch(() => {}); } catch (e) {}
@@ -3426,6 +3453,7 @@ async function boot() {
   document.getElementById("btn-tv")?.addEventListener("click", alternarModoTV);
   document.getElementById("btn-tela-cheia")?.addEventListener("click", entrarTelaCheia);
   atualizarBotaoTV();
+  prepararVoltaTelaCheia();
   atualizarBotaoTV();
 }
 
