@@ -3523,4 +3523,15 @@ function restaurarRolagem() {
   } catch (e) {}
 }
 setInterval(() => { if (!document.hidden) checarVersao(); }, 120_000);
+
+// Diagnóstico: "?tela" no endereço mostra o tamanho que o navegador usa
+// pra montar a página (TVs costumam usar uma tela "virtual" menor que o
+// painel). Não aparece pra ninguém sem o parâmetro.
+if (new URLSearchParams(location.search).has("tela")) {
+  const b = document.createElement("div");
+  b.style.cssText = "position:fixed;left:8px;top:8px;z-index:100000;padding:6px 10px;border-radius:8px;"
+    + "background:#ffeb3b;color:#000;font:700 16px/1.2 monospace;pointer-events:none";
+  const upd = () => { b.textContent = `${innerWidth}×${innerHeight} · zoom ${devicePixelRatio} · tela ${screen.width}×${screen.height}`; };
+  upd(); addEventListener("resize", upd); document.body.appendChild(b);
+}
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checarVersao(); });
