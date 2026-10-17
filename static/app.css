@@ -3114,7 +3114,7 @@ body.duelo-2t:not(.is-tv) main.page > #lista-candidatos { display: none !importa
 /* Desktop durante o duelo: o "Apurado" já está no placar do duelo, então
    o topo encolhe pra uma linha de números secundários e o placar sobe. */
 @media (min-width: 769px) {
-  body.duelo-vivo:not(.is-tv) .hero .stat-hero { display: none; }
+  body.duelo-vivo:not(.is-tv) .hero:not(.scrolled) .stat-hero { display: none; }
   body.duelo-vivo:not(.is-tv) .hero .stats { grid-template-columns: 1fr; padding-bottom: 14px; }
   body.duelo-vivo:not(.is-tv) .hero .stat-mini { padding: 8px 14px; }
   body.duelo-vivo:not(.is-tv) .hero .stat-mini .stat-value { font-size: 17px; margin-top: 2px; }
