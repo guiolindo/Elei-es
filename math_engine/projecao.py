@@ -53,8 +53,15 @@ DELTA_LOO = False
 TAU_SWING = 0.04
 
 FRACAO_MIN_PROJECAO = 0.10   # abaixo disso não projeta
-FRACAO_MIN_PROBABILIDADE = 0.30
+# 50%: com viés forte capital × interior a chance ficava confiante demais
+# na faixa 60–90% (validação 17/10, docs/metodologia.md §8.4).
+FRACAO_MIN_PROBABILIDADE = 0.50
 P_MAX_EXIBIDA = 0.99
+# Alarga só a incerteza usada na CHANCE (o IC95 já cobre >95%). Com 1,0 a
+# chance ficava confiante demais na faixa 70–90% com viés capital×interior
+# (dizia 82%, acontecia 68%). 1,4 escolhido na semente 555 e conferido na
+# 31337 (docs/metodologia.md §8.4); no cenário fácil fica cauteloso.
+FATOR_SD_PROB = 1.4
 
 
 @dataclass(frozen=True)
@@ -204,7 +211,7 @@ def projetar_2t(estratos: list[Estrato], antes: list[Estrato] | None = None) -> 
     var = (var_indep + corr_prior ** 2 * var_delta + (tau_nat * soma_r) ** 2) / proj_v ** 2
     sd = math.sqrt(var) * fator_sd(fracao)
     if sd > 0:
-        pa = _phi((S - 0.5) / sd)
+        pa = _phi((S - 0.5) / (sd * FATOR_SD_PROB))
     else:
         pa = 1.0 if S > 0.5 else (0.0 if S < 0.5 else 0.5)
     lo, hi = max(0.0, S - 1.96 * sd), min(1.0, S + 1.96 * sd)

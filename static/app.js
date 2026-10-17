@@ -2313,7 +2313,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
         return `<div class="tv2t-proj-linha tv2t-proj-pendente" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
           <span class="tv2t-proj-nome">${c.nome_urna}</span>
           <span class="tv2t-proj-pct" aria-label="Estimativa ainda não disponível">≈ —</span>
-          <span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 30%</span>
+          <span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 50%</span>
         </div>`;
       }).join("");
     aviso.textContent = "";
@@ -2332,7 +2332,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
       chance = `<span class="tv2t-proj-barra" aria-hidden="true"><span style="width:${w}%;background:${cor}"></span></span>`
         + `<span class="tv2t-proj-chance">${textoChance(c.p_vitoria).replace(" de vencer", "")}</span>`;
     } else {
-      chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 30%</span>`;
+      chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 50%</span>`;
     }
     return `<div class="tv2t-proj-linha" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
       <span class="tv2t-proj-nome">${nome}</span>

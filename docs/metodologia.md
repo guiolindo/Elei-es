@@ -335,9 +335,9 @@ Casos: estrato sem prior → `m = q`, `v = v_o`; sem voto ainda → `m = p + δ`
 S   = (Σ A_u + Σ R_u m_u) / (Σ V_u + Σ R_u)
 Var = [ Σ R_u² v_u  +  (Σ R_u (1−w_u))² var(δ)  +  (τ_nat Σ R_u)² ] / (ΣV + ΣR)²
 sd  = √Var · f(fração apurada)        f = 1,8 (<30%) · 1,4 (<50%) · 1,15 (<80%) · 1,0
-IC95 = S ± 1,96 sd          P(A vence) = Φ((S − 0,5)/sd)        B = complemento
+IC95 = S ± 1,96 sd          P(A vence) = Φ((S − 0,5)/(k·sd)), k = 1,4        B = complemento
 ```
-`drift_a` e `τ_nat` são substituídos pelo máximo entre a constante e o valor **medido** comparando o snapshot atual com o de ~60% do progresso (`estimar_deriva`): a banda só alarga, nunca estreita. A chance é exibida só a partir de 30% apurado, recortada em 1–99% (recorte só de exibição; o modelo é a normal acima).
+`drift_a` e `τ_nat` são substituídos pelo máximo entre a constante e o valor **medido** comparando o snapshot atual com o de ~60% do progresso (`estimar_deriva`): a banda só alarga, nunca estreita. A chance é exibida só a partir de 50% apurado (era 30% até 17/10), recortada em 1–99% (recorte só de exibição; o modelo é a normal acima).
 
 **Não usa** extrapolação de tendência: votos que mudam ao longo da noite refletem *de onde* vêm as urnas, e isso já está nos estratos.
 
@@ -351,7 +351,8 @@ IC95 = S ± 1,96 sd          P(A vence) = Φ((S − 0,5)/sd)        B = compleme
 | `τ_sem_prior` | 0,10 | Heurístico. |
 | `τ_swing` | 0,04 | Heurístico; a escolha da regra de estrato único foi decidida na semente 555 e conferida em 31337 (abaixo). |
 | `f(fração)` | 1,8/1,4/1,15/1,0 | Escolhido olhando simulações base/hard — **sementes que também serviram de avaliação na época (vazamento)**. |
-| 10% / 30% | limiares | Heurísticos de produto. |
+| `k` (só na chance) | 1,4 | Escolhido na semente 555 entre 1,0/1,4/1,7/2,0 (melhor Brier nos cenários hard e adverso); conferido na 31337 (tabela abaixo). |
+| 10% / 50% | limiares | Heurísticos de produto. Chance subiu de 30% para 50% em 17/10 por causa da calibração nos cenários hard/adverso (tabela abaixo). |
 
 **Nenhum parâmetro foi calibrado em eleição real.** O simulador usa eleitorado e voto por UF do 2T de 2022 e uma ordem regional de apuração Sul/Sudeste → Norte/Nordeste, mas a sequência real de parciais de 2022 não foi reproduzida.
 
@@ -376,6 +377,14 @@ Governador (estrato único, UFs AC/AM/DF/ES/RN/TO, disputas recentradas perto de
 | base | 0,79 → **0,72** pp | 0,047 → **0,044** | 81% → 93% / 96% (ambas subconfiantes) |
 | hard | 1,48 → **1,28** pp | 0,078 → **0,070** | 81% → 78% / **85%** |
 | adverso | 2,17 → **1,81** pp | 0,106 → **0,094** | 81% → 66% / **79%** |
+
+**Chance a partir de 50% apurado, com `k`** (semente de relatório 31337, só ≥50%, 1.500 previsões por cenário), favorito previsto 70–90% → venceu:
+
+| | k = 1,0 | k = 1,4 (atual) | Brier 1,0 → 1,4 |
+|---|---|---|---|
+| base | 82% → 79% | 82% → 90% (cauteloso) | 0,0270 → 0,0285 |
+| hard | 81% → **71%** | 81% → 84% | 0,0441 → 0,0440 |
+| adverso | 82% → **68%** | 81% → 81% | 0,0625 → 0,0611 |
 
 Leave-one-out no swing (Presidente): efeito nulo dentro do erro de simulação → desligado (`DELTA_LOO = False`).
 

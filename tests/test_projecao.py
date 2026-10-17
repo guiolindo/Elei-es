@@ -42,9 +42,10 @@ def test_corrige_vies_de_ordem_regional_estilo_2022():
     assert p.p_vitoria_a > 0.9
 
 
-def test_probabilidade_so_exibida_a_partir_de_30pct():
-    assert projetar_2t([e(1_000_000, 0.25, 0.55, 0.55)]).exibir_probabilidade is False
-    assert projetar_2t([e(1_000_000, 0.35, 0.55, 0.55)]).exibir_probabilidade is True
+def test_probabilidade_so_exibida_a_partir_de_50pct():
+    assert projetar_2t([e(1_000_000, 0.35, 0.55, 0.55)]).exibir_probabilidade is False
+    assert projetar_2t([e(1_000_000, 0.49, 0.55, 0.55)]).exibir_probabilidade is False
+    assert projetar_2t([e(1_000_000, 0.55, 0.55, 0.55)]).exibir_probabilidade is True
 
 
 def test_estrato_unico_usa_o_1t_sem_contar_o_parcial_duas_vezes():
@@ -66,6 +67,16 @@ def test_varios_estratos_mantem_o_swing_nacional():
     """Presidente: com outros estratos o comportamento é o validado (δ entra)."""
     a = projetar_2t([e(10_000_000, 0.5, 0.537, 0.52), e(10_000_000, 0.5, 0.537, 0.52)])
     assert abs(a.pct_a - 53.7) < 0.05  # q = p+δ em todos → projeta o observado
+
+
+def test_chance_usa_incerteza_mais_larga_que_o_ic95():
+    """A chance usa sd × FATOR_SD_PROB; o IC95 continua com o sd puro."""
+    from math_engine import projecao as PM
+    p = projetar_2t([e(10_000_000, 0.6, 0.515, 0.51), e(8_000_000, 0.6, 0.52, 0.51)])
+    S, sd = p.pct_a / 100, p.sd_pp / 100
+    assert abs(p.p_vitoria_a - PM._phi((S - 0.5) / (sd * PM.FATOR_SD_PROB))) < 1e-12
+    assert abs((p.ic95_a[1] - p.ic95_a[0]) / 2 - 196 * sd) < 1e-6
+    assert p.p_vitoria_a < PM._phi((S - 0.5) / sd)
 
 
 def test_intervalo_estreita_com_mais_apurado():
