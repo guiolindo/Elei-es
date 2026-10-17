@@ -150,6 +150,8 @@ function _sincronizarClasseTurno() {
 function alternarModoTV() {
   const ativar = !document.body.classList.contains("is-tv");
   document.body.classList.toggle("is-tv", ativar);
+  // O botão sempre prometeu "TV" — agora entra em tela cheia de verdade.
+  if (ativar) entrarTelaCheia(); else sairTelaCheia();
   try { localStorage.setItem(TV_KEY, ativar ? "1" : "0"); } catch(e) {}
   atualizarBotaoTV();
   // CSS do grid demora alguns ms pra aplicar; re-renderiza ECharts
@@ -186,7 +188,13 @@ function atualizarBotaoTV() {
   const ativo = document.body.classList.contains("is-tv");
   b.setAttribute("aria-pressed", ativo ? "true" : "false");
   b.textContent = ativo ? "📺 Sair do modo TV" : "📺 Modo TV";
+  // Modo TV sem tela cheia (voltou de um recarregamento, ou a pessoa
+  // apertou Esc): botão pra voltar à tela cheia com um clique.
+  const fs = document.getElementById("btn-tela-cheia");
+  if (fs) fs.hidden = !ativo || !!document.fullscreenElement
+    || !(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
 }
+document.addEventListener("fullscreenchange", () => atualizarBotaoTV());
 
 // Relógio BRT no topo — formata sempre em America/Sao_Paulo, independente
 // do fuso do navegador do usuário (um brasileiro acessando de Londres
@@ -3060,15 +3068,20 @@ function abrirAjuda() {
   modal.classList.remove("oculto");
 }
 
-// ============ UX: modo TV (foco no líder) ============
-function toggleModoTV() {
-  document.body.classList.toggle("modo-tv");
-  const isTV = document.body.classList.contains("modo-tv");
-  if (isTV && document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen().catch(() => {});
-  } else if (!isTV && document.fullscreenElement) {
-    document.exitFullscreen().catch(() => {});
-  }
+// ============ UX: modo TV — tecla "f" = mesmo que o botão ============
+function toggleModoTV() { alternarModoTV(); }
+
+// Tela cheia do navegador. Só funciona a partir de um clique/tecla (regra
+// do navegador) — por isso fica nos handlers de botão, nunca no boot.
+function entrarTelaCheia() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req || document.fullscreenElement) return;
+  try { const r = req.call(el); if (r?.catch) r.catch(() => {}); } catch (e) {}
+}
+function sairTelaCheia() {
+  if (!document.fullscreenElement) return;
+  try { const r = (document.exitFullscreen || document.webkitExitFullscreen).call(document); if (r?.catch) r.catch(() => {}); } catch (e) {}
 }
 
 // ============ MOBILE APP CHROME ============
@@ -3411,6 +3424,8 @@ async function boot() {
   bootMobile();
   navTVPorSetas();  // só ativa se body.is-tv
   document.getElementById("btn-tv")?.addEventListener("click", alternarModoTV);
+  document.getElementById("btn-tela-cheia")?.addEventListener("click", entrarTelaCheia);
+  atualizarBotaoTV();
   atualizarBotaoTV();
 }
 

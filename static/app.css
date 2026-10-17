@@ -3143,3 +3143,5 @@ body.duelo-2t:not(.is-tv) main.page > #lista-candidatos { display: none !importa
 .tv2t-proj-espera { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
 .tv2t-proj-espera .tv2t-proj-barra { height: 4px; }
 .tv2t-proj-pendente .tv2t-proj-pct { color: var(--muted); opacity: .7; }
+.rodape-tv .btn-ghost[hidden] { display: none; }
+body.is-tv #btn-tela-cheia { margin-right: 8px; }
