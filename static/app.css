@@ -3507,3 +3507,16 @@ body.tv-quadro .tvq-slot #mapa-brasil { background: none !important; border: 0 !
 .tvq-est > .tvq-rot { position: static !important; display: block; margin-bottom: calc(8 * var(--u)); }
 body.tv-quadro .hero { background: #0b1325 !important; }
 body.tv-quadro .hero .hero-bg { display: none; }
+/* Hora do último dado do TSE no topo do quadro */
+.tvq-tse {
+  display: flex; align-items: baseline; gap: calc(10 * var(--u)); white-space: nowrap;
+  padding-left: calc(24 * var(--u)); border-left: calc(2 * var(--u)) solid var(--tvq-linha);
+  font: 600 calc(18 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); letter-spacing: .06em; text-transform: uppercase;
+}
+.tvq-tse:empty { display: none; }
+.tvq-tse strong { font: 700 calc(30 * var(--u)) var(--tvq-cond); color: var(--tvq-txt); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.tvq-tse em { font-style: normal; text-transform: none; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.tvq-tse.stale-fresh em { color: #22c55e; }
+.tvq-tse.stale-warn em { color: var(--tvq-ouro); }
+.tvq-tse.stale-stale em { color: #ff6b72; }
+.tvq-barra { width: calc(200 * var(--u)); }

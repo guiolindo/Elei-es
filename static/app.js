@@ -399,6 +399,15 @@ function tickUltimoRelativo() {
       parent.classList.add(andando ? classeStaleness(iso) : "stale-sem");
     }
   }
+  // Quadro da TV: "TSE 20:41:58 · há 15 s", com a mesma cor de atraso.
+  const q = document.getElementById("tvq-tse");
+  if (q && document.body.classList.contains("tv-quadro")) {
+    const pct = state.ultimoSnapshot?.totais?.pct_apurado || 0;
+    const andando = pct > 0 && pct < 100;
+    q.innerHTML = `<span>Dado TSE</span><strong>${fmtHora(iso)}</strong>`
+      + (andando && txt ? `<em>${txt}</em>` : "");
+    q.className = "tvq-tse " + (andando ? classeStaleness(iso) : "stale-sem");
+  }
 }
 
 // Navegação por setas do controle remoto em modo TV. Os cards de
