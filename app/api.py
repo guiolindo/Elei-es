@@ -1556,6 +1556,46 @@ async def reparsear_snapshots(sess: AsyncSession = Depends(get_session)) -> dict
             "total_snapshots": len(snaps)}
 
 
+@router.post("/admin/reclassificar-suspeitos", dependencies=[Depends(_exigir_admin)])
+async def reclassificar_suspeitos(
+    aplicar: bool = Query(False, description="false = só simula (padrão)"),
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Até 17/10/2026 o poller comparava o 1º snapshot do 2T com o último
+    do 1T (100% apurado) e o marcava `suspeito` por "retrocesso". Como o
+    poller deduplica por hash, o arquivo ficava escondido até o TSE
+    publicar outra versão. Refaz a regra (totalizadas < snapshot anterior)
+    só dentro do MESMO turno e desmarca quem não deveria estar suspeito."""
+    rows = (await sess.execute(
+        select(Snapshot.id, Snapshot.cod_cargo, Snapshot.abrangencia, Snapshot.turno,
+               Snapshot.coletado_em, SnapshotTotais.qt_secoes_totalizadas)
+        .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
+        .where(Snapshot.suspeito.is_(True))
+    )).all()
+    corrigir = []
+    for r in rows:
+        anterior = (await sess.execute(
+            select(SnapshotTotais.qt_secoes_totalizadas)
+            .join(Snapshot, Snapshot.id == SnapshotTotais.snapshot_id)
+            .where(Snapshot.cod_cargo == r.cod_cargo, Snapshot.abrangencia == r.abrangencia,
+                   Snapshot.turno == r.turno, Snapshot.coletado_em < r.coletado_em)
+            .order_by(Snapshot.coletado_em.desc()).limit(1)
+        )).scalar_one_or_none()
+        if anterior is None or (r.qt_secoes_totalizadas or 0) >= anterior:
+            corrigir.append(r)
+    if aplicar and corrigir:
+        from sqlalchemy import update
+        await sess.execute(update(Snapshot).where(Snapshot.id.in_([r.id for r in corrigir]))
+                           .values(suspeito=False))
+        await sess.commit()
+    return {
+        "ok": True, "aplicado": aplicar,
+        "suspeitos_total": len(rows), "reclassificaveis": len(corrigir),
+        "exemplos": [{"id": r.id, "cargo": r.cod_cargo, "abr": r.abrangencia, "turno": r.turno}
+                     for r in corrigir[:60]],
+    }
+
+
 @router.post("/admin/limpar-eventos-pre-apuracao", dependencies=[Depends(_exigir_admin)])
 async def limpar_eventos_pre_apuracao(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Apaga eventos (VIRADA, ELEITO, etc) emitidos em snapshots com 0
