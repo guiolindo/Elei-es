@@ -153,6 +153,7 @@ function alternarModoTV() {
   // O botão sempre prometeu "TV" — agora entra em tela cheia de verdade.
   if (ativar) entrarTelaCheia();
   else { sairTelaCheia(); try { localStorage.removeItem(FS_KEY); } catch (e) {} }
+  try { aplicarQuadroTV(); } catch (e) { console.error(e); }
   try { localStorage.setItem(TV_KEY, ativar ? "1" : "0"); } catch(e) {}
   atualizarBotaoTV();
   // CSS do grid demora alguns ms pra aplicar; re-renderiza ECharts
@@ -212,6 +213,8 @@ function tickRelogio() {
   if (!el) return;
   el.textContent = _fmtRelogio.format(new Date());
   el.setAttribute("datetime", new Date().toISOString());
+  const q = document.getElementById("tvq-relogio");
+  if (q) q.innerHTML = `${el.textContent}<small>BRT</small>`;
 }
 function iniciarRelogio() {
   tickRelogio();
@@ -2031,26 +2034,37 @@ async function atualizarGrafHome() {
   // plot. Antes virava "listra" porque bottom:44 + containLabel comia
   // metade da altura disponível.
   const estreito = window.innerWidth < 640;
+  // Quadro da TV: sem legenda (os nomes estão no placar), letras e linhas
+  // na escala do quadro, linha tracejada nos 50%.
+  const quadro = document.body.classList.contains("tv-quadro");
+  const esc = quadro ? Math.max(0.45, Math.min(innerWidth / 1920, innerHeight / 1080)) : 1;
+  if (quadro) {
+    series.forEach(s => { s.lineStyle = { ...s.lineStyle, width: Math.max(2, 4 * esc) }; });
+    if (series[0]) series[0].markLine = { symbol: "none", silent: true, label: { show: false },
+      lineStyle: { color: "#56627a", type: "dashed", width: 1 }, data: [{ yAxis: 50 }] };
+  }
   _grafHome.setOption({
     backgroundColor: "transparent",
     textStyle: { fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" },
     tooltip: { trigger: "axis", formatter: tooltipHoraBRT,
                 backgroundColor: "#161b24", borderColor: "#303a4d",
                 textStyle: { color: "#ecf0f7" } },
-    legend: estreito
+    legend: quadro ? { show: false } : estreito
       ? { textStyle: { color: "#94a1b8", fontSize: 10 }, top: 4,
           type: "scroll", icon: "circle", itemGap: 10,
           itemWidth: 10, itemHeight: 10, pageIconSize: 10,
           pageTextStyle: { color: "#94a1b8", fontSize: 9 } }
       : { textStyle: { color: "#94a1b8" }, top: 0, type: "scroll" },
-    grid: estreito
+    grid: quadro
+      ? { left: 64 * esc, right: 18 * esc, top: 16 * esc, bottom: 34 * esc }
+      : estreito
       ? { left: 44, right: 14, top: 28, bottom: 24 }
       : { left: 48, right: 16, top: 36, bottom: 32 },
     xAxis: {
       type: "time",
       axisLabel: {
         color: "#94a1b8",
-        fontSize: estreito ? 9 : 12,
+        fontSize: quadro ? Math.round(17 * esc) : estreito ? 9 : 12,
         hideOverlap: true,
         formatter: (val) => new Date(val).toLocaleTimeString("pt-BR",
           { timeZone: TZ, hour: "2-digit", minute: "2-digit" }),
@@ -2061,12 +2075,12 @@ async function atualizarGrafHome() {
       // Escala pelos dados: no 2º turno as linhas ficam perto de 50% e,
       // num eixo 0–100, viravam duas retas coladas.
       scale: true,
-      axisLabel: { color: "#94a1b8", fontSize: estreito ? 10 : 12,
+      axisLabel: { color: "#94a1b8", fontSize: quadro ? Math.round(17 * esc) : estreito ? 10 : 12,
                    formatter: "{value}%" },
       splitLine: { lineStyle: { color: "#2a3242" } },
     },
     series,
-  });
+  }, true);  // notMerge: entrar/sair do quadro da TV não deixa sobra de opções
 }
 
 function renderLegenda(leg, dados, texto) {
@@ -2078,6 +2092,7 @@ function renderLegenda(leg, dados, texto) {
     atual.n += 1;
     nomes.set(d.nome_lider, atual);
   }
+  if (texto.unidade) state.contagemMapa = { unidade: texto.unidade, nomes };
   if (nomes.size) {
     const un = texto.unidade || "";
     leg.innerHTML = `<h3>${texto.tituloCheio}</h3>` +
@@ -2140,6 +2155,7 @@ async function carregarEventos() {
   state.eleitos.clear();
   state.segundoTurno.clear();
   evs.forEach(_absorverEventoNoState);
+  state.eventosLista = evs;
   // Vitória que a pessoa ainda não viu neste aparelho (tela estava apagada,
   // a aba foi recarregada pelo navegador, conexão caiu): troféu agora.
   for (const ev of evs) {
@@ -2163,7 +2179,7 @@ async function carregarEventos() {
     // [data-sq=...], então é no-op se não tiver dados ainda.
     if (state.ultimoSnapshot?.disponivel) atualizarPainelTotais();
   }
-  try { renderDuelo(); renderProjecaoPainel(); } catch (e) {}  // selo "eleito" no duelo
+  try { renderDuelo(); renderProjecaoPainel(); renderTVQuadro(); } catch (e) {}  // selo "eleito"
   const ul = $("lista-eventos");
   if (evs.length === 0) {
     const comecou = (state.ultimoSnapshot?.totais?.pct_apurado || 0) > 0;
@@ -2275,6 +2291,7 @@ async function refreshApuracao() {
   try { renderProjecaoTV(); } catch(e) {}
   try { renderProjecaoPainel(); } catch(e) {}
   try { renderDuelo(); } catch(e) {}
+  try { aplicarQuadroTV(); } catch(e) { console.error(e); }
 }
 
 // Bloco "Projeção para 100%" do placar TV 2T. Mostra % projetado,
@@ -3091,6 +3108,224 @@ function abrirAjuda() {
   card.innerHTML = html;
   modal.classList.remove("oculto");
 }
+
+// ============ Modo TV — quadro de transmissão (2º turno) ============
+// No 2º turno (dois candidatos) o modo TV vira um quadro 16:9 fixo, estilo
+// telejornal, que escala inteiro (1 unidade = 1px a 1920×1080): a mesma
+// composição em 960×540 ou 1920×1080. Mapa e gráfico são os do site,
+// "emprestados" pro quadro e devolvidos ao sair — continuam atualizando
+// pela mesma lógica. Controles (turno/cargo/UF/sair) ficam escondidos e
+// descem do topo com o mouse lá em cima ou uma tecla do controle.
+function quadroTVAtivo() {
+  if (!document.body.classList.contains("is-tv") || state.turno !== 2) return false;
+  return (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo").length === 2;
+}
+const _emprestimos = [];
+function emprestar(el, destino) {
+  if (!el || !destino || el.parentElement === destino) return;
+  _emprestimos.push([el, el.parentElement, el.nextSibling]);
+  destino.appendChild(el);
+}
+function devolverEmprestimos() {
+  while (_emprestimos.length) {
+    const [el, pai, prox] = _emprestimos.pop();
+    pai.insertBefore(el, prox && prox.parentElement === pai ? prox : null);
+  }
+}
+function aplicarQuadroTV() {
+  const box = $("tv-quadro");
+  if (!box) return;
+  const ativo = quadroTVAtivo();
+  const era = document.body.classList.contains("tv-quadro");
+  box.hidden = !ativo;
+  document.body.classList.toggle("tv-quadro", ativo);
+  if (ativo && !era) {
+    emprestar($("mapa-brasil"), $("tvq-mapa-slot"));
+    emprestar($("mapa-legenda"), $("tvq-mapa-slot"));
+    emprestar(document.querySelector(".home-graf-wrap"), $("tvq-graf-slot"));
+  } else if (!ativo && era) {
+    devolverEmprestimos();
+    document.body.classList.remove("tv-controles");
+  }
+  if (ativo !== era) {
+    _tickerChave = null;
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+      try { atualizarMapa(); } catch (e) {}
+      try { atualizarGrafHome(); } catch (e) {}
+    });
+  }
+  if (ativo) renderTVQuadro();
+}
+
+function renderTVQuadro() {
+  if (!document.body.classList.contains("tv-quadro")) return;
+  const snap = state.ultimoSnapshot || {};
+  const t = snap.totais || {};
+  const pct = t.pct_apurado || 0;
+  const comecou = !!snap.disponivel && pct > 0;
+  $("tvq-vivo").hidden = !(comecou && pct < 100);
+  $("tvq-titulo").innerHTML = `<b>2º turno</b> · ${state.cargo === 1 ? "Presidente da República" : `Governador · ${state.abrangencia}`}`;
+  $("tvq-pct").textContent = `${dec(pct, 2)}%`;
+  $("tvq-barra").style.transform = `scaleX(${Math.min(1, pct / 100)})`;
+  $("tvq-mapa-rot").textContent = state.abrangencia === "BR" ? "Quem lidera em cada estado" : "Quem lidera em cada município";
+  $("tvq-graf-rot").textContent = comecou ? "Evolução dos válidos (%)" : "Contagem regressiva";
+
+  // ---- placar (estrutura refeita só quando a dupla muda; números sempre)
+  const ativos = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo")
+    .sort((x, y) => (x.numero || 0) - (y.numero || 0));
+  if (ativos.length !== 2) return;
+  const placar = $("tvq-placar");
+  const chave = ativos.map(c => c.sq_candidato).join(",");
+  if (placar.dataset.chave !== chave) {
+    const lado = (c, i) => {
+      const cor = corPartido(c.partido);
+      return `<div class="tvq-lado ${i ? "dir" : ""}" data-sq="${c.sq_candidato}" style="--cor:${cor};--cor-txt:${corLegivel(cor, "#0d1424")}">
+        <div class="tvq-foto-box"><img class="tvq-foto" src="${c.foto}" alt=""></div>
+        <div class="tvq-id"><div class="tvq-nome">${c.nome_urna}</div>
+          <div class="tvq-part"><span class="tvq-numero">${c.numero}</span>${siglaDoPartido(+c.partido) || ""}</div></div>
+        <div class="tvq-valores"><div class="tvq-pct"></div><div class="tvq-votos"></div></div>
+      </div>`;
+    };
+    placar.innerHTML = lado(ativos[0], 0)
+      + `<div class="tvq-centro"><span class="tvq-meio" id="tvq-dif-rot">Diferença</span><span class="tvq-dif" id="tvq-dif"></span>
+          <div class="tvq-split" aria-hidden="true"><i id="tvq-split-a"></i><i id="tvq-split-b"></i></div>
+          <span class="tvq-meio">50% dos válidos</span></div>`
+      + lado(ativos[1], 1);
+    placar.dataset.chave = chave;
+    placar.querySelectorAll(".tvq-foto").forEach((img, i) =>
+      anexarFotoComRetry(img, ativos[i].nome_urna, ativos[i].partido));
+  }
+  const porSq = new Map((snap.candidatos || []).map(c => [c.sq_candidato, c]));
+  const v = ativos.map(c => porSq.get(c.sq_candidato) || { votos: 0, pct_validos: 0 });
+  const liderIdx = comecou && v[0].votos !== v[1].votos ? (v[0].votos > v[1].votos ? 0 : 1) : -1;
+  placar.querySelectorAll(".tvq-lado").forEach((el, i) => {
+    el.classList.toggle("lider", i === liderIdx);
+    el.classList.toggle("eleito", state.eleitos.has(ativos[i].sq_candidato));
+    el.querySelector(".tvq-pct").innerHTML = comecou ? `${dec(v[i].pct_validos, 2)}<small>%</small>` : "—";
+    el.querySelector(".tvq-votos").textContent = comecou ? `${fmtNum(v[i].votos)} votos` : "aguardando";
+  });
+  const tot = v[0].pct_validos + v[1].pct_validos;
+  const wA = comecou && tot > 0 ? v[0].pct_validos / tot * 100 : 50;
+  $("tvq-split-a").style.cssText = `flex-basis:${wA}%;background:${comecou ? corPartido(ativos[0].partido) : "#1a2440"}`;
+  $("tvq-split-b").style.cssText = `flex-basis:${100 - wA}%;background:${comecou ? corPartido(ativos[1].partido) : "#1a2440"}`;
+  const eleito = ativos.find(c => state.eleitos.has(c.sq_candidato));
+  $("tvq-dif-rot").textContent = eleito ? "Eleito" : (comecou ? "Diferença" : "A apuração começa");
+  $("tvq-dif").innerHTML = eleito
+    ? `${(state.ficha[eleito.sq_candidato]?.nome_urna || eleito.nome_urna)}`
+    : comecou
+      ? `${fmtNum(Math.abs(v[0].votos - v[1].votos))} <small>votos · ${dec(Math.abs(v[0].pct_validos - v[1].pct_validos), 2)} ponto${Math.abs(v[0].pct_validos - v[1].pct_validos) >= 2 ? "s" : ""}</small>`
+      : `${DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" })} <small>às 17h (Brasília)</small>`;
+
+  renderEstimativaQuadro(ativos, pct, !!eleito);
+  renderTickerQuadro(ativos, v, comecou, pct, t);
+}
+
+function renderEstimativaQuadro(ativos, pct, decidido) {
+  const box = $("tvq-est");
+  const tit = `<div class="tvq-rot">Estimativa para 100% apurado <span class="tvq-selo">não oficial</span></div>`;
+  if (decidido || pct >= 100) {
+    box.innerHTML = tit + `<p class="tvq-est-msg">${decidido
+      ? "Resultado decidido: os votos que faltam não mudam mais o vencedor."
+      : "Apuração encerrada: vale o resultado oficial."}</p>`;
+    return;
+  }
+  const pj = state.projecao;
+  const linha = (c, val, chance) => {
+    const cor = corPartido(c.partido);
+    return `<div class="tvq-est-l"><span class="tvq-est-n" style="border-color:${cor}">${c.nome_urna}</span>${val}${chance}</div>`;
+  };
+  if (!pj?.disponivel) {
+    box.innerHTML = tit + `<p class="tvq-est-espera">Começa com 10% apurado${pct > 0 ? ` · agora ${dec(pct, 1)}%` : ""}</p>`
+      + ativos.map(c => linha(c, `<span class="tvq-est-p tvq-mudo">≈ —</span>`, `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 50%</span></span>`)).join("");
+    return;
+  }
+  const porSq = new Map(pj.candidatos.map(c => [c.sq_candidato, c]));
+  box.innerHTML = tit + ativos.map(c => {
+    const e = porSq.get(c.sq_candidato);
+    if (!e) return "";
+    const m = (e.ic95[1] - e.ic95[0]) / 2;
+    const chance = e.p_vitoria != null
+      ? `<span class="tvq-est-c">${Math.round(e.p_vitoria * 100)}%<span>chance</span></span>`
+      : `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 50%</span></span>`;
+    return linha(c, `<span class="tvq-est-p">≈${dec(e.pct, 1)}<small>± ${dec(m, 1)}</small></span>`, chance);
+  }).join("");
+}
+
+// Letreiro "ÚLTIMAS": viradas/eleitos + situação da apuração, passando da
+// direita pra esquerda em loop. Só reconstrói quando o texto muda (senão a
+// animação reiniciaria a cada atualização).
+let _tickerChave = null;
+function renderTickerQuadro(ativos, v, comecou, pct, t) {
+  const fita = $("tvq-fita");
+  if (!fita) return;
+  const nome = sq => state.ficha[sq]?.nome_urna || "";
+  const itens = [];
+  const evs = (state.eventosLista || []).filter(e => e.tipo !== "MATEMATICAMENTE_ELIMINADO").slice(-8).reverse();
+  for (const ev of evs) {
+    const h = ev.ocorrido_em ? fmtHora(ev.ocorrido_em).slice(0, 5) : "";
+    let txt = "";
+    if (ev.tipo === "VIRADA") txt = `${nome(ev.sq_candidato_a)} passa ${nome(ev.sq_candidato_b)}`;
+    else if (TIPOS_ELEITO.has(ev.tipo)) txt = `${nome(ev.sq_candidato_a)} é eleito(a) — os votos que faltam não mudam o resultado`;
+    else continue;
+    itens.push(`${h ? `<time>${h}</time>` : ""}${txt}`);
+  }
+  if (comecou) {
+    itens.push(`${dec(pct, 2)}% apurado · ${fmtNum(t.secoes_totalizadas || 0)} de ${fmtNum(t.secoes_total || 0)} seções`);
+    const cm = state.contagemMapa;
+    if (cm?.nomes?.size) {
+      const partes = [...cm.nomes.entries()].sort((a, b) => b[1].n - a[1].n)
+        .map(([n, { n: k }]) => `${n} em ${k} ${cm.unidade === "UF" ? (k === 1 ? "estado" : "estados") : (k === 1 ? "município" : "municípios")}`);
+      itens.push(`Lidera: ${partes.join(" · ")}`);
+    }
+    const i = v[0].votos >= v[1].votos ? 0 : 1;
+    if (v[0].votos !== v[1].votos) itens.push(`${ativos[i].nome_urna} à frente por ${fmtNum(Math.abs(v[0].votos - v[1].votos))} votos`);
+  } else {
+    itens.push(`A apuração do 2º turno começa domingo, ${DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" })}, às 17h (Brasília)`);
+    itens.push(`${ativos[0].nome_urna} (${ativos[0].numero}) × ${ativos[1].nome_urna} (${ativos[1].numero})`);
+  }
+  itens.push("Resultado oficial: resultados.tse.jus.br");
+  const chave = itens.join("|") + "|" + innerWidth;
+  if (chave === _tickerChave) return;
+  _tickerChave = chave;
+  const um = itens.map(x => `<span class="tvq-item">${x}</span><span class="tvq-sep" aria-hidden="true">◆</span>`).join("");
+  fita.innerHTML = `<span class="tvq-copia">${um}</span><span class="tvq-copia" aria-hidden="true">${um}</span>`;
+  // Velocidade constante (~110 px/s num quadro de 1920) seja qual for o texto.
+  requestAnimationFrame(() => {
+    const largura = fita.firstElementChild?.offsetWidth || 1000;
+    const escala = ($("tv-quadro")?.firstElementChild?.offsetWidth || 1920) / 1920;
+    fita.style.setProperty("--tvq-dur", `${Math.max(20, largura / (110 * escala))}s`);
+  });
+}
+window.addEventListener("resize", () => { _tickerChave = null; try { renderTVQuadro(); } catch (e) {} });
+
+// Controles escondidos: descem do topo com o mouse lá em cima, um toque
+// no topo ou uma tecla do controle remoto; somem sozinhos depois.
+let _tvCtlTimer = null;
+function mostrarControlesTV(ms = 4000) {
+  if (!document.body.classList.contains("tv-quadro")) return;
+  document.body.classList.add("tv-controles");
+  clearTimeout(_tvCtlTimer);
+  _tvCtlTimer = setTimeout(esconderControlesTV, ms);
+}
+function esconderControlesTV() {
+  const hero = document.querySelector(".hero");
+  const focoDentro = hero && hero.contains(document.activeElement) && document.activeElement !== document.body;
+  if (hero?.matches(":hover") || focoDentro || document.querySelector(".rodape-tv:hover")) {
+    _tvCtlTimer = setTimeout(esconderControlesTV, 1500);
+    return;
+  }
+  document.body.classList.remove("tv-controles");
+}
+document.addEventListener("mousemove", (e) => {
+  if (e.clientY < Math.max(70, innerHeight * 0.12)) mostrarControlesTV();
+});
+document.addEventListener("pointerdown", (e) => {
+  if (e.clientY < innerHeight * 0.15) mostrarControlesTV(6000);
+});
+document.addEventListener("keydown", (e) => {
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Tab", "Escape", "m"].includes(e.key)) mostrarControlesTV(6000);
+});
 
 // ============ UX: modo TV — tecla "f" = mesmo que o botão ============
 function toggleModoTV() { alternarModoTV(); }

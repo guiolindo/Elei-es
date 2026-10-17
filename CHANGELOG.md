@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Modo TV — quadro de transmissão (18/10)
+- No 2º turno o modo TV vira um quadro 16:9 estilo telejornal que escala inteiro (mesma composição em 960×540 e 1920×1080): faixa "AO VIVO" + % apurado + relógio; placar de dois lados com barra e marca dos 50%; mapa com placar de estados; estimativa; gráfico de evolução; letreiro "ÚLTIMAS" correndo. Controles (turno, cargo, UF, sair) escondidos — descem com o mouse no topo, toque no topo ou tecla do controle. Mapa e gráfico são os do site, emprestados ao quadro e devolvidos ao sair.
+- Corrige TV 32" (navegador ~960×540) com blocos sobrepostos.
+
 ## 2026-10-12 / 2026-10-17 — Preparação do 2º turno (25/10)
 
 ### Adicionado
