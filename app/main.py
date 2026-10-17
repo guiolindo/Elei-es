@@ -235,6 +235,31 @@ def create_app() -> FastAPI:
             from starlette.responses import JSONResponse
             return JSONResponse({"ok": False, "erro": str(e)[:200]}, status_code=503)
 
+    # Versão do que roda no navegador: hash do conteúdo dos arquivos do
+    # front. Deploy que só mexe no backend não muda isso, então não faz
+    # ninguém recarregar à toa. A página nasce com a versão num <meta> e
+    # pergunta /api/versao de tempos em tempos (static/app.js: checarVersao).
+    def _calcular_versao_front() -> str:
+        import hashlib
+        h = hashlib.sha256()
+        for raiz, _, arquivos in sorted(os.walk("static")):
+            for nome in sorted(arquivos):
+                if nome.endswith((".html", ".js", ".css")):
+                    try:
+                        with open(os.path.join(raiz, nome), "rb") as f:
+                            h.update(nome.encode()); h.update(f.read())
+                    except OSError:
+                        pass
+        return h.hexdigest()[:12]
+
+    VERSAO_FRONT = _calcular_versao_front()
+
+    @app.get("/api/versao")
+    async def versao():
+        from starlette.responses import JSONResponse
+        return JSONResponse({"versao": VERSAO_FRONT},
+                            headers={"Cache-Control": "no-store"})
+
     def _servir_html_com_versao(caminho: str) -> HTMLResponse:
         try:
             with open(caminho, "r", encoding="utf-8") as f:
@@ -250,6 +275,8 @@ def create_app() -> FastAPI:
                     rf'\1?v={v}',
                     html,
                 )
+            html = html.replace(
+                "</head>", f'<meta name="versao" content="{VERSAO_FRONT}"></head>', 1)
             return HTMLResponse(html)
         except OSError:
             return FileResponse(caminho)

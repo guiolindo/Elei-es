@@ -2505,6 +2505,9 @@ function conectarWS() {
     // inclusive o troféu, via carregarEventos → celebrarSeNovo.
     state.ultimaMsgWs = Date.now();
     refreshApuracao().then(carregarEventos).catch(() => {});
+    // Deploy derruba o WebSocket; ao reconectar é a hora de ver se o
+    // front mudou.
+    checarVersao();
   };
   const reconectar = () => {
     // Se o WS foi fechado intencionalmente (troca de cargo/UF),
@@ -3411,4 +3414,47 @@ async function boot() {
   atualizarBotaoTV();
 }
 
-boot().catch(e => { console.error(e); toast("Erro: " + e.message, "danger"); });
+boot().then(restaurarRolagem).catch(e => { console.error(e); toast("Erro: " + e.message, "danger"); });
+
+// ============ Atualização automática de versão ============
+// A página nasce com a versão do front num <meta> (app/main.py). Se um
+// deploy mudar o front, recarrega sozinha — na primeira hora em que não
+// atrapalha: sem troféu/ficha/menu aberto, sem digitar, fora da tela
+// cheia (navegador só volta pra tela cheia com clique). Cargo, UF, turno,
+// modo TV e aba já ficam salvos; a rolagem é guardada aqui.
+const VERSAO_PAGINA = document.querySelector('meta[name="versao"]')?.content || null;
+let _recarregando = false;
+async function checarVersao() {
+  if (!VERSAO_PAGINA || _recarregando) return;
+  let v = null;
+  try { v = (await (await fetch("/api/versao", { cache: "no-store" })).json()).versao; } catch (e) { return; }
+  if (!v || v === VERSAO_PAGINA) return;
+  // Trava de laço: se já recarregou por esta versão e ainda vem a antiga
+  // (deploy no meio da troca de instâncias), não insiste.
+  try {
+    if (sessionStorage.getItem("elei-es:recarregou-para") === v) return;
+    sessionStorage.setItem("elei-es:recarregou-para", v);
+  } catch (e) {}
+  _recarregando = true;
+  recarregarQuandoSeguro();
+}
+function recarregarQuandoSeguro() {
+  const ocupado = !document.hidden && (
+    document.querySelector(".modal-vitoria")
+    || !$("modal-cand")?.classList.contains("oculto")
+    || !$("m-sheet")?.classList.contains("oculto")
+    || document.activeElement?.matches?.("input, select, textarea"));
+  if (ocupado || document.fullscreenElement) { setTimeout(recarregarQuandoSeguro, 5000); return; }
+  try { sessionStorage.setItem("elei-es:rolagem", String(window.scrollY)); } catch (e) {}
+  location.reload();
+}
+function restaurarRolagem() {
+  try {
+    const y = sessionStorage.getItem("elei-es:rolagem");
+    if (y == null) return;
+    sessionStorage.removeItem("elei-es:rolagem");
+    requestAnimationFrame(() => window.scrollTo(0, Number(y) || 0));
+  } catch (e) {}
+}
+setInterval(() => { if (!document.hidden) checarVersao(); }, 120_000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checarVersao(); });

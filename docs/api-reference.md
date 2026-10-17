@@ -204,3 +204,8 @@ A mesma URL (`/`) adapta o layout automaticamente ao dispositivo:
 - **Mobile** (≤768px): tabs de bottom nav (Placar/Mapa/Comparar/Eventos/Mais), stats sticky encolhendo ao scroll, chrome compacto.
 - **Desktop** (769px+): layout clássico com hero + conteúdo em coluna.
 - **TV / 10-foot UI**: ativado quando `navigator.userAgent` casa SmartTV/Tizen/WebOS/AndroidTV/Roku/consoles, OU manualmente via `?tv=1`. Dashboard com lista de candidatos à esquerda e mapa + gráfico + eventos à direita (todos visíveis ao mesmo tempo), fontes maiores, navegação por setas do controle remoto (Home/End/←→↑↓), sem elementos que exigem toque ou mouse (botões "comparar", filtros, CTAs). Testável em qualquer browser via `?tv=1`.
+
+
+## `GET /api/versao`
+
+`{"versao": "d7e4ede344ef"}` — hash do conteúdo dos arquivos do front (`static/*.html|js|css`), calculado na subida do servidor. As páginas trazem o mesmo valor em `<meta name="versao">`; `static/app.js` (`checarVersao`) compara a cada 2 min, ao voltar pra aba e ao reconectar o WebSocket, e recarrega quando muda (esperando modal/campo/tela cheia). `Cache-Control: no-store`.
