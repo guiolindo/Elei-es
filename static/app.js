@@ -2125,6 +2125,11 @@ async function carregarEventos() {
   state.eleitos.clear();
   state.segundoTurno.clear();
   evs.forEach(_absorverEventoNoState);
+  // Vitória que a pessoa ainda não viu neste aparelho (tela estava apagada,
+  // a aba foi recarregada pelo navegador, conexão caiu): troféu agora.
+  for (const ev of evs) {
+    if (TIPOS_ELEITO.has(ev.tipo) && celebrarSeNovo(ev)) break;
+  }
   // Faixa persistente de "VENCEDOR" quando o usuário navega pra um cargo
   // já decidido: diferente do modal (one-shot ao vivo), fica no topo da
   // página enquanto a disputa estiver resolvida.
@@ -2461,6 +2466,7 @@ function statusProporcionalDe(sq) {
 }
 
 function conectarWS() {
+  clearTimeout(state.wsTimer);
   if (state.ws) {
     // Marca como "fechado intencional" pro handler onclose ignorar e
     // NÃO agendar reconnect. Senão fica agendando reconexão do WS
@@ -2474,8 +2480,11 @@ function conectarWS() {
   ws.onopen = () => {
     atualizarRotuloConexao(ws);
     state.wsRetry = 0;
-    // Puxa snapshot fresco assim que reconecta (evita "buraco" de eventos)
-    refreshApuracao().catch(() => {});
+    // Puxa snapshot E eventos assim que reconecta: o que aconteceu com a
+    // conexão caída (tela apagada, túnel, troca de rede) aparece agora —
+    // inclusive o troféu, via carregarEventos → celebrarSeNovo.
+    state.ultimaMsgWs = Date.now();
+    refreshApuracao().then(carregarEventos).catch(() => {});
   };
   const reconectar = () => {
     // Se o WS foi fechado intencionalmente (troca de cargo/UF),
@@ -2483,15 +2492,19 @@ function conectarWS() {
     if (ws.__intencional) return;
     $("conexao").querySelector(".dot").classList.remove("on");
     $("conexao-label").textContent = "reconectando…";
+    // Tela apagada/aba em segundo plano: não fica tentando (gasta bateria);
+    // o "visibilitychange" reconecta na hora em que a pessoa voltar.
+    if (document.hidden) return;
     // Backoff exponencial com jitter: 1s, 2s, 4s, 8s, 15s teto
     state.wsRetry = (state.wsRetry || 0) + 1;
     const base = Math.min(15000, 1000 * Math.pow(2, state.wsRetry - 1));
     const jitter = Math.floor(Math.random() * 500);
-    setTimeout(conectarWS, base + jitter);
+    state.wsTimer = setTimeout(conectarWS, base + jitter);
   };
   ws.onclose = reconectar;
   ws.onerror = () => { try { ws.close(); } catch(e){} };
   ws.onmessage = async (m) => {
+    state.ultimaMsgWs = Date.now();
     const msg = JSON.parse(m.data);
     if (msg.type === "snapshot") {
       await refreshApuracao();
@@ -2504,8 +2517,7 @@ function conectarWS() {
         const num = state.ficha[ev.sq_candidato_a]?.partido;
         const cor = num ? corDoPartido(num) : "#f0b429";
         if (TIPOS_ELEITO.has(ev.tipo)) {
-          comemorar(nome, cor);
-          abrirModalVitoria(ev.sq_candidato_a, cor);
+          celebrarSeNovo(ev);
         } else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
           toast(`2º turno matematicamente definido`, "ok");
           // Nova UF com 2T de Gov → refresca o dropdown pra ela aparecer
@@ -2866,6 +2878,58 @@ function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
   // fica o selo ELEITO no placar e a faixa "Vencedor" no topo.
   setTimeout(fechar, 10000);
 }
+
+// Troféu uma vez por vitória por aparelho. Chamado tanto pelo aviso ao
+// vivo (WebSocket) quanto ao recarregar os eventos — assim quem estava com
+// a tela apagada vê o troféu ao voltar, e ninguém vê o mesmo troféu duas
+// vezes. Vitórias com mais de 12h não disparam (quem chega no dia seguinte
+// vê a faixa "Vencedor", não a comemoração).
+const TROFEU_JANELA_MS = 12 * 3600 * 1000;
+const _trofeusVistos = new Set();
+function celebrarSeNovo(ev) {
+  if (!ev?.sq_candidato_a || document.hidden) return false;  // escondido: mostra ao voltar
+  if (document.querySelector(".modal-vitoria")) return false;
+  const quando = ev.ocorrido_em ? Date.parse(ev.ocorrido_em) : Date.now();
+  if (Date.now() - quando > TROFEU_JANELA_MS) return false;
+  const chave = `trofeu:${state.turno}:${state.cargo}:${state.abrangencia}:${ev.sq_candidato_a}`;
+  if (_trofeusVistos.has(chave)) return false;
+  try { if (localStorage.getItem(chave)) return false; } catch (e) {}
+  _trofeusVistos.add(chave);
+  try { localStorage.setItem(chave, String(Date.now())); } catch (e) {}
+  const nome = state.ficha[ev.sq_candidato_a]?.nome_urna || "";
+  const num = state.ficha[ev.sq_candidato_a]?.partido;
+  const cor = num ? corDoPartido(num) : "#f0b429";
+  comemorar(nome, cor);
+  abrirModalVitoria(ev.sq_candidato_a, cor);
+  return true;
+}
+
+// Tela do celular acendeu / voltou pra aba: a conexão ao vivo pode ter
+// caído (ou estar "aberta" mas morta). Atualiza na hora em vez de esperar.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+    state.wsRetry = 0;
+    conectarWS();  // onopen já puxa placar + eventos
+  } else {
+    refreshApuracao().then(carregarEventos).catch(() => {});
+  }
+});
+// Página restaurada do cache de navegação (voltar/avançar, iOS): idem.
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) { state.wsRetry = 0; conectarWS(); }
+});
+// Rede: se a conexão ao vivo ficar muda por 90s durante a apuração
+// (Wi-Fi ↔ 4G costuma deixar o socket "aberto" sem entregar nada),
+// busca direto. O TSE atualiza bem antes disso nessa fase.
+setInterval(() => {
+  if (document.hidden) return;
+  const pct = state.ultimoSnapshot?.totais?.pct_apurado || 0;
+  if (pct <= 0 || pct >= 100) return;
+  if (Date.now() - (state.ultimaMsgWs || 0) < 90_000) return;
+  state.ultimaMsgWs = Date.now();
+  refreshApuracao().then(carregarEventos).catch(() => {});
+}, 30_000);
 
 function comemorar(nome, cor = "#f0b429") {
   // Confete simples via canvas (leve, sem dependência externa)
