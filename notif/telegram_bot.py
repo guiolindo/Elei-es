@@ -153,8 +153,9 @@ def _parse_cargo_uf(args: list[str], default_cargo: int = 1) -> tuple[int, str]:
     /pct presidente / /pct 1 SP / /pct SP / /pct governador RJ"""
     cargo = default_cargo
     uf = "BR"
+    # Sem "df" pra Dep. Federal: DF é o Distrito Federal (que tem 2º turno).
     mapa = {"presidente": 1, "pres": 1, "governador": 3, "gov": 3,
-            "senador": 5, "sen": 5, "deputado": 6, "df": 6, "dep": 6,
+            "senador": 5, "sen": 5, "deputado": 6, "dep": 6, "federal": 6,
             "estadual": 7, "de": 7}
     for a in args:
         s = a.strip().lower()
@@ -397,8 +398,24 @@ def _barra(pct: float, largura: int = 12) -> str:
 
 # ================== comandos de consulta ==================
 
+async def _pedir_uf(client, chat_id: int, cargo: int, args: list[str]) -> bool:
+    """Cargo estadual sem UF: pergunta o estado (antes caía calado em SP)."""
+    if cargo == 1 or any(a.upper() in UFS for a in args):
+        return False
+    ufs = None
+    if cargo == 3 and _turno_vigente() == 2 and not _parse_turno(args):
+        async with SessionLocal() as sess:
+            ufs = await _ufs_gov_2t(sess)
+    await _send(client, chat_id,
+                f"{CARGOS[cargo]} de qual estado?" + (" (com 2º turno)" if ufs else ""),
+                keyboard=_kb_escolher_uf("plcu", cargo, ufs))
+    return True
+
+
 async def cmd_pct(client, chat_id: int, args: list[str]) -> None:
     cargo, uf = _parse_cargo_uf(args)
+    if await _pedir_uf(client, chat_id, cargo, args):
+        return
     async with SessionLocal() as sess:
         turno, res, aviso = await _consultar(sess, cargo, uf, args)
     if aviso:
@@ -416,6 +433,8 @@ async def cmd_pct(client, chat_id: int, args: list[str]) -> None:
 
 async def cmd_placar(client, chat_id: int, args: list[str]) -> None:
     cargo, uf = _parse_cargo_uf(args)
+    if await _pedir_uf(client, chat_id, cargo, args):
+        return
     async with SessionLocal() as sess:
         turno, res, aviso = await _consultar(sess, cargo, uf, args)
         if aviso:
@@ -437,6 +456,8 @@ async def cmd_placar(client, chat_id: int, args: list[str]) -> None:
 
 async def cmd_lider(client, chat_id: int, args: list[str]) -> None:
     cargo, uf = _parse_cargo_uf(args)
+    if await _pedir_uf(client, chat_id, cargo, args):
+        return
     async with SessionLocal() as sess:
         turno, res, aviso = await _consultar(sess, cargo, uf, args)
         if aviso:
@@ -569,42 +590,54 @@ async def cmd_proporcional(client, chat_id: int, args: list[str], cargo: int = 6
         await _send(client, chat_id, f"Uso: /{'proporcional' if cargo==6 else 'estadual'} <uf>")
         return
     uf = args[0].upper()
-    try:
-        from math_engine.proporcional import calcular_apuracao_proporcional
-    except Exception:
-        await _send(client, chat_id, "Motor proporcional indisponível.")
-        return
+    # Mesmo cálculo de /api/apuracao/proporcional (QE, barreira, sobras,
+    # federações). Antes importava uma função que não existe e o comando
+    # sempre respondia "indisponível".
+    from math_engine.proporcional import (
+        CandidatoProporcional, calcular_eleitos_proporcional,
+        VAGAS_DEP_FEDERAL, vagas_dep_estadual,
+    )
+    vagas = VAGAS_DEP_FEDERAL.get(uf, 0) if cargo == 6 else vagas_dep_estadual(uf)
     async with SessionLocal() as sess:
         res = await _snapshot_atual(sess, cargo, uf, 1)
-        if not res:
-            await _send(client, chat_id, f"Sem dados de {CARGOS[cargo]} · {uf}.")
+        if not res or res[1].qt_secoes_totalizadas == 0:
+            await _send(client, chat_id, f"Sem votos apurados de {CARGOS[cargo]} · {uf}.")
             return
         snap, tot, cands = res
-        # Precisa da relação candidato → partido
-        sqs = [c.sq_candidato for c in cands]
-        rows = (await sess.execute(
-            select(Candidato.sq_candidato, Candidato.partido_numero)
-            .where(Candidato.sq_candidato.in_(sqs))
-        )).all()
-        mapa_part = {sq: pn for sq, pn in rows}
-        entrada = [{"sq_candidato": c.sq_candidato, "votos": c.votos,
-                    "partido_numero": mapa_part.get(c.sq_candidato, 0)} for c in cands]
+        fichas = {c.sq_candidato: c for c in (await sess.execute(
+            select(Candidato).where(Candidato.sq_candidato.in_([c.sq_candidato for c in cands]))
+        )).scalars()}
+        entrada = [
+            CandidatoProporcional(
+                sq_candidato=c.sq_candidato,
+                nome_urna=getattr(fichas.get(c.sq_candidato), "nome_urna", c.sq_candidato),
+                numero=getattr(fichas.get(c.sq_candidato), "numero", 0),
+                partido_numero=getattr(fichas.get(c.sq_candidato), "partido_numero", 0),
+                votos=c.votos,
+                situacao=getattr(fichas.get(c.sq_candidato), "situacao", "ativo"),
+            )
+            for c in cands
+        ]
         try:
-            r = calcular_apuracao_proporcional(entrada, cargo, uf, tot.qt_votos_validos)
+            r = calcular_eleitos_proporcional(entrada, vagas=vagas)
         except Exception:
             log.exception("proporcional falhou")
-            await _send(client, chat_id, "Falha ao calcular proporcional.")
+            await _send(client, chat_id, "Falha ao calcular a distribuição de vagas.")
             return
-        eleitos = [c for c in r["candidatos"] if c["status"] == "eleito"][:20]
-        linhas = [f"🪑 *{CARGOS[cargo]} · {uf}* — {r['vagas']} vagas",
-                  f"Quociente Eleitoral: `{r['quociente_eleitoral']:,}`".replace(",", "."), ""]
+        eleitos = sorted((c for c in r.candidatos if c.status == "eleito"),
+                         key=lambda c: -c.votos)
+        linhas = [f"🪑 *{CARGOS[cargo]} · {uf}* — {r.vagas} vagas · {_fmt_pct(_pct_apurado(tot), 1)} apurado",
+                  f"Quociente eleitoral: {_fmt_int(r.qe)} votos", ""]
         if eleitos:
-            for e in eleitos:
-                nome, sig = await _nome_partido(sess, e["sq_candidato"])
-                linhas.append(f"✅ {nome} ({sig}) — {e['votos']:,}".replace(",", "."))
+            for e in eleitos[:30]:
+                nome, sig = await _nome_partido(sess, e.sq_candidato)
+                linhas.append(f"✅ {nome} ({sig}) — {_fmt_int(e.votos)}")
+            if len(eleitos) > 30:
+                linhas.append(f"… e mais {len(eleitos) - 30}. Lista completa no site.")
         else:
-            linhas.append("_Nenhum eleito ainda._")
-    await _send(client, chat_id, "\n".join(linhas))
+            linhas.append("_Nenhuma vaga definida ainda._")
+        linhas.append("\n_Com a apuração parcial; muda até 100%._" if _pct_apurado(tot) < 100 else "")
+    await _send(client, chat_id, "\n".join(l for l in linhas if l is not None))
 
 
 def _texto_evento(tipo: str, a: str, b: str, turno: int) -> str:

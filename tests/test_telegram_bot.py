@@ -73,3 +73,22 @@ def test_teclado_de_alertas_marca_tipo_antigo_pela_familia():
     textos = [linha[0]["text"] for linha in kb["inline_keyboard"][:-1]]
     assert textos[0].startswith("✅") and "eleito" in textos[0]
     assert textos[1].startswith("◻")
+
+
+def test_df_e_distrito_federal_nao_deputado():
+    # "/placar governador DF" lia DF como Dep. Federal e caía em SP.
+    assert tb._parse_cargo_uf(["governador", "DF"]) == (3, "DF")
+    assert tb._parse_cargo_uf(["gov", "df"]) == (3, "DF")
+    assert tb._parse_cargo_uf(["deputado", "SP"]) == (6, "SP")
+
+
+def test_proporcional_usa_funcoes_que_existem():
+    # /proporcional importava uma função inexistente e respondia sempre
+    # "indisponível". Garante que o que o bot importa existe e roda.
+    from math_engine.proporcional import (
+        CandidatoProporcional, calcular_eleitos_proporcional, VAGAS_DEP_FEDERAL,
+    )
+    cands = [CandidatoProporcional(str(i), f"C{i}", 1000 + i, 13 if i < 5 else 22, 100 * (10 - i))
+             for i in range(10)]
+    r = calcular_eleitos_proporcional(cands, vagas=VAGAS_DEP_FEDERAL["AC"])
+    assert sum(1 for c in r.candidatos if c.status == "eleito") == VAGAS_DEP_FEDERAL["AC"]

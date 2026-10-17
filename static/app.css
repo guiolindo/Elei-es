@@ -1004,8 +1004,8 @@ body.is-tv .relogio {
    (60×78 no card, com hover scale). Fallback + tamanhos maiores
    pra modal e comparação continuam abaixo. */
 .cand-foto-fallback,
-.card-comp img.fallback,
-.modal-hero img.fallback {
+.card-comp > img.fallback,
+.modal-hero > img.fallback {
   display: grid; place-items: center;
   color: #fff; font-weight: 800; letter-spacing: 1px;
   font-size: 26px;
@@ -1162,7 +1162,9 @@ body.is-tv .relogio {
   text-align: center;
   position: relative;
 }
-.card-comp img { width: 88px; height: 112px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; }
+/* Só a foto (filho direto) — o logo do partido dentro de .meta herdava
+   88×112 e aparecia gigante e cortado. */
+.card-comp > img { width: 88px; height: 112px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; }
 .card-comp .nome { font-weight: 700; font-size: 16px; }
 .card-comp .meta { font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
 .card-comp .votos { font-size: 26px; font-weight: 800; margin-top: 10px; font-variant-numeric: tabular-nums; }
@@ -1317,7 +1319,7 @@ body.is-tv .timeline .ev-texto { font-size: 12px; white-space: nowrap; }
   display: flex; gap: 16px; align-items: flex-start;
   margin-bottom: 20px; margin-top: 8px;
 }
-.modal-hero img {
+.modal-hero > img {
   width: 100px; height: 130px;
   min-width: 100px;                       /* não deixa a foto encolher com nome longo */
   border-radius: 10px; object-fit: cover;
@@ -2070,7 +2072,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
   main.page.m-tab-placar > .prop-info { display: block; }
   main.page.m-tab-placar > .filtro-lista { display: flex; }
   main.page.m-tab-mapa > .mapa-secao,
-  main.page.m-tab-mapa > .home-graf-secao { display: block; }
+  main.page.m-tab-placar > .home-graf-secao { display: block; }
   main.page.m-tab-comparar > .comparacao { display: block; }
   main.page.m-tab-eventos > .timeline-secao { display: block; }
   main.page.m-tab-mais > .rodape { display: block; }
@@ -2095,7 +2097,7 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
   .cand-foto { width: 64px !important; height: 82px !important; }
   .candidato button, .candidato [role=button] { min-height: 44px; }
   .comparacao { display: block; padding: 0; }
-  .cards-comp { grid-template-columns: 1fr !important; gap: 12px; }
+  .cards-comp { gap: 12px; }
 
   /* --- Bottom navigation --- */
   .m-nav {
@@ -3059,3 +3061,86 @@ body.pre-apuracao .home-graf-secao { display: none !important; }
 
 /* CTA desceu pra depois dos candidatos: respiro entre os dois */
 .grid-candidatos + .proj-painel + .cta-strip, .grid-candidatos + .cta-strip, .proj-painel + .cta-strip { margin-top: 16px; }
+
+/* ============ Duelo ao vivo (2º turno, fora da TV) ============
+   Durante a apuração o duelo vira o placar: os dois lados fixos, % e
+   votos, barra de proporção, diferença, % apurado e, logo abaixo, a
+   estimativa (não oficial). Substitui os cards e o "comparar", que num
+   confronto de dois não acrescentam nada. Toque no candidato abre a ficha. */
+.duelo-cand {
+  background: none; border: 0; padding: 6px 8px; margin: 0; color: inherit; font: inherit;
+  cursor: pointer; border-radius: 14px; text-align: center;
+}
+.duelo-cand:hover .duelo-nome { text-decoration: underline; text-underline-offset: 3px; }
+.duelo-cand:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.duelo-pct:empty, .duelo-votos:empty { display: none; }
+.duelo-pct {
+  font-size: 44px; font-weight: 900; line-height: 1; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; color: var(--cor-txt, var(--fg));
+}
+.duelo-votos { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.duelo-cand { position: relative; }
+/* Selo sobre a foto: não empurra nome/% e os dois lados ficam alinhados. */
+.duelo-cand.eleito::before {
+  content: "ELEITO"; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  z-index: 1; white-space: nowrap;
+  padding: 2px 10px; border-radius: 999px; background: #22c55e; color: #0b0f19;
+  font-size: 12px; font-weight: 900; letter-spacing: 1px;
+}
+body.duelo-vivo .duelo-x { margin-top: 0; }
+body.duelo-vivo .duelo-quando { display: none; }
+.duelo-placar { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 10px; }
+.duelo-placar[hidden] { display: none; }
+.duelo-barra { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--surface-3); }
+.duelo-barra > span { min-width: 4px; transition: flex-basis 600ms var(--ease-out-quart, ease-out); }
+.duelo-dif { margin: 0; font-size: 16px; color: var(--fg); }
+.duelo-dif-pp { color: var(--muted); }
+.duelo-apurado { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.duelo-apurado-bar { width: 100%; height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+.duelo-apurado-bar > div { height: 100%; background: var(--brand); transition: width 500ms ease-out; }
+.duelo-apurado-lab { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.duelo > .proj-painel { width: 100%; max-width: 720px; margin: 4px 0 0; text-align: left; }
+body.duelo-2t:not(.is-tv) main.page > .lista-header,
+body.duelo-2t:not(.is-tv) main.page > .filtro-lista,
+body.duelo-2t:not(.is-tv) main.page > #lista-candidatos { display: none !important; }
+@media (max-width: 768px) {
+  body.duelo-vivo .m-stats { display: none !important; }
+  .duelo-pct { font-size: 32px; }
+  .duelo-votos { font-size: 12px; }
+  .duelo-dif { font-size: 14px; }
+  .duelo-apurado-lab { font-size: 12px; }
+  .duelo-cand { padding: 4px 2px; }
+}
+/* Desktop durante o duelo: o "Apurado" já está no placar do duelo, então
+   o topo encolhe pra uma linha de números secundários e o placar sobe. */
+@media (min-width: 769px) {
+  body.duelo-vivo:not(.is-tv) .hero .stat-hero { display: none; }
+  body.duelo-vivo:not(.is-tv) .hero .stats { grid-template-columns: 1fr; padding-bottom: 14px; }
+  body.duelo-vivo:not(.is-tv) .hero .stat-mini { padding: 8px 14px; }
+  body.duelo-vivo:not(.is-tv) .hero .stat-mini .stat-value { font-size: 17px; margin-top: 2px; }
+  body.duelo-vivo .duelo { padding-top: 20px; gap: 14px; }
+  body.duelo-vivo .duelo-foto { width: 84px; height: 84px; font-size: 28px; }
+  body.duelo-vivo .duelo-pct { font-size: 52px; }
+}
+/* Comparação no celular: cards lado a lado (antes empilhavam e cada um
+   ocupava meia tela). */
+@media (max-width: 768px) {
+  .cards-comp { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .card-comp { padding: 12px 10px; }
+  .card-comp > img, .card-comp .cand-foto-fallback { width: 64px; height: 82px; }
+  .card-comp .nome { font-size: 14px; overflow-wrap: anywhere; }
+  .card-comp .votos { font-size: 20px; }
+}
+/* Aba "Mais" no celular: links em lista tocável; Modo TV não faz sentido
+   numa tela de celular. */
+@media (max-width: 768px) {
+  main.page.m-tab-mais .rodape-tv { display: none; }
+  main.page.m-tab-mais .rodape-linha {
+    display: flex; flex-direction: column; align-items: stretch; gap: 0;
+    font-size: 0; /* some os "·" soltos entre os links */
+  }
+  main.page.m-tab-mais .rodape-linha a {
+    font-size: 16px; padding: 14px 4px; border-bottom: 1px solid var(--line);
+    text-align: left; text-decoration: none;
+  }
+}

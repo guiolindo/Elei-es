@@ -12,6 +12,16 @@ function corDoCandidato(sq_candidato, fallbackIdx = 0) {
   return PALETA[fallbackIdx % PALETA.length] || "#f0b429";
 }
 
+// Cor do i-ésimo selecionado nos gráficos de comparação: a do partido
+// (igual ao card e ao mapa); se dois selecionados forem do mesmo partido,
+// o segundo cai na paleta pra não ficarem idênticos.
+function corSel(i) {
+  const sqs = state.selecionados;
+  const cor = corDoCandidato(sqs[i], i);
+  const repetida = sqs.slice(0, i).some((sq, j) => corDoCandidato(sq, j) === cor);
+  return repetida ? PALETA[i % PALETA.length] : cor;
+}
+
 const PALETA = ["#f0b429", "#3b82f6", "#ec4899", "#10b981", "#a855f7", "#f97316"];
 const TZ = "America/Sao_Paulo";
 const MAX_SEL = 4;
@@ -245,7 +255,10 @@ function projecaoAplicavel() {
   return state.turno === 2 &&
     ((state.cargo === 1 && state.abrangencia === "BR") || state.cargo === 3);
 }
-const fmtPct1 = (x) => `${x.toFixed(1)}%`;
+// Decimal com vírgula (pt-BR). Ponto fica só como separador de milhar
+// (fmtNum) — "70.05%" ao lado de "313.655 seções" lia como milhar.
+const dec = (x, n = 2) => Number(x).toFixed(n).replace(".", ",");
+const fmtPct1 = (x) => `${dec(x, 1)}%`;
 // Nunca "100%" de chance: o modelo é estatístico; certeza só vem da
 // decisão matemática (evento ELEITO), que a UI mostra à parte.
 function textoChance(p) {
@@ -962,7 +975,7 @@ function renderLista() {
       }[prop.status] || "";
       const fed = prop.federacao ? ` · Fed.` : "";
       const title = alta ? prop.status
-                         : `${prop.status} — cálculo baseado em ${pctApurProp.toFixed(1)}% apurado; muda conforme chegam mais votos`;
+                         : `${prop.status} — cálculo baseado em ${dec(pctApurProp, 1)}% apurado; muda conforme chegam mais votos`;
       badgeProp = `<div class="badge-prop ${cls}" title="${title}">${label}${fed}</div>`;
       // Status projetado — só mostra quando difere do atual. Útil pra
       // proporcional: candidato ainda não está eleito, mas se o ritmo
@@ -1212,7 +1225,7 @@ async function abrirModal(sq) {
       : null;
     const fields = [
       ["Votos",           votos ? fmtNum(votos.votos) : "—", "num"],
-      ["% Válidos",       votos ? votos.pct_validos.toFixed(2) + "%" : "—", "num"],
+      ["% Válidos",       votos ? dec(votos.pct_validos, 2) + "%" : "—", "num"],
       ["Posição",         votos ? votos.posicao + "º" : "—", "num"],
       ["Situação",        opcional({
                             ativo: "Ativo",
@@ -1295,7 +1308,7 @@ async function abrirModalMunicipio(codIbge, nomeMun) {
             </div>
             <div style="text-align:right;min-width:120px">
               <div style="font-weight:700;font-variant-numeric:tabular-nums">${fmtNum(c.votos)}</div>
-              <div style="font-size:11px;color:var(--muted)">${c.pct_validos.toFixed(1)}%</div>
+              <div style="font-size:11px;color:var(--muted)">${dec(c.pct_validos, 1)}%</div>
             </div>
           </div>
         `).join("")}
@@ -1341,7 +1354,7 @@ function renderCardsComp() {
     if (!c) return;
     const div = document.createElement("div");
     div.className = "card-comp";
-    div.style.borderTopColor = PALETA[i];
+    div.style.borderTopColor = corPartido(c.partido);
     div.innerHTML = `
       <div class="badge-pos" data-pos="${sq}">—</div>
       <img src="${c.foto}" loading="lazy" decoding="async">
@@ -1372,7 +1385,7 @@ async function atualizarComparacao() {
     const posEl = document.querySelector(`[data-pos="${sq}"]`);
     if (c && votosEl) {
       votosEl.textContent = fmtNum(c.votos);
-      pctEl.textContent = c.pct_validos.toFixed(2) + "%";
+      pctEl.textContent = dec(c.pct_validos, 2) + "%";
       posEl.textContent = c.posicao + "º";
     }
   });
@@ -1383,7 +1396,7 @@ async function atualizarComparacao() {
   if (ordenados.length >= 2) {
     const dif = ordenados[0].votos - ordenados[1].votos;
     animarNumero($("dif-abs"), dif);
-    $("dif-pct").textContent = (ordenados[0].pct_validos - ordenados[1].pct_validos).toFixed(2) + " pp";
+    $("dif-pct").textContent = dec((ordenados[0].pct_validos - ordenados[1].pct_validos), 2) + " pp";
     const restantes = Math.max(0, (dados.totais.eleitorado_apto || 0) - (dados.totais.eleitorado_apto_totalizadas || 0));
     // Pergunta aritmética simples entre os dois mais votados da seleção:
     // a diferença cabe nos votos que ainda faltam? (teto: eleitores aptos
@@ -1430,6 +1443,15 @@ function tooltipHoraBRT(params) {
   return linhas.join("");
 }
 
+// Eixo Y de votos: "50 mi", "800 mil" — "50,000,000" (padrão do ECharts)
+// era formato americano e largo demais no celular.
+function fmtEixo(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return `${dec(v / 1e6, a % 1e6 ? 1 : 0)} mi`;
+  if (a >= 1e3) return `${dec(v / 1e3, 0)} mil`;
+  return String(v);
+}
+
 function baseOpts(title) {
   return {
     backgroundColor: "transparent",
@@ -1448,6 +1470,7 @@ function baseOpts(title) {
       axisLine: { lineStyle: { color: "#303a4d" } },
       axisLabel: {
         color: "#7d8899",
+        hideOverlap: true,
         // Rótulos do eixo X em BRT (HH:mm quando cabe, dd/mm HH:mm no zoom)
         formatter: (val) => {
           const d = new Date(val);
@@ -1455,8 +1478,12 @@ function baseOpts(title) {
         },
       },
     },
-    yAxis: { type: "value", axisLine: { lineStyle: { color: "#303a4d" } }, axisLabel: { color: "#7d8899" }, splitLine: { lineStyle: { color: "#1e2531" } } },
-    textStyle: { fontFamily: "Inter" },
+    yAxis: { type: "value", axisLine: { lineStyle: { color: "#303a4d" } },
+             axisLabel: { color: "#7d8899", formatter: fmtEixo },
+             splitLine: { lineStyle: { color: "#1e2531" } } },
+    // Mesma pilha do CSS: sem fallback, o canvas caía em serifa (Times)
+    // quando a Inter não carregava.
+    textStyle: { fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" },
   };
 }
 
@@ -1487,7 +1514,7 @@ async function inicializarGraficos() {
     ...baseOpts(),
     series: state.selecionados.map((sq, i) => ({
       name: nomes[i], type: "line", smooth: true, showSymbol: false,
-      data: dadosPor(i, "votos"), color: PALETA[i], lineStyle: { width: 2.5 },
+      data: dadosPor(i, "votos"), color: corSel(i), lineStyle: { width: 2.5 },
     })),
   });
 
@@ -1496,18 +1523,24 @@ async function inicializarGraficos() {
     yAxis: { ...baseOpts().yAxis, max: 100, axisLabel: { color: "#7d8899", formatter: "{value}%" } },
     series: state.selecionados.map((sq, i) => ({
       name: nomes[i], type: "line", smooth: true, showSymbol: false,
-      data: dadosPor(i, "pct"), color: PALETA[i], lineStyle: { width: 2.5 },
-      areaStyle: { opacity: 0.08, color: PALETA[i] },
+      data: dadosPor(i, "pct"), color: corSel(i), lineStyle: { width: 2.5 },
+      areaStyle: { opacity: 0.08, color: corSel(i) },
     })),
   });
 
-  // diferença: líder − 2º selecionado
+  // Diferença: quem lidera AGORA menos o outro (positivo = vantagem do
+  // líder). Antes era na ordem em que a pessoa marcou os cards, e o
+  // gráfico podia ficar todo negativo sem dizer de quem pra quem.
   const seriesDif = [];
   if (state.selecionados.length >= 2) {
-    const [A, B] = state.selecionados;
+    const votosAgora = sq => state.ultimoSnapshot?.candidatos?.find(c => c.sq_candidato === sq)?.votos || 0;
+    const [A, B] = state.selecionados.slice(0, 2).sort((x, y) => votosAgora(y) - votosAgora(x));
     const mA = new Map((hist.series[A] || []).map(p => [p.t, p.votos]));
     const mB = new Map((hist.series[B] || []).map(p => [p.t, p.votos]));
     for (const t of mA.keys()) if (mB.has(t)) seriesDif.push([t, mA.get(t) - mB.get(t)]);
+    const tit = $("graf-dif")?.previousElementSibling;
+    const nome = sq => state.ficha[sq]?.nome_urna || "—";
+    if (tit) tit.textContent = `Vantagem de ${nome(A)} sobre ${nome(B)}`;
   }
   graf("graf-dif").setOption({
     ...baseOpts(),
@@ -1599,8 +1632,8 @@ async function inicializarGraficos() {
     seriesFinal = state.selecionados.map((sq, i) => ({
       name: `margem de ${nomes[i]}`, type: "line", smooth: true, showSymbol: false,
       data: seriesPorSq[sq],
-      lineStyle: { width: 2.5, color: PALETA[i] },
-      areaStyle: { opacity: 0.08, color: PALETA[i] },
+      lineStyle: { width: 2.5, color: corSel(i) },
+      areaStyle: { opacity: 0.08, color: corSel(i) },
       markLine: i === 0 ? {
         symbol: "none", silent: true,
         data: [{
@@ -1645,6 +1678,19 @@ async function inicializarGraficos() {
 }
 
 // ============ painel superior ============
+// "ao vivo" com bolinha verde só quando a conexão está aberta E a
+// apuração ainda corre. Com 100% apurado (ex.: 1º turno, dias depois)
+// o verde pulsando dizia que algo ainda estava mudando.
+function atualizarRotuloConexao(ws = state.ws) {
+  const el = $("conexao");
+  if (!el) return;
+  const conectado = ws?.readyState === 1;
+  const encerrada = (state.ultimoSnapshot?.totais?.pct_apurado || 0) >= 100;
+  el.querySelector(".dot")?.classList.toggle("on", conectado && !encerrada);
+  $("conexao-label").textContent = !conectado ? "reconectando…"
+    : (encerrada ? "apuração encerrada" : "ao vivo");
+}
+
 async function atualizarPainelTotais() {
   const dados = state.ultimoSnapshot;
   if (!dados?.disponivel) {
@@ -1673,7 +1719,7 @@ async function atualizarPainelTotais() {
     return;
   }
   const t = dados.totais;
-  $("pct-apurado").textContent = t.pct_apurado.toFixed(2) + "%";
+  $("pct-apurado").textContent = dec(t.pct_apurado, 2) + "%";
   const prog = $("prog-apurado");
   prog.style.width = t.pct_apurado + "%";
   // Shimmer só enquanto a apuração está viva (entre 0 e 100%)
@@ -1685,8 +1731,8 @@ async function atualizarPainelTotais() {
   animarNumero($("comparecimento"), t.comparecimento);
   animarNumero($("abstencoes"), t.abstencoes);
   const totalAptos = t.eleitorado_apto || 1;
-  const pctCompar = (t.comparecimento / totalAptos * 100).toFixed(1);
-  const pctAbst = (t.abstencoes / totalAptos * 100).toFixed(1);
+  const pctCompar = dec((t.comparecimento / totalAptos * 100), 1);
+  const pctAbst = dec((t.abstencoes / totalAptos * 100), 1);
   $("pct-comparecimento").textContent = `${pctCompar}% dos aptos`;
   $("pct-abstencoes").textContent = `${pctAbst}% dos aptos`;
   $("brancos-nulos").textContent = `${fmtNum(t.votos_brancos)} · ${fmtNum(t.votos_nulos)}`;
@@ -1698,6 +1744,7 @@ async function atualizarPainelTotais() {
   const ts = dados.gerado_em_tse || dados.coletado_em;
   const el = $("ultimo");
   el.textContent = fmtHora(ts);
+  atualizarRotuloConexao();
   el.dataset.iso = ts;
   el.title = dados.gerado_em_tse
     ? `Gerado pelo TSE às ${fmtHora(dados.gerado_em_tse)} · Coletado por nós às ${fmtHora(dados.coletado_em)}`
@@ -1756,8 +1803,8 @@ async function atualizarPainelTotais() {
           const pAtual = c.pct_validos;
           const diff = Math.abs(Tp - pAtual);
           pTxt = diff >= 0.1
-            ? ` · ${Math.min(pAtual, Tp).toFixed(1)}–${Math.max(pAtual, Tp).toFixed(1)}%`
-            : ` · ${pAtual.toFixed(1)}%`;
+            ? ` · ${dec(Math.min(pAtual, Tp), 1)}–${dec(Math.max(pAtual, Tp), 1)}%`
+            : ` · ${dec(pAtual, 1)}%`;
         }
         projTxt = ` · ~ ${vTxt}${pTxt} proj.`;
       }
@@ -1769,7 +1816,7 @@ async function atualizarPainelTotais() {
       //   48,50<span class="cand-pct-sub"> dos válidos</span>
       // Visual: 48,50 é o grande (herda font-size do .cand-pct), "dos
       // válidos" é cinza/pequeno via .cand-pct-sub.
-      pct.innerHTML = `${c.pct_validos.toFixed(2)}%<span class="cand-pct-sub"> dos válidos</span>`
+      pct.innerHTML = `${dec(c.pct_validos, 2)}%<span class="cand-pct-sub"> dos válidos</span>`
         + (projTxt ? `<span class="cand-proj" title="${tooltip}">${projTxt}</span>` : "");
     }
     if (barra) barra.style.width = (c.votos / maxV * 100) + "%";
@@ -1971,6 +2018,7 @@ async function atualizarGrafHome() {
   const estreito = window.innerWidth < 640;
   _grafHome.setOption({
     backgroundColor: "transparent",
+    textStyle: { fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" },
     tooltip: { trigger: "axis", formatter: tooltipHoraBRT,
                 backgroundColor: "#161b24", borderColor: "#303a4d",
                 textStyle: { color: "#ecf0f7" } },
@@ -1995,6 +2043,9 @@ async function atualizarGrafHome() {
     },
     yAxis: {
       type: "value",
+      // Escala pelos dados: no 2º turno as linhas ficam perto de 50% e,
+      // num eixo 0–100, viravam duas retas coladas.
+      scale: true,
       axisLabel: { color: "#94a1b8", fontSize: estreito ? 10 : 12,
                    formatter: "{value}%" },
       splitLine: { lineStyle: { color: "#2a3242" } },
@@ -2086,6 +2137,7 @@ async function carregarEventos() {
     // [data-sq=...], então é no-op se não tiver dados ainda.
     if (state.ultimoSnapshot?.disponivel) atualizarPainelTotais();
   }
+  try { renderDuelo(); renderProjecaoPainel(); } catch (e) {}  // selo "eleito" no duelo
   const ul = $("lista-eventos");
   if (evs.length === 0) {
     const comecou = (state.ultimoSnapshot?.totais?.pct_apurado || 0) > 0;
@@ -2207,7 +2259,7 @@ function renderProjecaoTV() {
   if (!box) return;
   const snap = state.ultimoSnapshot;
   const pctApur = snap?.totais?.pct_apurado || 0;
-  const mostrar = projecaoAplicavel() && snap?.disponivel && pctApur < 100;
+  const mostrar = projecaoAplicavel() && snap?.disponivel && pctApur > 0 && pctApur < 100;
   renderBlocoProjecao(box, $("tv2t-proj-linhas"), $("tv2t-proj-aviso"), mostrar);
 }
 
@@ -2253,7 +2305,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
     }
     return `<div class="tv2t-proj-linha" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
       <span class="tv2t-proj-nome">${nome}</span>
-      <span class="tv2t-proj-pct" aria-label="Estimativa: cerca de ${fmtPct1(c.pct)}, margem de ${margem.toFixed(1)} pontos">≈${fmtPct1(c.pct)}<small> ±${margem.toFixed(1)}</small></span>
+      <span class="tv2t-proj-pct" aria-label="Estimativa: cerca de ${fmtPct1(c.pct)}, margem de ${dec(margem, 1)} pontos">≈${fmtPct1(c.pct)}<small> ±${dec(margem, 1)}</small></span>
       ${chance}
     </div>`;
   }).join("");
@@ -2283,7 +2335,7 @@ async function atualizarPlacar2T() {
   // que pareciam dado real de empate técnico.
   const semVotos = (a.votos === 0 && b.votos === 0);
   if (diffNumEl) diffNumEl.textContent = semVotos ? "—" : fmtNum(diffVotos);
-  if (diffPctEl) diffPctEl.textContent = semVotos ? "aguardando" : `${diffPct.toFixed(2)} pontos`;
+  if (diffPctEl) diffPctEl.textContent = semVotos ? "aguardando" : `${dec(diffPct, 2)} pontos`;
   // Spread bar: % de A e % de B proporcional. Com 0 votos (pré-apuração)
   // 50/50 fica visualmente mentiroso — mostramos barra neutra "aguardando".
   const total = a.pct_validos + b.pct_validos;
@@ -2305,13 +2357,13 @@ async function atualizarPlacar2T() {
       spreadA.style.flexBasis = flexA + "%";
       spreadA.style.setProperty("--cor-a", corA);
       spreadA.style.background = corA;
-      spreadA.textContent = `${a.pct_validos.toFixed(1)}%`;
+      spreadA.textContent = `${dec(a.pct_validos, 1)}%`;
     }
     if (spreadB) {
       spreadB.style.flexBasis = flexB + "%";
       spreadB.style.setProperty("--cor-b", corB);
       spreadB.style.background = corB;
-      spreadB.textContent = `${b.pct_validos.toFixed(1)}%`;
+      spreadB.textContent = `${dec(b.pct_validos, 1)}%`;
     }
   }
   // Tendência: compara com snapshot anterior pra ver se o líder tá
@@ -2328,7 +2380,7 @@ async function atualizarPlacar2T() {
         tendEl.textContent = "estável";
         tendEl.className = "tv2t-tend-num estavel";
       } else {
-        tendEl.textContent = (deltaPct > 0 ? "▲ " : "▼ ") + Math.abs(deltaPct).toFixed(2);
+        tendEl.textContent = (deltaPct > 0 ? "▲ " : "▼ ") + dec(Math.abs(deltaPct), 2);
         tendEl.className = "tv2t-tend-num " + (deltaPct > 0 ? "subindo" : "caindo");
       }
     }
@@ -2348,7 +2400,7 @@ async function atualizarPlacar2T() {
         ? "Carregando total de seções…"
         : "Aguardando apuração começar";
     } else {
-      lab.textContent = `${pctApur.toFixed(2)}% apurado · ${fmtNum(t.secoes_totalizadas || 0)} de ${fmtNum(t.secoes_total || 0)} seções`;
+      lab.textContent = `${dec(pctApur, 2)}% apurado · ${fmtNum(t.secoes_totalizadas || 0)} de ${fmtNum(t.secoes_total || 0)} seções`;
     }
   }
   // UFs lideradas (só Pres BR) — para Governador 2T uf-específico
@@ -2414,8 +2466,7 @@ function conectarWS() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${proto}//${location.host}/ws/apuracao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=${state.turno}`);
   ws.onopen = () => {
-    $("conexao").querySelector(".dot").classList.add("on");
-    $("conexao-label").textContent = "ao vivo";
+    atualizarRotuloConexao(ws);
     state.wsRetry = 0;
     // Puxa snapshot fresco assim que reconecta (evita "buraco" de eventos)
     refreshApuracao().catch(() => {});
@@ -2540,20 +2591,28 @@ function emPreApuracao() {
 function renderDuelo() {
   const box = $("duelo");
   if (!box) return;
-  const ativos = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo");
-  const mostrar = state.turno === 2 && ativos.length === 2 && emPreApuracao()
-    && !document.body.classList.contains("is-tv");
-  box.hidden = !mostrar;
-  document.body.classList.toggle("pre-apuracao", mostrar);
-  if (!mostrar) return;
+  const ativos = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo")
+    .sort((x, y) => (x.numero || 0) - (y.numero || 0));  // lados fixos, como num placar
+  const ehDuelo = state.turno === 2 && ativos.length === 2 && !document.body.classList.contains("is-tv");
+  const pre = ehDuelo && emPreApuracao();
+  box.hidden = !ehDuelo;
+  document.body.classList.toggle("pre-apuracao", pre);
+  document.body.classList.toggle("duelo-vivo", ehDuelo && !pre);
+  document.body.classList.toggle("duelo-2t", ehDuelo);
+  if (!ehDuelo) return;
   const cargo = state.cargo === 1 ? "Presidente da República"
     : `Governador${state.abrangencia ? " · " + state.abrangencia : ""}`;
   $("duelo-tit").textContent = `2º turno · ${cargo}`;
-  const card = c => `<div class="duelo-cand" style="--cor:${corPartido(c.partido)}">
+  const card = c => {
+    const cor = corPartido(c.partido);
+    return `<button type="button" class="duelo-cand" data-sq="${c.sq_candidato}" style="--cor:${cor};--cor-txt:${corLegivel(cor)}" aria-label="Ficha de ${c.nome_urna}">
       <img class="duelo-foto" src="${c.foto}" alt="" decoding="async">
-      <div class="duelo-nome">${c.nome_urna}</div>
-      <div class="duelo-meta"><span class="cand-numero-tag">${c.numero}</span>${badgePartidoHtml(c.partido)}</div>
-    </div>`;
+      <span class="duelo-nome">${c.nome_urna}</span>
+      <span class="duelo-meta"><span class="cand-numero-tag">${c.numero}</span>${badgePartidoHtml(c.partido)}</span>
+      <span class="duelo-pct"></span>
+      <span class="duelo-votos"></span>
+    </button>`;
+  };
   const cands = $("duelo-cands");
   const chave = ativos.map(c => c.sq_candidato).join(",");
   if (cands.dataset.chave !== chave) {
@@ -2561,10 +2620,53 @@ function renderDuelo() {
     cands.dataset.chave = chave;
     cands.querySelectorAll(".duelo-foto").forEach((img, i) =>
       anexarFotoComRetry(img, ativos[i].nome_urna, ativos[i].partido));
+    cands.querySelectorAll(".duelo-cand").forEach(b =>
+      b.addEventListener("click", () => abrirModal(b.dataset.sq)));
   }
-  const dataTxt = DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, weekday: "long", day: "2-digit", month: "2-digit" });
-  $("duelo-data").textContent = `${dataTxt}, às 17h (horário de Brasília)`;
-  tickDuelo();
+  $("duelo-placar").hidden = pre;
+  if (pre) {
+    const dataTxt = DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, weekday: "long", day: "2-digit", month: "2-digit" });
+    $("duelo-data").textContent = `${dataTxt}, às 17h (horário de Brasília)`;
+    cands.querySelectorAll(".duelo-pct, .duelo-votos").forEach(el => { el.textContent = ""; });
+    cands.querySelectorAll(".duelo-cand").forEach(el => el.classList.remove("lidera", "eleito"));
+    tickDuelo();
+    return;
+  }
+  // Apuração em andamento: placar ao vivo.
+  const snap = state.ultimoSnapshot;
+  const porSq = new Map((snap.candidatos || []).map(c => [c.sq_candidato, c]));
+  const [a, b] = ativos.map(c => porSq.get(c.sq_candidato) || { votos: 0, pct_validos: 0 });
+  const liderIdx = a.votos === b.votos ? -1 : (a.votos > b.votos ? 0 : 1);
+  cands.querySelectorAll(".duelo-cand").forEach((el, i) => {
+    const v = i === 0 ? a : b;
+    el.querySelector(".duelo-pct").textContent = `${dec(v.pct_validos, 2)}%`;
+    el.querySelector(".duelo-votos").textContent = `${fmtNum(v.votos)} votos`;
+    el.classList.toggle("lidera", i === liderIdx);
+    el.classList.toggle("eleito", state.eleitos.has(ativos[i].sq_candidato));
+  });
+  const total = a.pct_validos + b.pct_validos;
+  const wA = total > 0 ? a.pct_validos / total * 100 : 50;
+  $("duelo-barra-a").style.cssText = `flex-basis:${wA}%;background:${corPartido(ativos[0].partido)}`;
+  $("duelo-barra-b").style.cssText = `flex-basis:${100 - wA}%;background:${corPartido(ativos[1].partido)}`;
+  const dif = $("duelo-dif");
+  if (liderIdx < 0) {
+    dif.textContent = "Empate";
+  } else {
+    const lider = ativos[liderIdx];
+    const nome = state.ficha[lider.sq_candidato]?.nome_urna || lider.nome_urna;
+    const eleito = state.eleitos.has(lider.sq_candidato);
+    dif.innerHTML = eleito
+      ? `<strong>${nome} eleito(a)</strong> · ${fmtNum(Math.abs(a.votos - b.votos))} votos de diferença`
+      : `<strong>${nome}</strong> à frente por ${fmtNum(Math.abs(a.votos - b.votos))} votos `
+        + `<span class="duelo-dif-pp">(${dec(Math.abs(a.pct_validos - b.pct_validos), 2)} pontos)</span>`;
+  }
+  const t = snap.totais || {};
+  $("duelo-apurado-fill").style.width = Math.min(100, t.pct_apurado || 0) + "%";
+  const ts = snap.gerado_em_tse || snap.coletado_em;
+  const hora = ts ? fmtHora(ts) : "";
+  $("duelo-apurado-lab").textContent = `${dec(t.pct_apurado || 0, 2)}% apurado`
+    + (t.secoes_total ? ` · ${fmtNum(t.secoes_totalizadas || 0)} de ${fmtNum(t.secoes_total)} seções` : "")
+    + (hora ? ` · atualizado às ${hora}` : "");
 }
 
 function tickDuelo() {
@@ -2611,8 +2713,8 @@ function atualizarTituloAba(dados) {
     return;
   }
   const nome = state.ficha[lider.sq_candidato]?.nome_urna || "Líder";
-  const pct = lider.pct_validos.toFixed(0);
-  const apurado = t.pct_apurado.toFixed(0);
+  const pct = dec(lider.pct_validos, 0);
+  const apurado = dec(t.pct_apurado, 0);
   document.title = `${nome} ${pct}% · ${apurado}% apurado · ${TITULO_BASE}`;
 }
 
@@ -2703,7 +2805,7 @@ function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
   const partido = ficha.partido || "";
   const numero = ficha.numero || "";
   const lider = (state.ultimoSnapshot?.candidatos || []).find(c => c.sq_candidato === sq_candidato);
-  const pct = lider ? `${lider.pct_validos.toFixed(2)}%` : "";
+  const pct = lider ? `${dec(lider.pct_validos, 2)}%` : "";
   const cargoNome = { 1: "Presidente da República", 3: "Governador(a)", 5: "Senador(a)",
                       6: "Deputado(a) Federal", 7: "Deputado(a) Estadual" }[state.cargo] || "";
   const abr = state.abrangencia === "BR" ? "do Brasil" : `de ${state.abrangencia}`;
@@ -2817,7 +2919,7 @@ async function compartilhar() {
   const lider = dados?.candidatos?.[0];
   const nome = lider ? (state.ficha[lider.sq_candidato]?.nome_urna || "líder") : null;
   const texto = nome
-    ? `${nome} lidera com ${lider.pct_validos.toFixed(1)}% dos votos válidos · ${dados.totais.pct_apurado.toFixed(1)}% apurado`
+    ? `${nome} lidera com ${dec(lider.pct_validos, 1)}% dos votos válidos · ${dec(dados.totais.pct_apurado, 1)}% apurado`
     : "Acompanhe a apuração 2026 ao vivo";
   if (navigator.share) {
     try { await navigator.share({ title: TITULO_BASE, text: texto, url }); return; }
@@ -2940,6 +3042,11 @@ const TITULOS_TAB = {
 function trocarTabMobile(tab) {
   const page = document.querySelector("main.page");
   if (!page) return;
+  // 2º turno: comparar é sempre entre os dois finalistas — não precisa marcar.
+  if (tab === "comparar" && state.selecionados.length < 2 && state.turno === 2) {
+    const fin = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo");
+    if (fin.length === 2) state.selecionados = fin.map(c => c.sq_candidato);
+  }
   // Se for compare mas nada selecionado, avisa e mantém no placar
   if (tab === "comparar" && state.selecionados.length < 2) {
     toast("Marque 2 ou mais candidatos no placar para comparar.", "warn");

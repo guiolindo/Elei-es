@@ -326,7 +326,7 @@ function render(d) {
   const cands = (d.candidatos || []).slice(0, 20).map(c =>
     `<div class="urna-cand">
       <span class="urna-cand-sq">${c.numero ? c.numero + " · " : ""}${c.nome_urna || c.sq_candidato}</span>
-      <span class="urna-cand-votos">${fmt(c.votos)} · ${c.pct_validos.toFixed(1)}%</span>
+      <span class="urna-cand-votos">${fmt(c.votos)} · ${c.pct_validos.toFixed(1).replace(".", ",")}%</span>
     </div>`
   ).join("");
   resp.innerHTML = `
