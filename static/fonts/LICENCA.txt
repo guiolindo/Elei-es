@@ -1,0 +1,4 @@
+Barlow Condensed — Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)
+Licença: SIL Open Font License 1.1 — https://openfontlicense.org
+Arquivos woff2 (subconjunto latin) obtidos do Google Fonts e servidos localmente
+pra o modo TV não depender de rede externa.

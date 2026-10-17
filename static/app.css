@@ -3291,6 +3291,13 @@ body.is-tv .brand, body.is-tv .turno-toggle { flex: 0 0 auto; }
   body.is-tv.turno-2 .tv2t-proj-linha > .tv2t-proj-chance { grid-column: 3; margin-top: 0 !important; align-self: center; }
 }
 
+/* Fonte do quadro da TV servida pelo próprio site (static/fonts, OFL).
+   font-display: block — melhor esperar ~instantes que mostrar a fonte larga
+   de reserva, que quebrava "CANDIDATO" no meio. */
+@font-face { font-family: 'Barlow Condensed'; font-weight: 600; font-style: normal; font-display: block; src: url(/static/fonts/barlow-condensed-600.woff2) format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; font-style: normal; font-display: block; src: url(/static/fonts/barlow-condensed-700.woff2) format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 800; font-style: normal; font-display: block; src: url(/static/fonts/barlow-condensed-800.woff2) format('woff2'); }
+
 /* ======================================================================
    MODO TV — QUADRO DE TRANSMISSÃO (2º turno)  · maquete aprovada 18/10
    Quadro 16:9 fixo que escala inteiro: --u = 1px num quadro de 1920.
@@ -3366,7 +3373,8 @@ body.tv-quadro .tvq[hidden] { display: none; }
 .tvq-id { min-width: 0; }
 .tvq-nome {
   font: 800 calc(46 * var(--u))/1 var(--tvq-cond); text-transform: uppercase; letter-spacing: .01em;
-  overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  overflow-wrap: normal; word-break: normal; hyphens: none;  /* nunca "CANDIDAT/O" */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .tvq-part {
   display: flex; gap: calc(8 * var(--u)); align-items: center; margin-top: calc(8 * var(--u));

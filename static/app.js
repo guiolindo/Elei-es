@@ -3759,6 +3759,15 @@ function restaurarRolagem() {
 }
 setInterval(() => { if (!document.hidden) checarVersao(); }, 120_000);
 
+// Biblioteca de gráficos vem de /static/vendor. Se esse arquivo falhar,
+// tenta o CDN (permitido pela CSP) e redesenha mapa e gráfico ao chegar.
+if (typeof echarts === "undefined") {
+  const sc = document.createElement("script");
+  sc.src = "https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js";
+  sc.onload = () => { try { atualizarMapa(); atualizarGrafHome(); } catch (e) {} };
+  document.head.appendChild(sc);
+}
+
 // Diagnóstico: "?tela" no endereço mostra o tamanho que o navegador usa
 // pra montar a página (TVs costumam usar uma tela "virtual" menor que o
 // painel). Não aparece pra ninguém sem o parâmetro.
