@@ -3051,3 +3051,11 @@ body.pre-apuracao .hero .stats, body.pre-apuracao #countdown { display: none !im
   .proj-painel .tv2t-proj-pct { font-size: 17px; }
   .proj-painel .tv2t-proj-nome { font-size: 14px; }
 }
+
+/* Com o duelo na tela, o painel "Evolução ao vivo" vazio só repetia a
+   data de início. Some até a apuração começar. */
+body.pre-apuracao .home-graf-secao { display: none !important; }
+#sub-lista:empty { display: none; }
+
+/* CTA desceu pra depois dos candidatos: respiro entre os dois */
+.grid-candidatos + .proj-painel + .cta-strip, .grid-candidatos + .cta-strip, .proj-painel + .cta-strip { margin-top: 16px; }

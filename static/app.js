@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261017n";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017n";
+import { renderMapa } from "/static/mapa-br.js?v=20261017p";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017p";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -281,10 +281,8 @@ function classeStaleness(tsIso) {
 }
 
 // ============ Painel de status da coleta (pré-apuração) ============
-// Em pré-apuração, o espaço do "Gráfico aparece quando apuração começar"
-// vira um painel real com o estado do poller + última coleta. Dados
-// vêm de /api/poller-status (já público, sem admin token).
-//
+// Pré-apuração sem o bloco do duelo (ex.: cargo sem 2T definido): diz
+// quando começa e se o site está conectado ao TSE.
 let _statusColetaCache = null;
 let _statusColetaTimer = null;
 
@@ -319,7 +317,7 @@ async function renderPainelStatusColeta() {
   let estado, textoConexao;
   if (alvos === 0) {
     estado = "stale-sem";
-    textoConexao = "A atualização automática liga sozinha na véspera da eleição";
+    textoConexao = "";
   } else if (diffUltimo != null && diffUltimo <= intervalo * 3 && falhas === 0) {
     estado = "stale-fresh";
     textoConexao = "Conectado ao TSE";
@@ -340,8 +338,9 @@ async function renderPainelStatusColeta() {
     tit.textContent = "A apuração vai começar em instantes";
   }
   dot.className = "status-dot " + estado;
-  grid.innerHTML = `<p class="status-coleta-sub">Os resultados aparecem aqui sozinhos — não precisa recarregar a página.</p>`;
-  rodape.innerHTML = `<span class="status-dot-inline ${estado}"></span> ${textoConexao}`;
+  grid.innerHTML = "";
+  // Linha de conexão só quando diz algo útil (conectado / instável).
+  rodape.innerHTML = textoConexao ? `<span class="status-dot-inline ${estado}"></span> ${textoConexao}` : "";
 
   // Auto-refresh a cada 30s enquanto o painel estiver visível
   if (_statusColetaTimer) clearTimeout(_statusColetaTimer);
@@ -611,7 +610,7 @@ async function carregarUfsGov2T() {
   try {
     state._ufsGov2T = await get("/api/segundo-turno/ufs-governador");
   } catch (e) {
-    state._ufsGov2T = [];
+    state._ufsGov2T = null;  // falha ≠ "nenhuma UF com 2T"
   }
 }
 
@@ -859,27 +858,32 @@ function renderLista() {
     if (state.turno === 2) {
       // Contexto diferente — 2T é em 25/10/2026 e normalmente só define
       // os candidatos depois que o 1T fecha matematicamente.
-      const cargoNome = state.cargo === 3 ? "esta UF" : "a disputa nacional";
+      // O sistema sabe qual UF tem 2T de governador (eventos do 1T): diz
+      // o motivo exato em vez de "ou isso, ou aquilo".
+      const uf = state.abrangencia;
+      const decidida1T = state.cargo === 3 && Array.isArray(state._ufsGov2T) && !state._ufsGov2T.includes(uf);
+      const titulo = decidida1T ? `${uf} decidiu o governo no 1º turno` : "Candidatos do 2º turno ainda não publicados";
+      const texto = decidida1T
+        ? `Toque em "1º turno" no alto da página para ver quem foi eleito.`
+        : `O TSE ainda não divulgou os finalistas de ${state.cargo === 3 ? uf : "presidente"}.`;
       el.innerHTML = `<div class="empty-state">
         <svg class="empty-ico" width="48" height="48"><use href="#i-clock"/></svg>
-        <h3>Sem 2º turno aqui</h3>
-        <p>Ou ${cargoNome} foi decidida no 1º turno (vitória por maioria absoluta),
-        ou o TSE ainda não publicou os candidatos do 2º turno.
-        Toque em "1º turno" no alto da página pra ver o resultado final.</p>
+        <h3>${titulo}</h3>
+        <p>${texto}</p>
       </div>`;
     } else {
       el.innerHTML = `<div class="empty-state">
         <svg class="empty-ico" width="48" height="48"><use href="#i-clock"/></svg>
-        <h3>Aguardando o TSE liberar os dados</h3>
-        <p>Os primeiros resultados começam a sair a partir das 17h de domingo, quando as urnas fecham. O placar preenche sozinho assim que os primeiros votos chegarem.</p>
+        <h3>Apuração ainda não começou</h3>
+        <p>Os resultados saem a partir das 17h de ${(state.turno === 2 ? DIA_D_2T : DIA_D).toLocaleDateString("pt-BR", { timeZone: TZ, weekday: "long", day: "2-digit", month: "2-digit" })}, quando as urnas fecham.</p>
       </div>`;
     }
     return;
   }
   if (filtrados.length === 0) {
     el.innerHTML = `<div class="empty-state">
-      <h3>Nada com esse filtro</h3>
-      <p>Tente escrever outra parte do nome, mudar o partido ou limpar a busca.</p>
+      <h3>Nenhum candidato com esse filtro</h3>
+      <p>Limpe a busca ou escolha "Todos os partidos".</p>
     </div>`;
     return;
   }
@@ -1181,9 +1185,11 @@ function atualizarSubtitulo() {
   const abr = state.abrangencia === "BR" ? "Brasil" : state.abrangencia;
   $("titulo-lista").textContent = `${cargoNome} · ${abr}`;
   if (state.cargo === 1 && state.abrangencia !== "BR") {
-    $("sub-lista").innerHTML = `Votos dos candidatos presidenciais <strong>no estado ${abr}</strong>. Selecione até <strong>4</strong> para comparar.`;
+    $("sub-lista").innerHTML = `Votos de presidente <strong>só no estado ${abr}</strong> — o resultado que vale é o nacional.`;
   } else {
-    $("sub-lista").innerHTML = `Selecione até <strong>4 candidatos</strong> para comparar lado a lado.`;
+    // Instrução de comparação só quando há nomes suficientes pra escolher
+    $("sub-lista").innerHTML = (state.candidatos || []).length > 4
+      ? `Marque até <strong>4</strong> para comparar.` : "";
   }
 }
 
@@ -1819,7 +1825,7 @@ async function atualizarMapa() {
     renderLegenda(leg, dadosPorUF, {
       tituloVazio: "Mapa por UF",
       tituloCheio: "Líderes por UF",
-      dica: "Cada UF colorida pelo candidato líder daquele estado. Clique para ver o mapa do município.",
+      dica: "Clique num estado para ver os municípios.",
     });
     return;
   }
@@ -1905,7 +1911,7 @@ async function atualizarGrafHome() {
     .slice(0, topN)
     .map(c => c.sq_candidato);
   if (!topSqs.length) {
-    mostrarVazioGrafico("O gráfico aparece a partir da segunda atualização da apuração.");
+    mostrarVazioGrafico("Gráfico disponível a partir da 2ª atualização da apuração.");
     return;
   }
   let data;
@@ -1914,12 +1920,12 @@ async function atualizarGrafHome() {
     if (!r.ok) throw 0;
     data = await r.json();
   } catch (e) {
-    mostrarVazioGrafico("O gráfico aparece a partir da segunda atualização da apuração.");
+    mostrarVazioGrafico("Gráfico disponível a partir da 2ª atualização da apuração.");
     return;
   }
   const temDados = Object.values(data.series || {}).some(a => a.length > 1);
   if (!temDados) {
-    mostrarVazioGrafico("O gráfico aparece a partir da segunda atualização da apuração.");
+    mostrarVazioGrafico("Gráfico disponível a partir da 2ª atualização da apuração.");
     return;
   }
   vazio?.classList.add("oculto");
