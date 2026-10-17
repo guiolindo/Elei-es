@@ -28,7 +28,7 @@ function t(nome, cond) {
 t("null → null", tempoRelativo(null) === null);
 t("iso inválido → null", tempoRelativo("não-é-data") === null);
 const agora = new Date().toISOString();
-t("agora → 'agora mesmo'", tempoRelativo(agora) === "agora mesmo");
+t("agora → 'agora'", tempoRelativo(agora) === "agora");
 const ha10s = new Date(Date.now() - 10000).toISOString();
 t("10s atrás → 'há 10s'", tempoRelativo(ha10s) === "há 10s");
 const ha2min = new Date(Date.now() - 125000).toISOString();

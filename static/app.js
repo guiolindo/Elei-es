@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261016d";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261016d";
+import { renderMapa } from "/static/mapa-br.js?v=20261017d";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017d";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -150,6 +150,10 @@ function alternarModoTV() {
     setTimeout(() => {
       try { atualizarMapa(); } catch(e) {}
       try { atualizarGrafHome(); } catch(e) {}
+      // Placar e projeção da TV 2T só renderizam com body.is-tv — sem isso
+      // ficavam "0% apurado · 0 de 0 seções" até o próximo snapshot.
+      try { atualizarPlacar2T(); } catch(e) {}
+      try { renderProjecaoTV(); } catch(e) {}
       window.dispatchEvent(new Event("resize"));
     }, 120);
   });
@@ -204,6 +208,24 @@ function iniciarRelogio() {
   }, msAteProximoSegundo);
 }
 
+// ============ Projeção estatística do 2T ============
+function projecaoAplicavel() {
+  return state.turno === 2 &&
+    ((state.cargo === 1 && state.abrangencia === "BR") || state.cargo === 3);
+}
+function projecaoDoCandidato(sq) {
+  if (!projecaoAplicavel() || !state.projecao?.disponivel) return null;
+  return state.projecao.candidatos.find(c => c.sq_candidato === sq) || null;
+}
+const fmtPct1 = (x) => `${x.toFixed(1)}%`;
+// Nunca "100%" de chance: o modelo é estatístico; certeza só vem da
+// decisão matemática (evento ELEITO), que a UI mostra à parte.
+function textoChance(p) {
+  if (p >= 0.99) return ">99% de chance de vencer";
+  if (p <= 0.01) return "<1% de chance de vencer";
+  return `${Math.round(p * 100)}% de chance de vencer`;
+}
+
 // "há N s/min/h" relativo a agora. Null em menos de 2s pra não piscar
 // "há 0s". `tsIso` pode ser null → retorna null (chamador decide o texto).
 function tempoRelativo(tsIso) {
@@ -211,7 +233,7 @@ function tempoRelativo(tsIso) {
   const d = new Date(tsIso);
   if (isNaN(d.getTime())) return null;
   const diffS = Math.round((Date.now() - d.getTime()) / 1000);
-  if (diffS < 2) return "agora mesmo";
+  if (diffS < 2) return "agora";
   if (diffS < 60) return `há ${diffS}s`;
   if (diffS < 3600) return `há ${Math.round(diffS / 60)} min`;
   if (diffS < 86400) return `há ${Math.round(diffS / 3600)} h`;
@@ -1689,9 +1711,16 @@ async function atualizarPainelTotais() {
       // é o cálculo proporcional (QE/QP/sobras) que define a vaga.
       const L = c.projecao_linear, T = c.projecao_tendencia;
       const Tp = c.projecao_pct_tendencia;  // só vem pra majoritários
-      const mostra = pctApur >= 30 && pctApur < 100 && L;
+      const projEst = projecaoDoCandidato(c.sq_candidato);
+      const mostra = !projecaoAplicavel() && pctApur >= 30 && pctApur < 100 && L;
       let projTxt = "";
-      if (mostra) {
+      let tooltipProj = null;
+      if (projEst) {
+        projTxt = `Projeção final: ${fmtPct1(projEst.pct)} (entre ${fmtPct1(projEst.ic95[0])} e ${fmtPct1(projEst.ic95[1])})`
+          + (projEst.p_vitoria != null ? ` · ${textoChance(projEst.p_vitoria)}` : "");
+        tooltipProj = "Projeção estatística própria, por estado, com intervalo de 95%. "
+          + "Calculada só com a apuração parcial oficial do TSE. Não é pesquisa nem resultado oficial.";
+      } else if (mostra) {
         // Votos: faixa L↔T quando divergem
         const vTxt = (T != null && T !== L)
           ? `${fmtNum(Math.min(L, T))}–${fmtNum(Math.max(L, T))}`
@@ -1707,10 +1736,10 @@ async function atualizarPainelTotais() {
         }
         projTxt = ` · ~ ${vTxt}${pTxt} proj.`;
       }
-      const tooltip = "Projeção aritmética — faixa entre extrapolação linear e "
+      const tooltip = tooltipProj || ("Projeção aritmética — faixa entre extrapolação linear e "
         + "janela móvel das últimas 15 atualizações. Não considera composição "
         + "regional das urnas faltantes. Projeção de % só em cargos majoritários. "
-        + "Some ao atingir 100%.";
+        + "Some ao atingir 100%.");
       // % passou a ser o número hero do card. Formato:
       //   48,50<span class="cand-pct-sub"> dos válidos</span>
       // Visual: 48,50 é o grande (herda font-size do .cand-pct), "dos
@@ -1820,6 +1849,18 @@ async function atualizarMapa() {
 
 // ============ Gráfico único da home ============
 let _grafHome = null;
+// Estado vazio do gráfico: msg=null → painel de status da coleta (pré-
+// apuração); msg=texto → apuração já começou mas ainda não há série.
+function mostrarVazioGrafico(msg) {
+  const vazio = $("home-graf-vazio");
+  if (!vazio) return;
+  vazio.classList.remove("oculto");
+  const painel = $("status-coleta");
+  const txt = $("home-graf-msg");
+  if (painel) painel.hidden = msg != null;
+  if (txt) { txt.hidden = msg == null; txt.textContent = msg || ""; }
+  if (msg == null) renderPainelStatusColeta();
+}
 async function atualizarGrafHome() {
   const container = $("graf-home");
   const vazio = $("home-graf-vazio");
@@ -1829,9 +1870,8 @@ async function atualizarGrafHome() {
   // Antes de 1% apurado, não há dados reais ainda. Mostra painel de
   // status da coleta no lugar do "aguardando" vago.
   if (!snap?.disponivel || pctApur < 0.5) {
-    vazio?.classList.remove("oculto");
     if (_grafHome) { _grafHome.clear(); }
-    renderPainelStatusColeta();
+    mostrarVazioGrafico(null);
     return;
   }
   // Top N do snapshot (só ativos, não retirados — já ordenados por posicao).
@@ -1843,7 +1883,7 @@ async function atualizarGrafHome() {
     .slice(0, topN)
     .map(c => c.sq_candidato);
   if (!topSqs.length) {
-    vazio?.classList.remove("oculto");
+    mostrarVazioGrafico("O gráfico aparece a partir da segunda atualização da apuração.");
     return;
   }
   let data;
@@ -1852,12 +1892,12 @@ async function atualizarGrafHome() {
     if (!r.ok) throw 0;
     data = await r.json();
   } catch (e) {
-    vazio?.classList.remove("oculto");
+    mostrarVazioGrafico("O gráfico aparece a partir da segunda atualização da apuração.");
     return;
   }
   const temDados = Object.values(data.series || {}).some(a => a.length > 1);
   if (!temDados) {
-    vazio?.classList.remove("oculto");
+    mostrarVazioGrafico("O gráfico aparece a partir da segunda atualização da apuração.");
     return;
   }
   vazio?.classList.add("oculto");
@@ -2014,7 +2054,10 @@ async function carregarEventos() {
   }
   const ul = $("lista-eventos");
   if (evs.length === 0) {
-    ul.innerHTML = `<li class="vazio">Nenhum evento ainda. Aguardando apuração começar.</li>`;
+    const comecou = (state.ultimoSnapshot?.totais?.pct_apurado || 0) > 0;
+    ul.innerHTML = comecou
+      ? `<li class="vazio">Nenhuma virada nem decisão matemática até agora.</li>`
+      : `<li class="vazio">Sem eventos — a apuração ainda não começou.</li>`;
     return;
   }
   ul.innerHTML = "";
@@ -2077,6 +2120,16 @@ async function refreshApuracao() {
       if (p.disponivel) state.proporcional = p;
     } catch (e) { /* sem dados ainda */ }
   }
+  // Projeção estatística do 2T (estratificada por UF, com IC95 e
+  // probabilidade). Só Presidente-BR e Governador; antes de 10% apurado
+  // ou com 100% o backend devolve disponivel=false.
+  state.projecao = null;
+  if (projecaoAplicavel()) {
+    try {
+      const pj = await get(`/api/apuracao/projecao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=2`);
+      if (pj.disponivel) state.projecao = pj;
+    } catch (e) { /* sem projeção — UI cai no estado "aguardando" */ }
+  }
   // ORDEM IMPORTA: renderLista() faz `el.innerHTML = ""` e reconstrói
   // os cards a partir do template (que vem com "0 votos" placeholder).
   // Então ele PRECISA rodar antes de atualizarPainelTotais, que é quem
@@ -2104,6 +2157,60 @@ async function refreshApuracao() {
     try { atualizarGrafHome(); } catch(e) {}
     try { atualizarPlacar2T(); } catch(e) {}
   }
+  try { renderProjecaoTV(); } catch(e) {}
+  const av = $("aviso-projecao");
+  if (av) {
+    av.hidden = !state.projecao?.disponivel;
+    av.textContent = state.projecao?.disponivel
+      ? `ⓘ ${state.projecao.aviso} A chance de vitória aparece a partir de 30% do eleitorado apurado.`
+      : "";
+  }
+}
+
+// Bloco "Projeção para 100%" do placar TV 2T. Mostra % projetado,
+// intervalo de 95% e chance de vitória por candidato. Quem já foi
+// eleito matematicamente vê "Eleito" no lugar da chance (certeza
+// aritmética > estatística).
+function renderProjecaoTV() {
+  const box = $("tv2t-proj");
+  if (!box) return;
+  const snap = state.ultimoSnapshot;
+  const pctApur = snap?.totais?.pct_apurado || 0;
+  if (!projecaoAplicavel() || !snap?.disponivel || pctApur >= 100) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  const linhas = $("tv2t-proj-linhas");
+  const aviso = $("tv2t-proj-aviso");
+  const pj = state.projecao;
+  if (!pj?.disponivel) {
+    linhas.innerHTML = `<div class="tv2t-proj-vazio">Aparece com 10% do eleitorado apurado</div>`;
+    aviso.textContent = "";
+    return;
+  }
+  const ordenados = [...pj.candidatos].sort((x, y) => y.pct - x.pct);
+  linhas.innerHTML = ordenados.map(c => {
+    const nome = state.ficha[c.sq_candidato]?.nome_urna || "—";
+    const cor = corDoCandidato(c.sq_candidato);
+    const margem = (c.ic95[1] - c.ic95[0]) / 2;
+    let chance;
+    if (state.eleitos.has(c.sq_candidato)) {
+      chance = `<span class="tv2t-proj-eleito">Eleito</span>`;
+    } else if (c.p_vitoria != null) {
+      const w = Math.round(c.p_vitoria * 100);
+      chance = `<span class="tv2t-proj-barra" aria-hidden="true"><span style="width:${w}%;background:${cor}"></span></span>`
+        + `<span class="tv2t-proj-chance">${textoChance(c.p_vitoria).replace(" de vencer", "")}</span>`;
+    } else {
+      chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 30%</span>`;
+    }
+    return `<div class="tv2t-proj-linha" style="--cor:${cor}">
+      <span class="tv2t-proj-nome">${nome}</span>
+      <span class="tv2t-proj-pct">${fmtPct1(c.pct)}<small> ±${margem.toFixed(1)}</small></span>
+      ${chance}
+    </div>`;
+  }).join("");
+  aviso.textContent = pj.aviso || "";
 }
 
 // Placar extra do modo TV 2T: diferença absoluta, barra de split
@@ -2873,20 +2980,6 @@ async function boot() {
   setInterval(() => { atualizarContagemRegressiva(); esconderColaSeFechado(); }, 1000);
   atualizarContagemRegressiva();
   esconderColaSeFechado();
-
-  // Atualiza "há X segundos" no elemento #ultimo a cada 5s
-  setInterval(() => {
-    const el = $("ultimo");
-    const iso = el?.dataset.iso;
-    if (!iso) return;
-    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    let rotulo;
-    if (diff < 5) rotulo = "agora";
-    else if (diff < 60) rotulo = `há ${diff}s`;
-    else if (diff < 3600) rotulo = `há ${Math.floor(diff / 60)}min`;
-    else rotulo = fmtHora(iso);
-    el.textContent = rotulo;
-  }, 5000);
 
   // Header ganha sombra ao rolar + botão voltar ao topo + scroll-spy do topnav
   const hero = document.querySelector(".hero");

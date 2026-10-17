@@ -2893,3 +2893,56 @@ body.is-tv .rodape-tv .btn-ghost {
 .rodape-legal a { color: inherit; text-decoration: underline; }
 
 /* (bloco antigo "body.modo-tv" removido — era de iteração abandonada) */
+
+/* ============ TV 2T · Projeção para 100% ============
+   % projetado ± margem (IC95) + chance de vitória por candidato.
+   Fonte grande pra leitura a 3 m; aviso legal pequeno mas legível. */
+.tv2t-proj { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.tv2t-proj[hidden] { display: none; }
+.tv2t-proj-tit { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.tv2t-proj-linha {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(110px, 1.1fr);
+  align-items: center; gap: 10px;
+  padding-left: 8px; border-left: 3px solid var(--cor);
+}
+.tv2t-proj-nome { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv2t-proj-pct { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--cor); text-align: right; }
+.tv2t-proj-pct small { font-size: 11px; font-weight: 600; color: var(--muted); }
+.tv2t-proj-barra { display: block; height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+.tv2t-proj-barra > span { display: block; height: 100%; border-radius: 3px; }
+.tv2t-proj-linha > .tv2t-proj-barra { grid-column: 3; grid-row: 1; align-self: start; margin-top: 2px; }
+.tv2t-proj-chance { grid-column: 3; grid-row: 1; align-self: end; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tv2t-proj-linha > .tv2t-proj-barra + .tv2t-proj-chance { margin-top: 12px; }
+.tv2t-proj-mudo { color: var(--muted); font-weight: 600; }
+.tv2t-proj-eleito { grid-column: 3; justify-self: start; font-size: 12px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: #0b0f19; background: #22c55e; border-radius: 999px; padding: 2px 10px; }
+.tv2t-proj-vazio { font-size: 12px; color: var(--muted); }
+.tv2t-proj-aviso { font-size: 10px; line-height: 1.35; color: var(--muted); }
+@media (min-width: 1920px) {
+  .tv2t-proj-nome { font-size: 18px; }
+  .tv2t-proj-pct { font-size: 26px; }
+  .tv2t-proj-chance, .tv2t-proj-eleito { font-size: 15px; }
+  .tv2t-proj-aviso { font-size: 12px; }
+}
+
+/* Projeção nos cards (fora da TV): legível, não 10px */
+.cand-proj { display: block; opacity: 1; font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 2px; line-height: 1.3; white-space: normal; }
+body.is-tv.turno-2 .cand-proj { display: none; }
+.status-coleta[hidden] { display: none; }
+.home-graf-msg { margin: 0; padding: 24px; color: var(--muted); font-size: 14px; text-align: center; }
+.aviso-projecao { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+body.is-tv .aviso-projecao { display: none; }
+/* TV 1360px: subs das estatísticas não quebram em 3 linhas */
+body.is-tv .stat-mini .stat-sub, body.is-tv .stat-mini .stat-label { white-space: nowrap; }
+body.is-tv .stat-ultimo #conexao { display: none; }
+body.is-tv .stat-mini .stat-value { white-space: nowrap; }
+body.is-tv .stat-secundarias { min-width: 0; }
+/* TVs HD (1280-1599px): sem espaço pros subtítulos "% dos aptos" —
+   mantém só rótulo + número + "há X" do último dado. */
+@media (max-width: 1599px) {
+  body.is-tv #pct-comparecimento, body.is-tv #pct-abstencoes,
+  body.is-tv .stat-mini:not(.stat-ultimo) .stat-sub { display: none; }
+}
+@media (max-width: 1599px) {
+  body.is-tv .stats { gap: 6px; }
+  body.is-tv .stat-mini { padding: 4px 8px; }
+}

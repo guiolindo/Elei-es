@@ -343,6 +343,7 @@ async def _calcular_projecao_tendencia(
         .where(and_(
             Snapshot.cod_cargo == cargo,
             Snapshot.abrangencia == abrangencia,
+            Snapshot.turno == snap_atual.turno,
             Snapshot.suspeito.is_(False),
             Snapshot.id <= snap_atual.id,
         ))
@@ -393,6 +394,159 @@ async def _calcular_projecao_tendencia(
             proj_votos = max(c.votos, min(proj_votos, 2 * proj_linear))
         proj_pct = (proj_votos / proj_validos * 100.0) if proj_validos > 0 else None
         out[c.sq_candidato] = {"votos": proj_votos, "pct": proj_pct}
+    return out
+
+
+_UFS_ESTRATOS = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT",
+    "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO",
+    "RR", "SC", "SP", "SE", "TO", "ZZ",
+]
+_CACHE_PROJECAO: dict[tuple, tuple[float, dict]] = {}
+_CACHE_PROJECAO_TTL = 15.0
+AVISO_PROJECAO = (
+    "Projeção estatística própria, calculada só com a apuração parcial "
+    "oficial do TSE. Não é pesquisa eleitoral nem resultado oficial."
+)
+
+
+@router.get("/apuracao/projecao")
+async def apuracao_projecao(
+    cargo: int = Query(..., description="1 (Presidente) ou 3 (Governador)"),
+    abrangencia: str = Query("BR"),
+    turno: int = Query(2, ge=2, le=2),
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Projeção do resultado final do 2º turno com intervalo de 95% e
+    probabilidade de vitória (math_engine/projecao.py).
+
+    Presidente: estratificado por 27 UFs + exterior, cada estrato com o
+    resultado do 1º turno como base. Governador: estrato único (a UF).
+    """
+    from time import monotonic
+    from math_engine.projecao import Estrato, projetar_2t
+
+    abr = abrangencia.upper()
+    if cargo == 1:
+        if abr != "BR":
+            return {"disponivel": False, "motivo": "presidente_so_br"}
+        abrs = _UFS_ESTRATOS
+    elif cargo == 3:
+        abrs = [abr]
+    else:
+        return {"disponivel": False, "motivo": "cargo_sem_2t"}
+
+    chave = (cargo, abr, turno)
+    hit = _CACHE_PROJECAO.get(chave)
+    if hit and monotonic() - hit[0] < _CACHE_PROJECAO_TTL:
+        return hit[1]
+
+    snap_ref = await _ultimo_snapshot(sess, cargo, abr, turno=turno)
+    if not snap_ref:
+        return {"disponivel": False, "motivo": "sem_snapshot"}
+    cands_ref = (await sess.execute(
+        select(SnapshotCandidato.sq_candidato).where(SnapshotCandidato.snapshot_id == snap_ref.id)
+        .order_by(SnapshotCandidato.posicao)
+    )).scalars().all()
+    if len(cands_ref) != 2:
+        return {"disponivel": False, "motivo": "nao_sao_2_candidatos"}
+    sq_a, sq_b = cands_ref
+
+    async def _snaps(t: int) -> dict[str, list]:
+        rows = (await sess.execute(
+            select(Snapshot.id, Snapshot.abrangencia,
+                   SnapshotTotais.qt_secoes_total, SnapshotTotais.qt_secoes_totalizadas,
+                   SnapshotTotais.qt_eleitorado_apto,
+                   SnapshotTotais.qt_eleitorado_apto_totalizadas)
+            .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
+            .where(Snapshot.cod_cargo == cargo, Snapshot.turno == t,
+                   Snapshot.suspeito.is_(False), Snapshot.abrangencia.in_(abrs))
+            .order_by(Snapshot.id)
+        )).all()
+        por_abr: dict[str, list] = {}
+        for r in rows:
+            por_abr.setdefault(r.abrangencia, []).append(r)
+        return por_abr
+
+    snaps_2t = await _snaps(turno)
+    snaps_1t = await _snaps(1)
+
+    atual = {a: rs[-1] for a, rs in snaps_2t.items()}
+    # Snapshot "antes" (~60% do progresso atual) pra medir a deriva real
+    antes = {}
+    for a, rs in snaps_2t.items():
+        alvo = 0.6 * (rs[-1].qt_eleitorado_apto_totalizadas or 0)
+        cand = [r for r in rs[:-1] if 0 < (r.qt_eleitorado_apto_totalizadas or 0) <= alvo]
+        if cand:
+            antes[a] = cand[-1]
+    base_1t = {a: rs[-1] for a, rs in snaps_1t.items()}
+
+    ids = {r.id for r in atual.values()} | {r.id for r in antes.values()} | {r.id for r in base_1t.values()}
+    votos: dict[int, dict[str, int]] = {}
+    if ids:
+        for sid, sq, v in (await sess.execute(
+            select(SnapshotCandidato.snapshot_id, SnapshotCandidato.sq_candidato,
+                   SnapshotCandidato.votos)
+            .where(SnapshotCandidato.snapshot_id.in_(ids),
+                   SnapshotCandidato.sq_candidato.in_([sq_a, sq_b]))
+        )).all():
+            votos.setdefault(sid, {})[sq] = v
+
+    def _estrato(r, prior) -> Estrato:
+        va = votos.get(r.id, {}).get(sq_a, 0)
+        vb = votos.get(r.id, {}).get(sq_b, 0)
+        return Estrato(
+            eleitorado=r.qt_eleitorado_apto or 0,
+            eleitorado_tot=r.qt_eleitorado_apto_totalizadas or 0,
+            validos=va + vb, votos_a=va,
+            secoes=r.qt_secoes_total or 0, secoes_tot=r.qt_secoes_totalizadas or 0,
+            prior_a=prior,
+        )
+
+    lista_agora, lista_antes = [], []
+    for a in abrs:
+        prior = None
+        r1 = base_1t.get(a)
+        if r1 is not None:
+            v1 = votos.get(r1.id, {})
+            pa, pb = v1.get(sq_a, 0), v1.get(sq_b, 0)
+            if pa + pb > 0:
+                prior = pa / (pa + pb)
+        r2 = atual.get(a)
+        if r2 is not None:
+            e_agora = _estrato(r2, prior)
+        elif r1 is not None:
+            # UF ainda sem JSON do 2T: eleitorado do 1T, nada apurado
+            e_agora = Estrato(r1.qt_eleitorado_apto or 0, 0, 0, 0,
+                              r1.qt_secoes_total or 0, 0, prior)
+        else:
+            continue
+        lista_agora.append(e_agora)
+        lista_antes.append(_estrato(antes[a], prior) if a in antes else e_agora)
+
+    proj = projetar_2t(lista_agora, lista_antes if antes else None)
+    if proj is None:
+        out = {"disponivel": False, "motivo": "apuracao_insuficiente_ou_completa"}
+    else:
+        def _p(x: float) -> float | None:
+            return round(min(max(x, 0.01), 0.99), 4) if proj.exibir_probabilidade else None
+        out = {
+            "disponivel": True,
+            "metodo": "estratificado_uf" if cargo == 1 else "estrato_unico",
+            "n_estratos": len(lista_agora),
+            "fracao_apurada": round(proj.fracao_apurada * 100, 2),
+            "exibir_probabilidade": proj.exibir_probabilidade,
+            "candidatos": [
+                {"sq_candidato": sq_a, "pct": round(proj.pct_a, 2),
+                 "ic95": [round(proj.ic95_a[0], 2), round(proj.ic95_a[1], 2)],
+                 "p_vitoria": _p(proj.p_vitoria_a), "votos": proj.votos_a},
+                {"sq_candidato": sq_b, "pct": round(proj.pct_b, 2),
+                 "ic95": [round(proj.ic95_b[0], 2), round(proj.ic95_b[1], 2)],
+                 "p_vitoria": _p(proj.p_vitoria_b), "votos": proj.votos_b},
+            ],
+            "aviso": AVISO_PROJECAO,
+        }
+    _CACHE_PROJECAO[chave] = (monotonic(), out)
     return out
 
 

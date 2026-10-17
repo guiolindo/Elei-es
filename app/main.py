@@ -64,6 +64,11 @@ async def _cleanup_snapshots_loop():
     while True:
         try:
             async with SessionLocal() as sess:
+                ids_zero: list[int] = []
+                # Snapshots com evento são preservados: Evento.snapshot_id é FK
+                # sem cascade (apagar quebraria o commit inteiro) e a linha do
+                # tempo depende deles.
+                com_evento = select(Evento.snapshot_id).distinct()
                 zero = (await sess.execute(
                     select(Snapshot.id, Snapshot.cod_cargo, Snapshot.abrangencia,
                            Snapshot.turno, Snapshot.coletado_em)
@@ -101,7 +106,8 @@ async def _cleanup_snapshots_loop():
                     ids_antigos = [r[0] for r in (await sess.execute(
                         select(Snapshot.id)
                         .where(Snapshot.cod_cargo == cargo, Snapshot.abrangencia == abr,
-                               Snapshot.turno == turno, Snapshot.coletado_em < corte)
+                               Snapshot.turno == turno, Snapshot.coletado_em < corte,
+                               Snapshot.id.not_in(com_evento))
                     )).all()]
                     if not ids_antigos:
                         continue
