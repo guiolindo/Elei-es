@@ -130,12 +130,15 @@ async def _snapshot_ja_existe(sess: AsyncSession, sha: str) -> bool:
 
 
 async def _ultimo_totalizadas(
-    sess: AsyncSession, cod_cargo: int, abrangencia: str
+    sess: AsyncSession, cod_cargo: int, abrangencia: str, turno: int
 ) -> int | None:
+    # Filtra por turno: sem isso, o 1º snapshot do 2T (poucas seções) era
+    # comparado com o último do 1T (100%) e marcado `suspeito` (retrocesso).
     q = (
         select(SnapshotTotais.qt_secoes_totalizadas)
         .join(Snapshot, Snapshot.id == SnapshotTotais.snapshot_id)
-        .where(Snapshot.cod_cargo == cod_cargo, Snapshot.abrangencia == abrangencia)
+        .where(Snapshot.cod_cargo == cod_cargo, Snapshot.abrangencia == abrangencia,
+               Snapshot.turno == turno)
         .order_by(Snapshot.coletado_em.desc())
         .limit(1)
     )
@@ -145,14 +148,22 @@ async def _ultimo_totalizadas(
 
 
 async def _eventos_existentes(
-    sess: AsyncSession, cod_cargo: int, abrangencia: str
-) -> set[tuple[str, str]]:
-    """Retorna (tipo, sq_candidato_a) já registrados p/ evitar duplicatas."""
-    q = select(Evento.tipo, Evento.sq_candidato_a).where(
-        Evento.cod_cargo == cod_cargo, Evento.abrangencia == abrangencia
+    sess: AsyncSession, cod_cargo: int, abrangencia: str, turno: int
+) -> set[tuple]:
+    """Chaves de eventos já registrados NESTE turno, pra evitar duplicatas.
+    Inclui (tipo, a) e (tipo, a, b) — VIRADA deduplica pelo par."""
+    q = (
+        select(Evento.tipo, Evento.sq_candidato_a, Evento.sq_candidato_b)
+        .join(Snapshot, Snapshot.id == Evento.snapshot_id)
+        .where(Evento.cod_cargo == cod_cargo, Evento.abrangencia == abrangencia,
+               Snapshot.turno == turno)
     )
     r = await sess.execute(q)
-    return {(t, a) for t, a in r.all()}
+    out: set[tuple] = set()
+    for t, a, b in r.all():
+        out.add((t, a))
+        out.add((t, a, b))
+    return out
 
 
 # Contadores do ciclo em curso — zerados no `loop()` antes de cada
@@ -212,7 +223,7 @@ async def processar_alvo(
         _stats_ciclo["novos"] += 1
 
         suspeito = False
-        ultimo = await _ultimo_totalizadas(sess, alvo.cod_cargo, alvo.abrangencia)
+        ultimo = await _ultimo_totalizadas(sess, alvo.cod_cargo, alvo.abrangencia, alvo.turno)
         if ultimo is not None and parsed.totais.qt_secoes_totalizadas < ultimo:
             log.warning(
                 "snapshot suspeito %s: totalizadas retrocedeu %d -> %d",
@@ -436,6 +447,7 @@ async def processar_alvo(
                 .where(
                     Snapshot.cod_cargo == alvo.cod_cargo,
                     Snapshot.abrangencia == alvo.abrangencia,
+                    Snapshot.turno == alvo.turno,
                     Snapshot.suspeito.is_(False),
                     Snapshot.id != snap.id,
                 )
@@ -452,7 +464,7 @@ async def processar_alvo(
                 if resumos_ant:
                     eventos.extend(detectar_viradas(resumos, resumos_ant))
 
-            ja = await _eventos_existentes(sess, alvo.cod_cargo, alvo.abrangencia)
+            ja = await _eventos_existentes(sess, alvo.cod_cargo, alvo.abrangencia, alvo.turno)
             for ev in eventos:
                 # Viradas podem repetir se candidato ping-pongar → dedupe por A+B
                 chave = (ev["tipo"], ev["sq_candidato_a"])

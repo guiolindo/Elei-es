@@ -57,6 +57,21 @@ def votos_restantes_max(totais: TotaisResumo) -> int:
     )
 
 
+def totais_consistentes(totais: TotaisResumo) -> bool:
+    """False quando os totais do TSE não permitem um limite superior
+    confiável de votos restantes. `votos_restantes_max` clampa pra 0 em
+    dados inconsistentes — sem esta guarda, 0 restantes com seções ainda
+    faltando viraria "eleição decidida" (falso positivo)."""
+    if totais.qt_eleitorado_apto <= 0:
+        return False
+    if totais.qt_eleitorado_apto_totalizadas > totais.qt_eleitorado_apto:
+        return False
+    if (votos_restantes_max(totais) == 0
+            and totais.qt_secoes_totalizadas < totais.qt_secoes_total):
+        return False
+    return True
+
+
 def pct_apurado(totais: TotaisResumo) -> float:
     if totais.qt_secoes_total <= 0:
         return 0.0
@@ -393,6 +408,8 @@ def _avaliar_2_turno(
     if cod_cargo not in (1, 3):
         # Cargos sem 2T (Senador, Deputado) não deveriam nem chegar aqui
         return []
+    if not totais_consistentes(totais):
+        return []
     ordenados = sorted(candidatos, key=lambda c: c.votos, reverse=True)
     if len(ordenados) < 2:
         return []
@@ -426,7 +443,9 @@ def _avaliar_2_turno(
     # eleito o mais idoso. Só aplicável se idade dos dois foi fornecida
     # em CandidatoResumo. Sem idade, motor NÃO decide — mantém em
     # disputa (TSE fará o desempate).
-    if restantes == 0 and a.votos == b.votos:
+    apuracao_completa = (totais.qt_secoes_total > 0
+                         and totais.qt_secoes_totalizadas == totais.qt_secoes_total)
+    if restantes == 0 and apuracao_completa and a.votos > 0 and a.votos == b.votos:
         if a.idade_anos is not None and b.idade_anos is not None and a.idade_anos != b.idade_anos:
             mais_velho, mais_novo = (a, b) if a.idade_anos > b.idade_anos else (b, a)
             tipo_ganhador = "ELEITO_2T" if cod_cargo == 1 else "ELEITO_MAJORITARIO"
@@ -486,6 +505,8 @@ def avaliar_apuracao(
     renovação de 1/3 do Senado).
     """
     if pct_apurado(totais) < APURACAO_MIN_PCT:
+        return []
+    if not totais_consistentes(totais):
         return []
     # EARLY RETURN pra cargos proporcionais (Dep Federal=6, Dep Estadual=7).
     # Esta função avaliar_apuracao() calcula apenas ELEITO/MATEMATICAMENTE_

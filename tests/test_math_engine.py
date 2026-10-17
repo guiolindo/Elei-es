@@ -720,3 +720,52 @@ def test_rj_gov_sub_judice_continua_2t():
     assert "ELEITO_MAJORITARIO" not in tipos, (
         f"Com sub judice ativo não deveria eleger no 1T; eventos={tipos}"
     )
+
+
+# ---- 2º turno: guardas contra dados inconsistentes do TSE ----
+
+def test_2t_nao_elege_com_apto_totalizadas_maior_que_apto():
+    """apto_tz > apto faz votos_restantes_max clampar em 0. Com 30% das
+    seções apuradas, isso NÃO pode virar ELEITO_2T."""
+    cands = [CandidatoResumo("A", 101), CandidatoResumo("B", 100)]
+    t = totais(100, 30, 1000, 5000, 201)
+    assert avaliar_apuracao(cands, t, cod_cargo=1, turno=2) == []
+
+
+def test_2t_nao_elege_sem_bloco_eleitorado():
+    """Parser zera apto/apto_tz quando o bloco `e` falta no JSON."""
+    cands = [CandidatoResumo("A", 900), CandidatoResumo("B", 100)]
+    t = totais(100, 50, 0, 0, 1000)
+    assert avaliar_apuracao(cands, t, cod_cargo=3, turno=2) == []
+
+
+def test_2t_desempate_idade_so_com_100pct_secoes():
+    """Empate com restantes=0 mas seções faltando: não decide por idade."""
+    cands = [CandidatoResumo("A", 100, idade_anos=70),
+             CandidatoResumo("B", 100, idade_anos=50)]
+    t = totais(100, 50, 1000, 1000, 200)
+    assert avaliar_apuracao(cands, t, cod_cargo=1, turno=2) == []
+
+
+def test_2t_desempate_idade_com_100pct_elege_mais_velho():
+    cands = [CandidatoResumo("A", 100, idade_anos=50),
+             CandidatoResumo("B", 100, idade_anos=70)]
+    t = totais(100, 100, 1000, 1000, 200)
+    ev = avaliar_apuracao(cands, t, cod_cargo=1, turno=2)
+    assert [e["tipo"] for e in ev] == ["ELEITO_2T", "MATEMATICAMENTE_ELIMINADO"]
+    assert ev[0]["sq_candidato_a"] == "B"
+    assert ev[1]["sq_candidato_a"] == "A"
+
+
+def test_2t_desempate_nao_dispara_com_zero_votos():
+    cands = [CandidatoResumo("A", 0, idade_anos=70),
+             CandidatoResumo("B", 0, idade_anos=50)]
+    t = totais(100, 100, 1000, 1000, 0)
+    assert avaliar_apuracao(cands, t, cod_cargo=1, turno=2) == []
+
+
+def test_1t_nao_elege_com_totais_inconsistentes():
+    cands = [CandidatoResumo("A", 900), CandidatoResumo("B", 50),
+             CandidatoResumo("C", 50)]
+    t = totais(100, 30, 1000, 5000, 1000)
+    assert avaliar_apuracao(cands, t, cod_cargo=1, turno=1) == []
