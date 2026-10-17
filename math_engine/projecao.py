@@ -39,6 +39,19 @@ TAU_NAT = 0.010       # deriva correlacionada entre todos os estratos
 # Fator multiplicativo do desvio-padrão por fração do eleitorado apurada.
 FATOR_SD_FAIXAS = ((0.30, 1.8), (0.50, 1.4), (0.80, 1.15), (1.01, 1.0))
 
+# Swing δ "deixando o próprio estrato de fora" (leave-one-out), pra o share
+# de um estado não entrar duas vezes na própria projeção (em q_u e em δ).
+# Testado (val.py, sementes fora do ajuste): com 28 estratos o efeito é
+# nulo dentro do erro de simulação — fica desligado pra não mexer no que
+# está validado. O caso em que a contagem dupla importa (estrato único) é
+# tratado abaixo, em projetar_2t.
+DELTA_LOO = False
+# Estrato único (Governador): δ só poderia sair do próprio estrato e aí
+# p+δ = q — o 1º turno era anulado e a variância contava duas fontes.
+# Usa o 1T sem swing, com a incerteza do swing somada à do prior.
+# HEURÍSTICO (não calibrado em eleição real): ~ desvio do swing 1T→2T.
+TAU_SWING = 0.04
+
 FRACAO_MIN_PROJECAO = 0.10   # abaixo disso não projeta
 FRACAO_MIN_PROBABILIDADE = 0.30
 P_MAX_EXIBIDA = 0.99
@@ -133,8 +146,8 @@ def projetar_2t(estratos: list[Estrato], antes: list[Estrato] | None = None) -> 
     # Swing nacional 1T→2T a partir dos estratos com prior e dados
     com_prior = [e for e in estratos if e.prior_a is not None and e.validos > 0]
     den = sum(e.validos for e in com_prior)
-    delta = (sum(e.validos * (e.votos_a / e.validos - e.prior_a) for e in com_prior) / den
-             if den else 0.0)
+    num_delta = sum(e.validos * (e.votos_a / e.validos - e.prior_a) for e in com_prior)
+    delta = num_delta / den if den else 0.0
     if den:
         pesos = [e.validos / den for e in com_prior]
         n_eff = 1.0 / sum(w * w for w in pesos)
@@ -160,9 +173,20 @@ def projetar_2t(estratos: list[Estrato], antes: list[Estrato] | None = None) -> 
             if p is not None:
                 vp = TAU_P ** 2
                 wo = (1 / vo) / (1 / vo + 1 / vp)
-                m = wo * q + (1 - wo) * (p + delta)
-                v = 1 / (1 / vo + 1 / vp)
-                wp = 1 - wo
+                outros = den - e.validos
+                if outros > 0:
+                    d_u = delta
+                    if DELTA_LOO:
+                        d_u = (num_delta - e.validos * (q - p)) / outros
+                    m = wo * q + (1 - wo) * (p + d_u)
+                    v = 1 / (1 / vo + 1 / vp)
+                    wp = 1 - wo
+                else:  # único estrato com dado: 1T puro + incerteza do swing
+                    vp2 = TAU_P ** 2 + TAU_SWING ** 2
+                    wo2 = (1 / vo) / (1 / vo + 1 / vp2)
+                    m = wo2 * q + (1 - wo2) * p
+                    v = 1 / (1 / vo + 1 / vp2)
+                    wp = 0.0
             else:
                 m, v, wp = q, vo, 0.0
         elif p is not None:

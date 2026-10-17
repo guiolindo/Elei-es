@@ -296,9 +296,97 @@ Quando qualquer guarda falha, o campo `projecao_tendencia` fica `null` — o fro
 Fonte: `app/api.py:_calcular_projecao_tendencia`.
 
 ### 8.3. Limitações conhecidas (honestas)
-- **Composição regional das urnas faltantes não é modelada**. Modelo mais sofisticado (projeção por UF ponderada por eleitorado, usando os snapshots paralelos de cada UF) está no roadmap pós-eleição.
+- **Composição regional das urnas faltantes não é modelada**. No 2º turno isso é tratado pela estimativa estratificada (8.4).
 - **Sem backtest histórico ainda**. Os parâmetros (janela de 15, mínimo de 30% apurado) são escolhas heurísticas razoáveis mas não validadas contra erro observado em eleições passadas. Validação retroativa com dados 2022/2026 fica pra depois do dia D.
 - **Sem intervalo de incerteza estatístico**. A "faixa" exibida é só a diferença entre as duas métricas aritméticas — informativa mas não é um intervalo de confiança formal.
+
+### 8.4. Estimativa do 2º turno (estratificada) — `math_engine/projecao.py`
+
+Usada só no 2º turno, Presidente-BR e Governador. As seções 8.1–8.3 valem para o 1º turno.
+
+**Dados de entrada por estrato `u`** (Presidente: 27 UFs + exterior; Governador: a própria UF), do último snapshot não-suspeito do 2T:
+`E_u` eleitorado apto · `E_cu` apto das seções já totalizadas · `A_u`, `B_u` votos de A e B · `V_u = A_u + B_u` (no 2T, válidos = A + B) · `n_cu` seções totalizadas · `n_u` seções totais. **Prior** `p_u = A¹_u / (A¹_u + B¹_u)` com os votos de A e B no 1º turno daquele estrato.
+
+**Passo 1 — válidos restantes** (inclui comparecimento *e* brancos/nulos, porque a razão é medida em válidos por apto):
+```
+r_u = V_u / E_cu                 (estrato sem voto ainda: r_nat = ΣV / ΣE_c)
+R_u = r_u · (E_u − E_cu)
+```
+
+**Passo 2 — swing nacional 1T→2T**, ponderado por válidos, só estratos com prior e voto:
+```
+δ = Σ V_u (q_u − p_u) / Σ V_u,   q_u = A_u / V_u
+var(δ) = τ_p² / n_eff,           n_eff = 1 / Σ (V_u/ΣV)²
+```
+
+**Passo 3 — share de A nos votos que faltam** (mistura por precisão, não linear no % apurado):
+```
+v_o = drift_a² + c²/n_cu + b²/(n_u − n_cu)        variância do observado como preditor do restante
+w   = (1/v_o) / (1/v_o + 1/τ_p²)
+m_u = w · q_u + (1 − w) · (p_u + δ)
+v_u = 1 / (1/v_o + 1/τ_p²)
+```
+`drift_a` é um **piso**: mesmo com 99% apurado, o observado nunca vira certeza sobre as seções que faltam (elas não são amostra aleatória). Com os valores atuais o peso do observado fica **no máximo ≈ 0,44** (`1/0,028²` contra `1/0,025²`).
+Casos: estrato sem prior → `m = q`, `v = v_o`; sem voto ainda → `m = p + δ`, `v = τ_p²`; sem nenhum dos dois → `m = q_nat`, `v = τ_sem_prior²`.
+**Estrato único (Governador)**: `δ` sairia do próprio estrato e `p + δ = q` — o 1T era anulado e a variância contava duas fontes. Desde 17/10: `m = w′q + (1−w′)p`, com `τ′² = τ_p² + τ_swing²` no lugar de `τ_p²`.
+
+**Passo 4 — total e incerteza**:
+```
+S   = (Σ A_u + Σ R_u m_u) / (Σ V_u + Σ R_u)
+Var = [ Σ R_u² v_u  +  (Σ R_u (1−w_u))² var(δ)  +  (τ_nat Σ R_u)² ] / (ΣV + ΣR)²
+sd  = √Var · f(fração apurada)        f = 1,8 (<30%) · 1,4 (<50%) · 1,15 (<80%) · 1,0
+IC95 = S ± 1,96 sd          P(A vence) = Φ((S − 0,5)/sd)        B = complemento
+```
+`drift_a` e `τ_nat` são substituídos pelo máximo entre a constante e o valor **medido** comparando o snapshot atual com o de ~60% do progresso (`estimar_deriva`): a banda só alarga, nunca estreita. A chance é exibida só a partir de 30% apurado, recortada em 1–99% (recorte só de exibição; o modelo é a normal acima).
+
+**Não usa** extrapolação de tendência: votos que mudam ao longo da noite refletem *de onde* vêm as urnas, e isso já está nos estratos.
+
+#### Origem de cada parâmetro
+
+| Parâmetro | Valor | Origem |
+|---|---|---|
+| `drift_a`, `c`, `b` | 0,028 · 0,37 · 0,12 | Regressão ponderada em simulação (cenário "base", semente 99). **Sintético.** |
+| `τ_p` | 0,025 | Heurístico (erro típico do 1T como guia do 2T por UF). |
+| `τ_nat` | 0,010 | Heurístico. |
+| `τ_sem_prior` | 0,10 | Heurístico. |
+| `τ_swing` | 0,04 | Heurístico; a escolha da regra de estrato único foi decidida na semente 555 e conferida em 31337 (abaixo). |
+| `f(fração)` | 1,8/1,4/1,15/1,0 | Escolhido olhando simulações base/hard — **sementes que também serviram de avaliação na época (vazamento)**. |
+| 10% / 30% | limiares | Heurísticos de produto. |
+
+**Nenhum parâmetro foi calibrado em eleição real.** O simulador usa eleitorado e voto por UF do 2T de 2022 e uma ordem regional de apuração Sul/Sudeste → Norte/Nordeste, mas a sequência real de parciais de 2022 não foi reproduzida.
+
+#### Simulador e resultados (17/10/2026)
+
+`scratchpad/agentB/sim.py` (fora do repositório): 28 estratos com seções em blocos; voto por bloco = logit(share da UF + choque nacional) + viés ligado à **posição na fila de apuração dentro da UF** (capital × interior) + ruído; comparecimento por bloco, correlacionado à ordem no N/NE; prior = share final − swing + ruído. Cenários: **base**; **hard** (viés intra-UF 2×, prior pior); **adverso** — criado depois do ajuste e **nunca usado para escolher nada**: viés intra-UF 3×, comparecimento ligado à ordem, prior pior (σ 5 pp), swing grande (σ 5 pp).
+
+Medido só no que a tela mostra (≥30% apurado, 7 pontos de corte × 300 eleições = 2.100 previsões por cenário; pontos da mesma eleição são correlacionados, então o n efetivo é menor), semente de relatório 31337:
+
+| Presidente | erro médio | IC95 contém o real | prev. 50–70% → real | prev. 70–90% → real | prev. 90–99% → real |
+|---|---|---|---|---|---|
+| base | 0,37 pp | 100% | 61% → 63% ±7 | 81% → 84% ±4 | 96% → 99% ±1 |
+| hard | 0,68 pp | 99,2% | 61% → 59% ±7 | 81% → **72% ±5** | 96% → 98% ±1 |
+| adverso | 0,99 pp | 98,2% | 60% → **54% ±6** | 82% → **68% ±4** | 96% → 96% ±2 |
+
+Leitura: o **IC95 está conservador** (cobre mais que 95%) em todos os cenários. A **chance de vencer é bem calibrada no cenário base, mas fica confiante demais na faixa 60–90% quando há viés forte capital × interior** (hard/adverso). Acima de 90% está calibrada nos três.
+
+Governador (estrato único, UFs AC/AM/DF/ES/RN/TO, disputas recentradas perto de 50%, 400 eleições, semente 31337), regra antiga → nova:
+
+| | erro médio | Brier | prev. 70–90% → real |
+|---|---|---|---|
+| base | 0,79 → **0,72** pp | 0,047 → **0,044** | 81% → 93% / 96% (ambas subconfiantes) |
+| hard | 1,48 → **1,28** pp | 0,078 → **0,070** | 81% → 78% / **85%** |
+| adverso | 2,17 → **1,81** pp | 0,106 → **0,094** | 81% → 66% / **79%** |
+
+Leave-one-out no swing (Presidente): efeito nulo dentro do erro de simulação → desligado (`DELTA_LOO = False`).
+
+#### Plano de validação retrospectiva (pós-eleição, sem vazamento)
+
+1. **Dados**: arquivos públicos do TSE de 2018 e 2022 (dadosabertos.tse.jus.br) com resultado por seção nos dois turnos: votação por seção, boletins de urna e eleitorado por seção. Verificar se os boletins trazem horário de recebimento/totalização; se trouxerem, reconstruir a **ordem real** da apuração. Se não, usar ordens alternativas plausíveis (por zona e município, capital primeiro), marcadas como aproximação.
+2. **Reconstrução**: em cada instante `t`, só a informação disponível em `t` (seções totalizadas até `t`; 1T completo como prior). Nada do resultado final entra.
+3. **Separação**: ajustar constantes em **2018**; avaliar em **2022** sem tocar em nada. Depois do 2T de 2026, avaliar em 2026 como terceiro conjunto.
+4. **Métricas separadas**: erro absoluto do share final por % apurado; cobertura empírica do IC95; calibração da probabilidade (diagrama de confiabilidade com intervalos, Brier); acerto do vencedor — com bootstrap por eleição para os intervalos.
+5. **Comparação** de variantes nos mesmos instantes: atual × estratificação municipal (Governador e UFs grandes), medindo também custo (requisições por ciclo ao TSE).
+6. Só então decidir constantes novas e a versão municipal.
 
 ## Auditoria
 

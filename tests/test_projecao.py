@@ -47,9 +47,25 @@ def test_probabilidade_so_exibida_a_partir_de_30pct():
     assert projetar_2t([e(1_000_000, 0.35, 0.55, 0.55)]).exibir_probabilidade is True
 
 
-def test_estrato_unico_projeta_share_atual():
+def test_estrato_unico_usa_o_1t_sem_contar_o_parcial_duas_vezes():
+    """Governador (um estrato só): o swing δ só sairia do próprio estrato e
+    p+δ = q — o 1º turno era anulado e a margem contava duas fontes. Agora
+    a projeção fica entre o parcial (53,7%) e o 1T (52%), e a margem é mais
+    larga que a da combinação ingênua."""
+    import math
+    from math_engine import projecao as PM
     p = projetar_2t([e(10_000_000, 0.5, 0.537, 0.52)])
-    assert abs(p.pct_a - 53.7) < 0.05
+    assert 52.0 < p.pct_a < 53.7
+    vo = PM._s_w(5_000, 5_000, PM.DRIFT_A) ** 2
+    sd_ingenuo = math.sqrt(1 / (1 / vo + 1 / PM.TAU_P ** 2))  # por eleitor restante
+    sd_novo = math.sqrt(1 / (1 / vo + 1 / (PM.TAU_P ** 2 + PM.TAU_SWING ** 2)))
+    assert sd_novo > sd_ingenuo
+
+
+def test_varios_estratos_mantem_o_swing_nacional():
+    """Presidente: com outros estratos o comportamento é o validado (δ entra)."""
+    a = projetar_2t([e(10_000_000, 0.5, 0.537, 0.52), e(10_000_000, 0.5, 0.537, 0.52)])
+    assert abs(a.pct_a - 53.7) < 0.05  # q = p+δ em todos → projeta o observado
 
 
 def test_intervalo_estreita_com_mais_apurado():
