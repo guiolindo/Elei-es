@@ -356,21 +356,21 @@ body.is-tv .turno-btn { font-size: 11px; padding: 4px 12px; }
 .stat-hero {
   background: linear-gradient(160deg, rgba(240,180,41,.14), rgba(240,180,41,.04));
   border-color: rgba(240,180,41,.25);
-  padding: 20px 24px;
+  padding: 14px 20px;
   display: flex; flex-direction: column; justify-content: center;
 }
 .stat-hero .stat-value {
-  font-size: 56px; margin-top: 8px; letter-spacing: -0.045em;
+  font-size: 44px; margin-top: 4px; letter-spacing: -0.045em;
   background: var(--grad-a); -webkit-background-clip: text; background-clip: text;
   color: transparent;
 }
-.stat-hero .stat-progress { height: 8px; margin-top: 12px; border-radius: 4px; }
-.stat-hero .stat-sub { font-size: 13px; margin-top: 10px; }
+.stat-hero .stat-progress { height: 8px; margin-top: 8px; border-radius: 4px; }
+.stat-hero .stat-sub { font-size: 13px; margin-top: 6px; }
 /* Grid interno das secundárias */
 .stat-secundarias {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
 }
-.stat-mini { padding: 14px 16px; }
+.stat-mini { padding: 12px 16px; }
 .stat-mini .stat-value { font-size: 20px; margin-top: 4px; }
 .stat-mini .stat-sub { font-size: 11px; }
 .stat-progress {
@@ -2990,3 +2990,64 @@ body.is-tv .stat-secundarias { min-width: 0; }
 body:not(.is-tv) .home-graf-secao.graf-vazio .home-graf-wrap { min-height: 0; }
 body:not(.is-tv) .home-graf-secao.graf-vazio #graf-home { display: none; }
 body:not(.is-tv) .home-graf-secao.graf-vazio .home-graf-vazio { position: static; }
+
+/* ============ Duelo do 2º turno (antes da apuração) ============
+   Substitui as caixas de zeros do topo: quem disputa + quando começa. */
+.duelo {
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  margin: 8px 0 28px; padding: 28px 24px 24px;
+  background: radial-gradient(ellipse at top, rgba(240,180,41,.10), transparent 60%), var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--radius); text-align: center;
+}
+.duelo[hidden], body.is-tv .duelo { display: none !important; }
+body.pre-apuracao .hero .stats, body.pre-apuracao #countdown { display: none !important; }
+.duelo-tit { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--brand); }
+.duelo-cands { display: flex; align-items: flex-start; justify-content: center; gap: clamp(16px, 5vw, 64px); width: 100%; }
+.duelo-cand { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 0 1 260px; min-width: 0; }
+.duelo-foto {
+  width: 112px; height: 112px; border-radius: 50%; object-fit: cover;
+  border: 4px solid var(--cor); background: var(--surface-3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; font-weight: 900; color: #fff;
+}
+.duelo-nome { font-size: 22px; font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
+.duelo-meta { display: flex; align-items: center; gap: 6px; }
+.duelo-x { align-self: center; margin-top: -36px; font-size: 34px; font-weight: 300; color: var(--muted); }
+.duelo-quando { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.duelo-quando-lab { font-size: 14px; color: var(--muted); }
+.duelo-cd { font-size: 20px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.duelo-cd b { font-size: 40px; font-weight: 900; color: var(--fg); letter-spacing: -0.02em; }
+.duelo-data { font-size: 15px; color: var(--fg); }
+.duelo-sub { margin: 0; font-size: 13px; color: var(--muted); }
+@media (max-width: 768px) {
+  main.page.m-tab-placar > .duelo:not([hidden]) { display: flex; }
+  body.pre-apuracao .m-stats { display: none !important; }
+  .duelo { margin: 6px 0 18px; padding: 20px 12px 18px; gap: 14px; }
+  .duelo-foto { width: 76px; height: 76px; font-size: 24px; border-width: 3px; }
+  .duelo-nome { font-size: 16px; }
+  .duelo-tit { font-size: 12px; letter-spacing: 1px; }
+  .duelo-x { font-size: 26px; margin-top: -26px; }
+  .duelo-cd b { font-size: 28px; }
+  .duelo-cd { font-size: 15px; }
+  .duelo-data { font-size: 14px; }
+}
+
+/* Projeção é ESTIMATIVA: hierarquia abaixo do resultado oficial.
+   Borda tracejada, sem fundo de destaque, números neutros (a cor do
+   partido fica só na barra/borda), selo "não oficial". */
+.selo-nao-oficial {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--line-2, rgba(255,255,255,.2)); color: var(--muted);
+  font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: none; vertical-align: middle;
+}
+.proj-painel { background: transparent; border-style: dashed; margin: 4px 0 20px; }
+.proj-painel .tv2t-proj-pct, .tv2t-proj .tv2t-proj-pct { color: var(--fg); opacity: .85; font-weight: 700; }
+.proj-painel .tv2t-proj-pct { font-size: 18px; }
+.proj-painel .tv2t-proj-nome { font-size: 14px; font-weight: 600; }
+.proj-painel .tv2t-proj-barra { height: 4px; opacity: .7; }
+.tv2t-proj-pct { font-size: 17px; }
+@media (min-width: 1920px) { .tv2t-proj-pct { font-size: 21px; } }
+@media (max-width: 768px) {
+  .proj-painel .tv2t-proj-pct { font-size: 17px; }
+  .proj-painel .tv2t-proj-nome { font-size: 14px; }
+}

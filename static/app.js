@@ -1,5 +1,5 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261017j";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017j";
+import { renderMapa } from "/static/mapa-br.js?v=20261017n";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017n";
 
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
@@ -155,6 +155,7 @@ function alternarModoTV() {
       try { atualizarPlacar2T(); } catch(e) {}
       try { renderProjecaoTV(); } catch(e) {}
       try { renderProjecaoPainel(); } catch(e) {}
+      try { renderDuelo(); } catch(e) {}
       window.dispatchEvent(new Event("resize"));
     }, 120);
   });
@@ -829,6 +830,8 @@ function renderSkeletons(n = 6) {
 function renderLista() {
   const el = $("lista-candidatos");
   el.innerHTML = "";
+  // Busca/filtro/ordenação só atrapalham com poucos nomes (2T tem 2).
+  document.querySelector(".filtro-lista")?.classList.toggle("oculto", (state.candidatos || []).length <= 4);
   const filtrados = candidatosFiltrados();
   // Detecta candidatos "em conflito": mesmo (uf, numero) com >1 ativo.
   // Caso real 2026: Guto Schiavetto SP-144 tem 2 sq_candidato ambos
@@ -2183,6 +2186,7 @@ async function refreshApuracao() {
   }
   try { renderProjecaoTV(); } catch(e) {}
   try { renderProjecaoPainel(); } catch(e) {}
+  try { renderDuelo(); } catch(e) {}
 }
 
 // Bloco "Projeção para 100%" do placar TV 2T. Mostra % projetado,
@@ -2240,7 +2244,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
     }
     return `<div class="tv2t-proj-linha" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
       <span class="tv2t-proj-nome">${nome}</span>
-      <span class="tv2t-proj-pct" aria-label="${fmtPct1(c.pct)}, margem de ${margem.toFixed(1)} pontos">${fmtPct1(c.pct)}<small> ±${margem.toFixed(1)}</small></span>
+      <span class="tv2t-proj-pct" aria-label="Estimativa: cerca de ${fmtPct1(c.pct)}, margem de ${margem.toFixed(1)} pontos">≈${fmtPct1(c.pct)}<small> ±${margem.toFixed(1)}</small></span>
       ${chance}
     </div>`;
   }).join("");
@@ -2483,7 +2487,8 @@ function atualizarContagemRegressiva() {
   const titulo = state.turno === 2 ? "2º turno começa em" : "Apuração começa em";
   const dataStr = state.turno === 2 ? "· 25/10 17h BRT" : "· 4/10 17h BRT";
   const diff = alvo.getTime() - Date.now();
-  if (diff <= 0) { el.classList.add("oculto"); return; }
+  const apurando = (state.ultimoSnapshot?.totais?.pct_apurado || 0) > 0;
+  if (diff <= 0 || apurando) { el.classList.add("oculto"); return; }
   const dias = Math.floor(diff / 86_400_000);
   const horas = Math.floor((diff % 86_400_000) / 3_600_000);
   const min = Math.floor((diff % 3_600_000) / 60_000);
@@ -2510,6 +2515,61 @@ function esconderColaSeFechado() {
   document.querySelectorAll(
     ".cta-brand, .m-icon-cta, .d-topnav-cta, #btn-cola-cta"
   ).forEach(el => el.classList.add("oculto"));
+}
+
+// ============ Duelo do 2º turno (antes da apuração) ============
+// Antes da apuração, as 5 caixas do topo só mostravam zeros e "há 2 dias".
+// O que importa nesse momento é QUEM disputa e QUANDO começa — então elas
+// dão lugar a este bloco. Some sozinho quando o TSE publica o 1º voto.
+function emPreApuracao() {
+  const snap = state.ultimoSnapshot;
+  return !snap?.disponivel || (snap.totais?.pct_apurado || 0) === 0;
+}
+
+function renderDuelo() {
+  const box = $("duelo");
+  if (!box) return;
+  const ativos = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo");
+  const mostrar = state.turno === 2 && ativos.length === 2 && emPreApuracao()
+    && !document.body.classList.contains("is-tv");
+  box.hidden = !mostrar;
+  document.body.classList.toggle("pre-apuracao", mostrar);
+  if (!mostrar) return;
+  const cargo = state.cargo === 1 ? "Presidente da República"
+    : `Governador${state.abrangencia ? " · " + state.abrangencia : ""}`;
+  $("duelo-tit").textContent = `2º turno · ${cargo}`;
+  const card = c => `<div class="duelo-cand" style="--cor:${corPartido(c.partido)}">
+      <img class="duelo-foto" src="${c.foto}" alt="" decoding="async">
+      <div class="duelo-nome">${c.nome_urna}</div>
+      <div class="duelo-meta"><span class="cand-numero-tag">${c.numero}</span>${badgePartidoHtml(c.partido)}</div>
+    </div>`;
+  const cands = $("duelo-cands");
+  const chave = ativos.map(c => c.sq_candidato).join(",");
+  if (cands.dataset.chave !== chave) {
+    cands.innerHTML = card(ativos[0]) + `<span class="duelo-x" aria-hidden="true">×</span>` + card(ativos[1]);
+    cands.dataset.chave = chave;
+    cands.querySelectorAll(".duelo-foto").forEach((img, i) =>
+      anexarFotoComRetry(img, ativos[i].nome_urna, ativos[i].partido));
+  }
+  const dataTxt = DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, weekday: "long", day: "2-digit", month: "2-digit" });
+  $("duelo-data").textContent = `${dataTxt}, às 17h (horário de Brasília)`;
+  tickDuelo();
+}
+
+function tickDuelo() {
+  const el = $("duelo-cd");
+  if (!el || $("duelo")?.hidden) return;
+  const diff = DIA_D_2T.getTime() - Date.now();
+  if (diff <= 0) {
+    $("duelo-quando-lab").textContent = "As urnas fecharam.";
+    el.textContent = "Apuração começando…";
+    return;
+  }
+  const d = Math.floor(diff / 86_400_000), h = Math.floor(diff % 86_400_000 / 3_600_000),
+        m = Math.floor(diff % 3_600_000 / 60_000), sg = Math.floor(diff % 60_000 / 1000);
+  const p2 = n => String(n).padStart(2, "0");
+  el.innerHTML = (d ? `<b>${d}</b>${d === 1 ? " dia" : " dias"} ` : "")
+    + `<b>${p2(h)}</b>h <b>${p2(m)}</b>min <b>${p2(sg)}</b>s`;
 }
 
 // ============ UX: título dinâmico da aba ============
@@ -3011,7 +3071,7 @@ async function boot() {
   $("btn-ajuda")?.addEventListener("click", abrirAjuda);
 
   // Countdown regressivo enquanto TSE não abre a apuração
-  setInterval(() => { atualizarContagemRegressiva(); esconderColaSeFechado(); }, 1000);
+  setInterval(() => { atualizarContagemRegressiva(); esconderColaSeFechado(); tickDuelo(); }, 1000);
   atualizarContagemRegressiva();
   esconderColaSeFechado();
 
