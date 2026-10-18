@@ -357,7 +357,7 @@ async function renderPainelStatusColeta() {
     textoConexao = "Conectando ao TSE…";
   } else {
     estado = "stale-warn";
-    textoConexao = "Conexão com o TSE instável — tentando de novo";
+    textoConexao = "Conexão com o TSE instável, tentando de novo";
   }
   const diaD = state.turno === 2 ? DIA_D_2T : DIA_D;
   const nomeTurno = state.turno === 2 ? "do 2º turno" : "do 1º turno";
@@ -1002,7 +1002,7 @@ function renderLista() {
       }[prop.status] || "";
       const fed = prop.federacao ? ` · Fed.` : "";
       const title = alta ? prop.status
-                         : `${prop.status} — cálculo baseado em ${dec(pctApurProp, 1)}% apurado; muda conforme chegam mais votos`;
+                         : `${prop.status}: cálculo com ${dec(pctApurProp, 1)}% apurado, muda conforme chegam votos`;
       badgeProp = `<div class="badge-prop ${cls}" title="${title}">${label}${fed}</div>`;
       // Status projetado — só mostra quando difere do atual. Útil pra
       // proporcional: candidato ainda não está eleito, mas se o ritmo
@@ -1015,7 +1015,7 @@ function renderLista() {
           nao_atingiu_barreira: "~ proj. s/ barreira",
           partido_sem_vaga: "~ proj. partido s/ vaga",
         }[sp] || `~ proj. ${sp}`;
-        badgeProp += `<div class="badge-prop-proj" title="Projeção baseada no ritmo recente — não é resultado final">${labelProj}</div>`;
+        badgeProp += `<div class="badge-prop-proj" title="Projeção pelo ritmo recente, não é resultado final">${labelProj}</div>`;
       }
     }
     const pillPart = badgePartidoHtml(c.partido);
@@ -1036,7 +1036,7 @@ function renderLista() {
       }[ficha.situacao] || "Fora da disputa";
       tarja = `<div class="cand-tarja tarja-retirado">
         <svg width="14" height="14" aria-hidden="true"><use href="#i-x"/></svg>
-        <span>${motivo} — votos nulos por lei</span>
+        <span>${motivo}: votos nulos por lei</span>
       </div>`;
     } else if (eleito) {
       tarja = `<div class="cand-tarja tarja-eleito">
@@ -1064,7 +1064,7 @@ function renderLista() {
     if (conflito && !retirado) {
       tarja = `<div class="cand-tarja tarja-conflito">
         <svg width="14" height="14" aria-hidden="true"><use href="#i-info"/></svg>
-        <span>TSE tem 2 registros ativos neste número — só um receberá votos</span>
+        <span>O TSE tem 2 registros ativos neste número, e só um receberá votos</span>
       </div>` + tarja;
     }
     // Layout redesenhado: header (foto + nome/partido) → métricas
@@ -1225,7 +1225,7 @@ function atualizarSubtitulo() {
   const abr = state.abrangencia === "BR" ? "Brasil" : state.abrangencia;
   $("titulo-lista").textContent = `${cargoNome} · ${abr}`;
   if (state.cargo === 1 && state.abrangencia !== "BR") {
-    $("sub-lista").innerHTML = `Votos de presidente <strong>só no estado ${abr}</strong> — o resultado que vale é o nacional.`;
+    $("sub-lista").innerHTML = `Votos de presidente <strong>só no estado ${abr}</strong>. O resultado que vale é o nacional.`;
   } else {
     // Instrução de comparação só quando há nomes suficientes pra escolher
     $("sub-lista").innerHTML = (state.candidatos || []).length > 4
@@ -1835,7 +1835,7 @@ async function atualizarPainelTotais() {
         }
         projTxt = ` · ~ ${vTxt}${pTxt} proj.`;
       }
-      const tooltip = "Projeção aritmética — faixa entre extrapolação linear e "
+      const tooltip = "Projeção aritmética: faixa entre extrapolação linear e "
         + "janela móvel das últimas 15 atualizações. Não considera composição "
         + "regional das urnas faltantes. Projeção de % só em cargos majoritários. "
         + "Some ao atingir 100%.";
@@ -2194,7 +2194,7 @@ async function carregarEventos() {
     const comecou = (state.ultimoSnapshot?.totais?.pct_apurado || 0) > 0;
     ul.innerHTML = comecou
       ? `<li class="vazio">Nenhuma virada nem decisão matemática até agora.</li>`
-      : `<li class="vazio">Sem eventos — a apuração ainda não começou.</li>`;
+      : `<li class="vazio">A apuração ainda não começou.</li>`;
     return;
   }
   ul.innerHTML = "";
@@ -2823,7 +2823,7 @@ const NOTAS_CONTEXTO = [
   {
     cargo: 3, uf: "RJ", turno: 1,
     titulo: "Resultado alterado pelo TSE em 09/10",
-    corpo: "Anthony Garotinho (Republicanos) concorreu com o registro sob recurso, e os votos dele contaram como válidos durante a apuração — por isso Douglas Ruas aparecia com 49,27%, abaixo da maioria. O TSE manteve a cassação, os 274.411 votos de Garotinho foram anulados e Ruas ficou com 50,88% dos válidos: eleito no 1º turno, sem 2º turno no RJ.",
+    corpo: "Anthony Garotinho (Republicanos) concorreu com o registro sob recurso, e os votos dele contaram como válidos durante a apuração. Por isso Douglas Ruas aparecia com 49,27%, abaixo da maioria. O TSE manteve a cassação, os 274.411 votos de Garotinho foram anulados e Ruas ficou com 50,88% dos válidos: eleito no 1º turno, sem 2º turno no RJ.",
     link: "https://www.tse.jus.br/comunicacao/noticias/2026/Outubro/tse-decide-pela-retotalizacao-dos-votos-para-governador-no-rio-de-janeiro",
   },
 ];
@@ -3275,7 +3275,7 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
     const h = ev.ocorrido_em ? fmtHora(ev.ocorrido_em).slice(0, 5) : "";
     let txt = "";
     if (ev.tipo === "VIRADA") txt = `${nome(ev.sq_candidato_a)} passa ${nome(ev.sq_candidato_b)}`;
-    else if (TIPOS_ELEITO.has(ev.tipo)) txt = `${nome(ev.sq_candidato_a)} é eleito(a) — os votos que faltam não mudam o resultado`;
+    else if (TIPOS_ELEITO.has(ev.tipo)) txt = `${nome(ev.sq_candidato_a)} é eleito(a): os votos que faltam não mudam o resultado`;
     else continue;
     itens.push(`${h ? `<time>${h}</time>` : ""}${txt}`);
   }
@@ -3666,14 +3666,14 @@ async function boot() {
     const selUF = $("sel-uf");
     for (const u of ufs) {
       const opt = document.createElement("option");
-      opt.value = u.sigla; opt.textContent = `${u.sigla} — ${u.nome}`;
+      opt.value = u.sigla; opt.textContent = `${u.sigla} · ${u.nome}`;
       selUF.appendChild(opt);
     }
     // Opção fixa: voto do exterior (ZZ). Só vota presidente — a função
     // ajustarUFParaCargo() esconde/mostra conforme o cargo escolhido.
     if (!Array.from(selUF.options).some(o => o.value === "ZZ")) {
       const optZZ = document.createElement("option");
-      optZZ.value = "ZZ"; optZZ.textContent = "ZZ — Exterior (brasileiros no exterior)";
+      optZZ.value = "ZZ"; optZZ.textContent = "ZZ · Exterior";
       selUF.appendChild(optZZ);
     }
   } catch (e) { /* ok */ }

@@ -114,7 +114,7 @@ function renderSheetLista(q) {
     </button>
   `).join("");
   if (filtered.length > 500) {
-    lista.innerHTML += `<div class="sheet-vazio">+${filtered.length - 500} itens — refine a busca</div>`;
+    lista.innerHTML += `<div class="sheet-vazio">+${filtered.length - 500} itens, refine a busca</div>`;
   }
   lista.querySelectorAll(".sheet-opt").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -304,7 +304,7 @@ function render(d) {
     resp.innerHTML = `<div class="urna-resp-head">
       <div>
         <h2>Seção ${d.secao} · Zona ${d.zona}</h2>
-        <div class="urna-resp-sub">${state.municipio.nome} — ${d.uf} · ${nomeCargo(d.cargo)}</div>
+        <div class="urna-resp-sub">${state.municipio.nome} (${d.uf}) · ${nomeCargo(d.cargo)}</div>
       </div>
     </div>
     <a class="urna-img-link urna-btn-primario-link" href="${d.url_tse_spa}" target="_blank" rel="noopener">
@@ -333,7 +333,7 @@ function render(d) {
     <div class="urna-resp-head">
       <div>
         <h2>Seção ${d.secao} · Zona ${d.zona}</h2>
-        <div class="urna-resp-sub">${state.municipio.nome} — ${d.uf} · ${nomeCargo(d.cargo)}</div>
+        <div class="urna-resp-sub">${state.municipio.nome} (${d.uf}) · ${nomeCargo(d.cargo)}</div>
       </div>
     </div>
     <div class="urna-stats">${stats}</div>

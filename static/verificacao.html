@@ -105,17 +105,14 @@
   <a href="/" class="verif-voltar">← voltar para o placar</a>
 
   <h1 class="verif-titulo">Verificação e API pública</h1>
-  <div class="verif-sub">Transparência · Dados abertos · Sem autenticação</div>
+  <div class="verif-sub">Dados abertos, sem login</div>
 
   <div class="verif-intro">
-    Este site é independente e republica dados públicos do TSE.
-    <strong>Qualquer pessoa</strong> pode conferir os números abertamente —
-    sem login, sem token, sem app. Os links abaixo apontam direto para
-    a API deste site, que por sua vez busca no
-    <code>resultados.tse.jus.br</code>. Cada resposta inclui um
-    <strong>hash SHA-256</strong> do JSON bruto do TSE, permitindo
-    verificar que o número mostrado aqui bate byte-a-byte com o que
-    o TSE publicou.
+    Este site é independente e usa os dados públicos do TSE. Os links
+    abaixo abrem a API do site sem login. Ela busca os dados em
+    <code>resultados.tse.jus.br</code>, e cada resposta traz o código
+    SHA-256 do arquivo original do TSE, para comparar com o que o TSE
+    publicou.
   </div>
 
   <div class="verif-grupo">
@@ -194,14 +191,14 @@
         <a class="verif-card-url" href="/api/apuracao/atual?cargo=1&amp;abrangencia=BR" target="_blank" rel="noopener">/api/apuracao/atual?cargo=1&amp;abrangencia=BR</a>
       </div>
       <div class="verif-card-desc">
-        Snapshot mais recente da apuração — votos totais, candidatos
+        Snapshot mais recente da apuração: votos totais, candidatos
         ordenados, % apurado, hash SHA-256 do JSON bruto do TSE para
         verificação. Troque <code>cargo</code> e <code>abrangencia</code>
         para outros cortes (ex.: <code>cargo=3&amp;abrangencia=SP</code>
         pra governador de SP). Passe
         <code>&amp;inflate=true</code> pra receber nome, número,
-        partido e situação de cada candidato embutidos no JSON — útil
-        pra auditoria direta sem precisar cruzar com <code>/api/candidatos</code>.</div>
+        partido e situação de cada candidato embutidos no JSON, para auditar
+        direto sem precisar cruzar com <code>/api/candidatos</code>.</div>
     </div>
 
     <div class="verif-card">
@@ -210,7 +207,7 @@
         <a class="verif-card-url" href="/api/apuracao/atual?cargo=1&amp;abrangencia=BR&amp;inflate=true" target="_blank" rel="noopener">/api/apuracao/atual?cargo=1&amp;abrangencia=BR&amp;inflate=true</a>
       </div>
       <div class="verif-card-desc">
-        Versão com nomes inline — cada candidato traz
+        Versão com nomes: cada candidato traz
         <code>nome_urna</code>, <code>numero</code>, <code>partido</code>,
         <code>situacao</code> e <code>uf</code>.
       </div>
@@ -224,7 +221,7 @@
       <div class="verif-card-desc">
         Série temporal dos últimos snapshots (até 200 por chave) para
         os candidatos indicados. Parâmetro <code>candidatos</code> é
-        obrigatório — lista de <code>sq_candidato</code> separada por
+        obrigatório: lista de <code>sq_candidato</code> separada por
         vírgula (ex.: dois candidatos do exemplo). Pegue os
         <code>sq_candidato</code> em <code>/api/candidatos?cargo=1</code>.
         Permite reconstruir a curva de evolução da apuração no dia D.
@@ -265,7 +262,7 @@
         <a class="verif-card-url" href="/api/apuracao/lideres-por-uf?cargo=1" target="_blank" rel="noopener">/api/apuracao/lideres-por-uf?cargo=1</a>
       </div>
       <div class="verif-card-desc">
-        Líder em cada uma das 27 UFs — para o mapa nacional.
+        Líder em cada uma das 27 UFs, usado no mapa nacional.
       </div>
     </div>
 
@@ -293,7 +290,7 @@
     </div>
 
     <!-- Zona removida 03/10/2026: TSE não publica agregado por zona no
-         S3 público. Testado em 2022/2024/2026 — sempre 404. Para
+         S3 público. Testado em 2022, 2024 e 2026: sempre 404. Para
          detalhamento por zona, usar /urna que puxa BU de cada seção. -->
 
 
@@ -340,8 +337,7 @@
     Endpoints sob <code>/api/admin/*</code> existem para operações
     reservadas (importar candidatos manualmente, limpar seed de teste,
     disparar sincronização). Eles exigem token (<code>X-Admin-Token</code>)
-    e por isso <strong>não aparecem aqui</strong> — não há nada que
-    uma pessoa comum do público precise fazer com eles. A página
+    e por isso não aparecem aqui. A página
     <a href="/importar">/importar</a> também cai nessa categoria: o
     formulário existe mas só funciona com o token de admin.
   </div>

@@ -20,7 +20,7 @@ function render(){steps.replaceChildren();paper.replaceChildren();
   count.textContent=`${chosen.filter(Boolean).length} de ${slots.length}`;
   const semGov=turno===2&&slots.length===1&&uf.value;
   hint.textContent=turno===2?(semGov?'':'Na urna, governador vem antes de presidente.'):'Ordem da urna. Para senador, escolha duas pessoas diferentes.';
-  if(semGov)steps.append(el('p',`${uf.value} decidiu o governo no 1º turno — no dia 25 você vota só para presidente.`,'cola-aviso'));
+  if(semGov)steps.append(el('p',`${uf.value} decidiu o governo no 1º turno. No dia 25 você vota só para presidente.`,'cola-aviso'));
   document.querySelector('#cola-paper-sub').textContent=turno===2?'Eleições 2026 · 2º turno':'Eleições 2026 · 1º turno';
   document.querySelector('#cola-paper-foot').textContent=turno===2?'Domingo, 25 de outubro · 8h às 17h':'Eleições 2026';
   slots.forEach(([label,cargo],i)=>{const c=chosen[i],step=el('article','','cola-step'),top=el('div','','cola-step-top');top.append(el('span',String(i+1).padStart(2,'0'),'cola-step-n'),el('span',label,'cola-step-title'),el('strong',c?String(c.numero):'—','cola-step-number'));step.append(top,el('div',c?.nome_urna||'Nenhum candidato escolhido','cola-step-name'));

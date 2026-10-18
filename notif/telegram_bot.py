@@ -441,15 +441,15 @@ async def cmd_placar(client, chat_id: int, args: list[str]) -> None:
             await _send(client, chat_id, aviso)
             return
         snap, tot, cands = res
-        linhas = [f"📊 *{_rotulo(cargo, uf, turno)}* — {_fmt_pct(_pct_apurado(tot), 1)} apurado\n"]
+        linhas = [f"📊 *{_rotulo(cargo, uf, turno)}* · {_fmt_pct(_pct_apurado(tot), 1)} apurado\n"]
         for c in cands[:8]:
             nome, sigla = await _nome_partido(sess, c.sq_candidato)
             marca = ["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣"][min(c.posicao-1, 7)]
             linhas.append(
-                f"{marca} *{nome}* ({sigla}) — {_fmt_pct(float(c.pct_validos))}\n"
+                f"{marca} *{nome}* ({sigla}) {_fmt_pct(float(c.pct_validos))}\n"
                 f"    `{_barra(float(c.pct_validos))}` {_fmt_int(c.votos)}")
         if cargo == 3 and turno == 1 and _turno_vigente() == 2 and not _parse_turno(args):
-            linhas.append("\n_Decidido no 1º turno — não há 2º turno neste estado._")
+            linhas.append("\n_Decidido no 1º turno, sem 2º turno neste estado._")
     linhas.append(f"\n_Atualizado às {snap.coletado_em.astimezone(BRT).strftime('%H:%M:%S')}_")
     await _send(client, chat_id, "\n".join(linhas))
 
@@ -469,7 +469,7 @@ async def cmd_lider(client, chat_id: int, args: list[str]) -> None:
             return
         a = cands[0]
         nome_a, sig_a = await _nome_partido(sess, a.sq_candidato)
-        texto = (f"👑 *{_rotulo(cargo, uf, turno)}* — {_fmt_pct(_pct_apurado(tot), 1)} apurado\n\n"
+        texto = (f"👑 *{_rotulo(cargo, uf, turno)}* · {_fmt_pct(_pct_apurado(tot), 1)} apurado\n\n"
                  f"Lidera: *{nome_a}* ({sig_a})\n"
                  f"{_fmt_int(a.votos)} votos · {_fmt_pct(float(a.pct_validos))} dos válidos")
         if len(cands) >= 2:
@@ -535,7 +535,7 @@ async def cmd_vs(client, chat_id: int, args: list[str]) -> None:
         turno, res, _ = await _consultar(sess, cargo, abr, args)
         placar = {c.sq_candidato: c for c in res[2]} if res else {}
         linhas = [f"⚔ *{_rotulo(cargo, abr, turno)}*"
-                  + (f" — {_fmt_pct(_pct_apurado(res[1]), 1)} apurado" if res else "") + "\n"]
+                  + (f" · {_fmt_pct(_pct_apurado(res[1]), 1)} apurado" if res else "") + "\n"]
         for c in (c1, c2):
             _, sig = await _nome_partido(sess, c.sq_candidato)
             sc = placar.get(c.sq_candidato)
@@ -546,7 +546,7 @@ async def cmd_vs(client, chat_id: int, args: list[str]) -> None:
                     f"  {_fmt_int(sc.votos)} votos · {_fmt_pct(float(sc.pct_validos))}\n"
                     f"  `{_barra(float(sc.pct_validos))}`")
             else:
-                linhas.append(f"*{nome_esc}* ({sig}, {c.numero}) — sem votos apurados")
+                linhas.append(f"*{nome_esc}* ({sig}, {c.numero}): sem votos apurados")
         if c1.sq_candidato in placar and c2.sq_candidato in placar:
             a, b = placar[c1.sq_candidato], placar[c2.sq_candidato]
             diff = a.votos - b.votos
@@ -565,7 +565,7 @@ async def cmd_mapa(client, chat_id: int, args: list[str]) -> None:
         else:
             ufs = UFS
             turno = pedido or (_turno_vigente() if cargo == 1 else 1)
-        linhas = [f"🗺 *Quem lidera em cada estado — {CARGOS.get(cargo)} · {turno}º turno*\n"]
+        linhas = [f"🗺 *Quem lidera em cada estado · {CARGOS.get(cargo)} · {turno}º turno*\n"]
         contas: dict[str, int] = {}
         for uf in ufs:
             res = await _snapshot_atual(sess, cargo, uf, turno)
@@ -626,12 +626,12 @@ async def cmd_proporcional(client, chat_id: int, args: list[str], cargo: int = 6
             return
         eleitos = sorted((c for c in r.candidatos if c.status == "eleito"),
                          key=lambda c: -c.votos)
-        linhas = [f"🪑 *{CARGOS[cargo]} · {uf}* — {r.vagas} vagas · {_fmt_pct(_pct_apurado(tot), 1)} apurado",
+        linhas = [f"🪑 *{CARGOS[cargo]} · {uf}* · {r.vagas} vagas · {_fmt_pct(_pct_apurado(tot), 1)} apurado",
                   f"Quociente eleitoral: {_fmt_int(r.qe)} votos", ""]
         if eleitos:
             for e in eleitos[:30]:
                 nome, sig = await _nome_partido(sess, e.sq_candidato)
-                linhas.append(f"✅ {nome} ({sig}) — {_fmt_int(e.votos)}")
+                linhas.append(f"✅ {nome} ({sig}) {_fmt_int(e.votos)}")
             if len(eleitos) > 30:
                 linhas.append(f"… e mais {len(eleitos) - 30}. Lista completa no site.")
         else:
@@ -683,7 +683,7 @@ async def cmd_eventos(client, chat_id: int, args: list[str]) -> None:
                 fb = f"*{nb}* ({sb})"
             emo = EMOJI_TIPO.get(e.tipo, "🔔")
             onde = f"{CARGOS.get(e.cod_cargo, '?')} · {_nome_abr(e.abrangencia)}"
-            linhas.append(f"`{hora}` {emo} {_texto_evento(e.tipo, f'*{na}* ({sa})', fb, turno)} — {onde}")
+            linhas.append(f"`{hora}` {emo} {_texto_evento(e.tipo, f'*{na}* ({sa})', fb, turno)} · {onde}")
     await _send(client, chat_id, "\n".join(linhas))
 
 
@@ -722,7 +722,7 @@ async def cmd_cola(client, chat_id: int, args: list[str]) -> None:
     foto = (f"https://divulgacandcontas.tse.jus.br/divulga/rest/arquivo/img/"
             f"{settings.eleicao_cod_divulga}/{c.sq_candidato}/{c.uf or 'BR'}")
     await _send(client, chat_id,
-                f"🗳 *{_md_escape(c.nome_urna)}* — {c.numero}\n"
+                f"🗳 *{_md_escape(c.nome_urna)}* · {c.numero}\n"
                 f"{CARGOS.get(c.cod_cargo)} · {_nome_abr(c.uf or 'BR')}\n_{_md_escape(c.nome)}_",
                 foto=foto)
 
@@ -735,10 +735,10 @@ async def _tratar_assinar_start(client, chat_id: int, msg_id: int | None = None)
     kb = _kb_escolher_cargo("subc")
     if msg_id:
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                   text="🔔 *Alertas* — de qual cargo?",
+                   text="🔔 *Alertas:* de qual cargo?",
                    parse_mode="Markdown", reply_markup=kb)
     else:
-        await _send(client, chat_id, "🔔 *Alertas* — de qual cargo?", keyboard=kb)
+        await _send(client, chat_id, "🔔 *Alertas:* de qual cargo?", keyboard=kb)
 
 
 async def _listar_assinaturas(client, chat_id: int, msg_id: int | None = None) -> None:
@@ -819,7 +819,7 @@ async def _tratar_callback(client, cb: dict) -> None:
             await cmd_placar(client, chat_id, ["1"])
         else:
             await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                       text=f"{CARGOS[cargo]} — escolha o estado:",
+                       text=f"{CARGOS[cargo]}: escolha o estado",
                        reply_markup=_kb_escolher_uf("plcu", cargo))
         return
     if data.startswith("plcu:"):
@@ -864,15 +864,15 @@ async def _tratar_callback(client, cb: dict) -> None:
             if "MATEMATICAMENTE_ELIMINADO" in est["tipos"]:
                 est["tipos"].remove("MATEMATICAMENTE_ELIMINADO")
             await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                       text="Presidente · Brasil — avisar quando:",
+                       text="Presidente · Brasil: avisar quando",
                        reply_markup=_kb_tipos(est["tipos"]))
         else:
             ufs = None
             if cod == 3 and _turno_vigente() == 2:
                 async with SessionLocal() as sess:
                     ufs = await _ufs_gov_2t(sess)
-            texto = (f"{CARGOS[cod]} — estados com 2º turno:" if ufs
-                     else f"{CARGOS[cod]} — escolha o estado:")
+            texto = (f"{CARGOS[cod]}: estados com 2º turno" if ufs
+                     else f"{CARGOS[cod]}: escolha o estado")
             await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
                        text=texto, reply_markup=_kb_escolher_uf("subu", cod, ufs))
         return
@@ -883,7 +883,7 @@ async def _tratar_callback(client, cb: dict) -> None:
         est["cargo"] = int(cargo); est["uf"] = uf
         est["tipos"] = ["ELEITO", "VIRADA"]
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                   text=f"{CARGOS[int(cargo)]} · {uf} — avisar quando:",
+                   text=f"{CARGOS[int(cargo)]} · {uf}: avisar quando",
                    reply_markup=_kb_tipos(est["tipos"]))
         return
     if data.startswith("tipo:"):
@@ -988,32 +988,32 @@ async def _tratar_mensagem(client, msg: dict) -> None:
                   if _turno_vigente() == 2 else "1º turno: domingo, 4/10 · resultados a partir das 17h.")
         await _send(client, chat_id,
             f"🗳 *Apuração 2026*\n{quando}\n\n"
-            f"Placar ao vivo e aviso quando alguém é eleito — "
-            f"só quando os votos que faltam não mudam mais o resultado.",
+            f"Placar ao vivo e aviso quando alguém é eleito, "
+            f"assim que os votos que faltam não mudarem mais o resultado.",
             keyboard=_kb_principal())
     elif cmd == "/help":
         await _send(client, chat_id,
             "*Apuração*\n"
-            "/placar — candidatos e %\n"
-            "/lider — quem lidera e a diferença\n"
-            "/pct — quanto já foi apurado\n"
-            "/mapa — quem lidera em cada estado\n"
-            "/eventos — viradas e eleitos\n"
+            "/placar: candidatos e %\n"
+            "/lider: quem lidera e a diferença\n"
+            "/pct: quanto já foi apurado\n"
+            "/mapa: quem lidera em cada estado\n"
+            "/eventos: viradas e eleitos\n"
             "Ex.: `/placar governador DF` · `/placar 1t` (1º turno)\n\n"
             "*Candidatos*\n"
-            "/candidato <nº> [uf] — ficha\n"
-            "/vs <nº> <nº> [uf] — lado a lado\n"
-            "/cola <nº> [uf] — foto e número\n\n"
+            "/candidato <nº> [uf]: ficha\n"
+            "/vs <nº> <nº> [uf]: lado a lado\n"
+            "/cola <nº> [uf]: foto e número\n\n"
             "*Alertas*\n"
-            "/assinar — escolher o que acompanhar\n"
-            "/minhas — ver e remover\n"
+            "/assinar: escolher o que acompanhar\n"
+            "/minhas: ver e remover\n"
             "/pausar · /retomar\n"
-            "/silencio 00-07 — sem alertas nesse horário\n"
-            "/apagar\\_tudo — remove seus dados\n\n"
+            "/silencio 00-07: sem alertas nesse horário\n"
+            "/apagar\\_tudo: remove seus dados\n\n"
             "*Outros*\n"
-            "/status — código de verificação do TSE\n"
-            "/proporcional <uf> · /estadual <uf> — deputados (1º turno)\n"
-            "/tse — site oficial")
+            "/status: código de verificação do TSE\n"
+            "/proporcional <uf> · /estadual <uf>: deputados (1º turno)\n"
+            "/tse: site oficial")
     elif cmd == "/pct":            await cmd_pct(client, chat_id, args)
     elif cmd == "/placar":         await cmd_placar(client, chat_id, args)
     elif cmd == "/lider":          await cmd_lider(client, chat_id, args)
