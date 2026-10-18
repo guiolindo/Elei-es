@@ -1922,6 +1922,7 @@ async function atualizarMapa() {
         onFiltroChange();
       },
     });
+    registrarViradasUF(dadosPorUF);
     renderLegenda(leg, dadosPorUF, {
       tituloVazio: "Mapa por UF",
       tituloCheio: "Líderes por UF", unidade: "UF",
@@ -3190,7 +3191,8 @@ function aplicarQuadroTV() {
     document.body.classList.remove("tv-controles");
   }
   if (ativo !== era) {
-    _tickerChave = null;
+    _ticker.html = null; _ticker.x = 0;
+    const f = $("tvq-fita"); if (f) f.innerHTML = "";
     requestAnimationFrame(() => {
       window.dispatchEvent(new Event("resize"));
       try { atualizarMapa(); } catch (e) {}
@@ -3294,25 +3296,67 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
   }).join("");
 }
 
-// Letreiro "ÚLTIMAS": viradas/eleitos + situação da apuração, passando da
-// direita pra esquerda em loop. Só reconstrói quando o texto muda (senão a
-// animação reiniciaria a cada atualização).
-let _tickerChave = null;
+// Letreiro "ÚLTIMAS". Rola por requestAnimationFrame (não animação CSS):
+// a posição nunca volta ao começo quando o texto muda. O texto novo fica
+// "na fila" e só entra quando uma volta completa termina, no ponto em que
+// a costura não aparece. Cada volta repete os itens até cobrir a largura
+// da faixa (antes sobrava um buraco). Quem foi eleito fica FIXO à
+// esquerda, fora da rolagem.
+const NOMES_UF_EXT = { AC: "Acre", AL: "Alagoas", AM: "Amazonas", AP: "Amapá", BA: "Bahia", CE: "Ceará",
+  DF: "Distrito Federal", ES: "Espírito Santo", GO: "Goiás", MA: "Maranhão", MG: "Minas Gerais",
+  MS: "Mato Grosso do Sul", MT: "Mato Grosso", PA: "Pará", PB: "Paraíba", PE: "Pernambuco", PI: "Piauí",
+  PR: "Paraná", RJ: "Rio de Janeiro", RN: "Rio Grande do Norte", RO: "Rondônia", RR: "Roraima",
+  RS: "Rio Grande do Sul", SC: "Santa Catarina", SE: "Sergipe", SP: "São Paulo", TO: "Tocantins", ZZ: "Exterior" };
+// Viradas por estado: o TSE/motor só registra virada nacional; as dos
+// estados são percebidas aqui, comparando o líder de cada UF entre
+// atualizações do mapa.
+state.viradasUF = [];
+let _lideresUFAnt = null;
+function registrarViradasUF(dadosPorUF) {
+  const atual = {};
+  for (const [uf, d] of Object.entries(dadosPorUF)) if (d.nome_lider && d.votos > 0) atual[uf] = d.nome_lider;
+  if (_lideresUFAnt && state.turno === 2) {
+    for (const [uf, nome] of Object.entries(atual)) {
+      const antes = _lideresUFAnt[uf];
+      if (antes && antes !== nome) {
+        state.viradasUF.push({ t: Date.now(), txt: `${nome} passa à frente em ${NOMES_UF_EXT[uf] || uf}` });
+      }
+    }
+    state.viradasUF = state.viradasUF.slice(-8);
+  }
+  _lideresUFAnt = atual;
+}
+
+const _ticker = { x: 0, w: 0, pendente: null, html: null, ultimo: 0, raf: 0 };
 function renderTickerQuadro(ativos, v, comecou, pct, t) {
   const fita = $("tvq-fita");
   if (!fita) return;
   const nome = sq => state.ficha[sq]?.nome_urna || "";
-  const itens = [];
-  const evs = (state.eventosLista || []).filter(e => e.tipo !== "MATEMATICAMENTE_ELIMINADO").slice(-8).reverse();
-  for (const ev of evs) {
-    const h = ev.ocorrido_em ? fmtHora(ev.ocorrido_em).slice(0, 5) : "";
-    let txt = "";
-    if (ev.tipo === "VIRADA") txt = `${nome(ev.sq_candidato_a)} passa ${nome(ev.sq_candidato_b)}`;
-    else if (TIPOS_ELEITO.has(ev.tipo)) txt = `${nome(ev.sq_candidato_a)} é eleito(a): os votos que faltam não mudam o resultado`;
-    else continue;
-    itens.push(`${h ? `<time>${h}</time>` : ""}${txt}`);
+  // Eleito: fixo à esquerda
+  const fixo = $("tvq-fixo");
+  const eleito = ativos.find(c => state.eleitos.has(c.sq_candidato));
+  if (fixo) {
+    if (eleito) {
+      const vi = v[ativos.indexOf(eleito)];
+      fixo.innerHTML = `<b>Eleito</b>${nome(eleito.sq_candidato) || eleito.nome_urna} <small>${siglaDoPartido(+eleito.partido) || ""}${vi?.pct_validos ? ` · ${dec(vi.pct_validos, 2)}%` : ""}</small>`;
+      fixo.hidden = false;
+    } else fixo.hidden = true;
   }
+  // Últimos acontecimentos (mais recentes primeiro): viradas nacionais e
+  // por estado, com hora.
+  const recentes = [];
+  for (const ev of (state.eventosLista || [])) {
+    if (ev.tipo !== "VIRADA") continue;
+    recentes.push({ t: ev.ocorrido_em ? Date.parse(ev.ocorrido_em) : 0,
+      txt: `${nome(ev.sq_candidato_a)} passa ${nome(ev.sq_candidato_b)} no ${state.cargo === 1 ? "Brasil" : state.abrangencia}` });
+  }
+  if (state.abrangencia === "BR") recentes.push(...state.viradasUF);
+  recentes.sort((a, b) => b.t - a.t);
+  const itens = recentes.slice(0, 6).map(r =>
+    `${r.t ? `<time>${new Date(r.t).toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" })}</time>` : ""}${r.txt}`);
   if (comecou) {
+    const i = v[0].votos >= v[1].votos ? 0 : 1;
+    if (v[0].votos !== v[1].votos && !eleito) itens.push(`${ativos[i].nome_urna} à frente por ${fmtNum(Math.abs(v[0].votos - v[1].votos))} votos`);
     itens.push(`${dec(pct, 2)}% apurado · ${fmtNum(t.secoes_totalizadas || 0)} de ${fmtNum(t.secoes_total || 0)} seções`);
     const cm = state.contagemMapa;
     if (cm?.nomes?.size) {
@@ -3320,26 +3364,64 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
         .map(([n, { n: k }]) => `${n} em ${k} ${cm.unidade === "UF" ? (k === 1 ? "estado" : "estados") : (k === 1 ? "município" : "municípios")}`);
       itens.push(`Lidera: ${partes.join(" · ")}`);
     }
-    const i = v[0].votos >= v[1].votos ? 0 : 1;
-    if (v[0].votos !== v[1].votos) itens.push(`${ativos[i].nome_urna} à frente por ${fmtNum(Math.abs(v[0].votos - v[1].votos))} votos`);
   } else {
     itens.push(`A apuração do 2º turno começa domingo, ${DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" })}, às 17h (Brasília)`);
     itens.push(`${ativos[0].nome_urna} (${ativos[0].numero}) × ${ativos[1].nome_urna} (${ativos[1].numero})`);
   }
   itens.push("Resultado oficial: resultados.tse.jus.br");
-  const chave = itens.join("|") + "|" + innerWidth;
-  if (chave === _tickerChave) return;
-  _tickerChave = chave;
-  const um = itens.map(x => `<span class="tvq-item">${x}</span><span class="tvq-sep" aria-hidden="true">◆</span>`).join("");
-  fita.innerHTML = `<span class="tvq-copia">${um}</span><span class="tvq-copia" aria-hidden="true">${um}</span>`;
-  // Velocidade constante (~110 px/s num quadro de 1920) seja qual for o texto.
-  requestAnimationFrame(() => {
-    const largura = fita.firstElementChild?.offsetWidth || 1000;
-    const escala = ($("tv-quadro")?.firstElementChild?.offsetWidth || 1920) / 1920;
-    fita.style.setProperty("--tvq-dur", `${Math.max(20, largura / (110 * escala))}s`);
-  });
+  const html = itens.map(x => `<span class="tvq-item">${x}</span><span class="tvq-sep" aria-hidden="true">◆</span>`).join("");
+  if (html === _ticker.html) return;
+  _ticker.html = html;
+  if (!fita.firstElementChild) trocarFitaTicker(); else _ticker.pendente = html;
+  if (!_ticker.raf) _ticker.raf = requestAnimationFrame(passoTicker);
 }
-window.addEventListener("resize", () => { _tickerChave = null; try { renderTVQuadro(); } catch (e) {} });
+// Monta duas cópias idênticas; cada cópia repete os itens até ficar mais
+// larga que a faixa, então a emenda nunca deixa espaço vazio.
+function trocarFitaTicker() {
+  const fita = $("tvq-fita"), trilho = fita?.parentElement;
+  if (!fita || !trilho) return;
+  const base = _ticker.pendente || _ticker.html;
+  _ticker.pendente = null;
+  fita.innerHTML = `<span class="tvq-copia">${base}</span>`;
+  const um = fita.firstElementChild;
+  let rep = 1;
+  while (um.offsetWidth > 0 && um.offsetWidth < trilho.clientWidth + 40 && rep < 12) { um.innerHTML += base; rep++; }
+  fita.innerHTML += `<span class="tvq-copia" aria-hidden="true">${um.innerHTML}</span>`;
+  _ticker.w = um.offsetWidth;
+}
+function passoTicker(agora) {
+  _ticker.raf = 0;
+  const fita = $("tvq-fita");
+  if (!fita || !document.body.classList.contains("tv-quadro")) { _ticker.ultimo = 0; return; }
+  const dt = _ticker.ultimo ? Math.min(100, agora - _ticker.ultimo) : 0;
+  _ticker.ultimo = agora;
+  const escala = ($("tv-quadro")?.firstElementChild?.offsetWidth || 1920) / 1920;
+  const reduzido = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduzido) _ticker.x -= (110 * escala) * dt / 1000;
+  // Faixa mudou de largura (abriu agora, janela redimensionada) e a cópia
+  // ficou curta: remonta já, sem esperar a volta, pra não abrir buraco.
+  const larg = fita.parentElement?.clientWidth || 0;
+  if (larg && fita.firstElementChild && fita.firstElementChild.offsetWidth < larg + 20) {
+    _ticker.pendente = _ticker.pendente || _ticker.html;
+    trocarFitaTicker();
+    _ticker.x = Math.max(_ticker.x, -_ticker.w + 1);
+  }
+  // Largura medida sempre na hora: a medida guardada podia ser da fonte de
+  // reserva (mais larga), antes da fonte da TV carregar, e a emenda passava
+  // do ponto, abrindo buraco.
+  _ticker.w = fita.firstElementChild?.offsetWidth || 0;
+  if (_ticker.w && -_ticker.x >= _ticker.w) {
+    _ticker.x += _ticker.w;
+    if (_ticker.pendente) trocarFitaTicker();   // emenda: troca o texto aqui
+  }
+  fita.style.transform = `translateX(${_ticker.x}px)`;
+  _ticker.raf = requestAnimationFrame(passoTicker);
+}
+window.addEventListener("resize", () => {
+  // Só remede a largura (sem voltar ao início).
+  if (!_ticker.html) return;
+  _ticker.pendente = _ticker.pendente || _ticker.html;
+});
 
 // Controles escondidos: descem do topo com o mouse lá em cima, um toque
 // no topo ou uma tecla do controle remoto; somem sozinhos depois.
