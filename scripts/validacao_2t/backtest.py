@@ -65,7 +65,7 @@ def finalistas(sec2):
     return [nr for nr, _ in sorted(tot.items(), key=lambda x: -x[1])[:2]]
 
 
-def avaliar(sec1, sec2, estrato_de, ordem):
+def avaliar(sec1, sec2, estrato_de, ordem, desloc_lider=0.0):
     """Uma disputa. estrato_de(r) -> nome do estrato."""
     a_nr, b_nr = finalistas(sec2)
     v1 = {}
@@ -76,6 +76,10 @@ def avaliar(sec1, sec2, estrato_de, ordem):
         a_nr, b_nr = b_nr, a_nr  # A = quem teve mais votos no 1T
         v1 = {g: [d[1], d[0]] for g, d in v1.items()}
     prior = {g: d[0] / (d[0] + d[1]) for g, d in v1.items() if d[0] + d[1] > 0}
+    if desloc_lider:
+        # Contrafactual (não é o motor do site): base do líder do 1T deslocada
+        # em direção ao 2º colocado.
+        prior = {g: p - desloc_lider if p > 0.5 else p + desloc_lider for g, p in prior.items()}
     estratos = sorted({estrato_de(r) for r in sec2})
     gi = {g: i for i, g in enumerate(estratos)}
     regs = [(instante(r, ordem), gi[estrato_de(r)], r["aptos"],
@@ -152,14 +156,21 @@ def main():
         ordem = sys.argv[sys.argv.index("--ordem") + 1]
     print(f"# {ano}, ordem por {ordem}" + ("  (APROXIMAÇÃO da ordem real)" if ordem == "encerramento" else "  (ordem real de chegada)"))
     resultados = {}
+    sufixo = ""
+    desloc = 0.0
+    if "--gov-contrafactual" in sys.argv:
+        # ex.: --gov-contrafactual 0.0425,0.097 (desloc. da base, TAU_SWING)
+        d, t = sys.argv[sys.argv.index("--gov-contrafactual") + 1].split(",")
+        desloc = float(d); P.TAU_SWING = float(t); sufixo = "_govcf"
+        print(f"CONTRAFACTUAL Governador: base do líder do 1T −{desloc*100:.2f} pp, TAU_SWING={P.TAU_SWING}")
     p1, p2 = ler(f"{pasta}/{ano}_1t.csv", "1"), ler(f"{pasta}/{ano}_2t.csv", "1")
     res = avaliar(p1, p2, lambda r: r["uf"], ordem)
     imprimir("Presidente", res); resultados["Presidente"] = res
     g1, g2 = ler(f"{pasta}/{ano}_1t.csv", "3"), ler(f"{pasta}/{ano}_2t.csv", "3")
     for uf in sorted({r["uf"] for r in g2}):
-        res = avaliar([r for r in g1 if r["uf"] == uf], [r for r in g2 if r["uf"] == uf], lambda r: r["uf"], ordem)
+        res = avaliar([r for r in g1 if r["uf"] == uf], [r for r in g2 if r["uf"] == uf], lambda r: r["uf"], ordem, desloc)
         imprimir(f"Governador {uf}", res); resultados[f"Governador {uf}"] = res
-    with open(f"{pasta}/backtest_{ano}_{ordem}.json", "w") as f:
+    with open(f"{pasta}/backtest_{ano}_{ordem}{sufixo}.json", "w") as f:
         json.dump(resultados, f)
 
 

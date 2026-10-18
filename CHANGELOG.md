@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Estimativa — validação com boletins de urna reais (18/10)
+- `scripts/validacao_2t/`: download dos boletins de 2018 e 2022 (`baixar_bu.py`), reconstrução da apuração seção por seção (`backtest.py`), diagnóstico da virada (`diag_swing.py`), protótipo de margem regional e calibração por eleição (`vies2.py`). Resultados e limitações conhecidas em `docs/metodologia.md` §8.4. Motor inalterado.
+- `/sobre`: a margem é descrita como "calculada para acertar 95%", com o caso em que ela acerta menos, e a hipótese de comparecimento.
+
 ### Estimativa — teste de viés (18/10)
 - `scripts/validacao_2t/` (simulador + `vies.py`): erro assinado, super/subestimação por candidato, cobertura e calibração da chance separados, com cenários de migração regional. Motor inalterado. Resultados em `docs/metodologia.md` §8.4.
 

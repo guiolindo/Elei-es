@@ -436,15 +436,69 @@ Leitura: no agregado a chance é cautelosa em todos os cenários. O problema fic
 
 Limitações: o simulador é nosso (geografia 2022, ordem de apuração e efeitos regionais com tamanhos escolhidos, não medidos); as previsões da mesma eleição são correlacionadas (os IC95 são calculados por ponto de corte, entre eleições independentes); só Presidente; nada aqui substitui o backtest com seções reais abaixo, que também precisa medir se o comparecimento das seções tardias é de fato diferente.
 
+#### Margem com erro regional e calibração por eleição (protótipo, 18/10/2026)
+
+`scripts/validacao_2t/projecao_regional.py` (não usado pelo site) divide o erro da base do 1T de cada UF, TAU_P², em uma parte independente (1−ρ) e uma parte comum à região (ρ). A variância de cada UF sozinha não muda; só aparece covariância dentro da região. Com ρ = 0 o resultado é idêntico ao do motor (diferença ≤ 2×10⁻¹⁵). `vies2.py`, semente 2610, 2.000 eleições por cenário. Cobertura do IC95 / largura média (pp) com 90% apurado:
+
+| cenário | ρ = 0 (atual) | ρ = 0,25 | ρ = 0,5 | ρ = 0,75 |
+|---|---|---|---|---|
+| base | 99,5% / 0,48 | 99,7% / 0,50 | 99,7% / 0,51 | 99,8% / 0,53 |
+| hard | 95,5% / 0,75 | 96,5% / 0,77 | 97,2% / 0,79 | 98,2% / 0,81 |
+| adverso | 91,6% / 1,03 | 93,0% / 1,05 | 94,0% / 1,08 | 95,2% / 1,10 |
+| adverso_regional | 88,4% / 1,02 | 89,8% / 1,05 | 90,6% / 1,07 | 91,6% / 1,10 |
+| dirigido_pro_B | 91,7% / 0,48 | 93,5% / 0,50 | 94,6% / 0,51 | 96,0% / 0,53 |
+
+O termo regional melhora a cobertura no fim com 5 a 9% a mais de largura, mas não resolve o adverso_regional e alarga casos que já eram largos demais (base: 100% de cobertura a 10–70%). Nenhum ρ foi escolhido.
+
+Calibração da chance contando eleições (só ≥50% apurado; 6.000 previsões de 2.000 eleições por cenário; IC95 por bootstrap de eleições inteiras): nas faixas 60–70% e 70–80% o adverso é confiante demais (65,0% previsto × 57,0% real, IC 52,2–61,5; 75,3% × 68,7%, IC 63,6–73,8), e o adverso_regional na 60–70% (65,1% × 56,4%, IC 51,8–60,9). Por favorito, a assimetria fica em B (forte no Sul, que apura primeiro) na faixa 50–70%: 59,7% × 48,7% (adverso) e 60,6% × 48,7% (adverso_regional); com A favorito a mesma faixa está calibrada (60,3% × 60,9%). Nos demais cenários e faixas a chance é cautelosa. Uma previsão por eleição (ponto de 50%): 83,9% × 82,4% (adverso), 84,1% × 82,5% (adverso_regional).
+
+#### Validação retrospectiva com boletins de urna (18/10/2026)
+
+Dados: boletins de urna do TSE (dadosabertos.tse.jus.br, `bweb_*`), Presidente e Governador, 1º e 2º turno, 2018 e 2022 (`baixar_bu.py`). `backtest.py` reconstrói a apuração seção por seção; em cada instante o motor recebe só as seções já chegadas, somadas por estrato, e o 1T como base; o "antes" segue a regra do servidor. **Motor sem alteração; nenhum parâmetro atual foi ajustado com 2018 ou 2022**, então os dois anos são fora da amostra para a versão em produção.
+
+Ordem da apuração:
+- **2022**: `DT_BU_RECEBIDO`, horário em que o TSE recebeu cada boletim. É a ordem real de chegada (a divulgação vem logo depois, mas não é o mesmo instante).
+- **2018**: o arquivo não tem esse campo. Usa `DT_ENCERRAMENTO` (hora local em que a urna fechou) convertido para Brasília. **Aproximação.** Medida em 2022, onde existem os dois: com a ordem por encerramento o erro do Presidente a 50% cai de −0,83 para −0,49 pp e o efeito de comparecimento desaparece. Ou seja, a aproximação torna o teste mais fácil do que a realidade, e os números de 2018 devem ser lidos como otimistas.
+
+Presidente (A = 1º colocado no 1T entre os dois finalistas):
+
+| | 20% | 30% | 50% | 70% | 90% |
+|---|---|---|---|---|---|
+| 2022 (ordem real), erro A = Lula | −0,82 | −0,92 | −0,83 | −0,61 | −0,23 |
+| 2018 (aproximada), erro A = Bolsonaro | +1,47 | +1,00 | +0,61 | +0,44 | +0,22 |
+
+O IC95 cobriu o resultado em todos os pontos dos dois anos. Em 2022 a estimativa ficou abaixo de 50% para Lula entre 30% e 45% apurado (49,97–49,98%); a chance só aparece a partir de 50%, quando já indicava Lula (55,9% a 55%). A chance nunca apontou o favorito errado.
+
+Origem do erro do Presidente (`diag_swing.py`, virada 1T→2T nas seções já apuradas × nas que faltavam):
+- **2022 (ordem real):** com 50% apurado, a virada das seções apuradas era cerca de −2,6 pp em todas as regiões, e a das que faltavam cerca de −1,0 pp, também em todas. O erro veio da **ordem dentro de cada estado** (seções que chegam primeiro viraram mais), não de diferença entre regiões. O protótipo regional não corrige isso.
+- **2018 (aproximada):** aqui houve diferença regional: o que faltava no SE e CO virou −9,6 pp, no NE −3,3 pp, contra δ = −5,5 pp.
+- O comparecimento das seções que faltavam não explica o erro em nenhum dos dois anos (diferença de −0,2 a +0,3 pp, efeito nos válidos restantes de até 0,5%).
+
+Governador (estrato único; A = líder do 1T), erro assinado médio entre disputas (IC95 entre disputas) e cobertura:
+
+| | disputas | 20% | 50% | 70% | 90% | cobertura 70% / 90% |
+|---|---|---|---|---|---|---|
+| 2022 (ordem real) | 12 | +2,46 (+0,82 a +4,10) | +1,56 (+0,46 a +2,65) | +0,87 | +0,21 | 12/12 / 11/12 |
+| 2018 (aproximada) | 14 | +1,10 | +0,81 (−0,07 a +1,70) | +0,53 | +0,21 | 12/14 / 11/14 |
+
+Causa: o líder do 1T perde participação no 2T (média −4,25 pp, dp 9,7 em 2018; −6,0 pp, dp 6,0 em 2022; negativa em 19 de 26 disputas). O motor trata a base do Governador como sem viés e com dp ≈ 4,7 pp (TAU_P e TAU_SWING), e a base ainda pesa ~26% com metade apurada.
+
+**Contrafactual (informativo, não está no site):** deslocamento e dp estimados **só em 2018** (−4,25 pp; TAU_SWING = 0,097), avaliados em 2022: erro a 50% de +1,56 para +0,80 pp, a 90% de +0,21 para +0,02 pp; erro absoluto a 50% de 2,05 para 1,55 pp; cobertura 12/12 em todos os pontos; largura a 50% de 8,25 para 8,97 pp. São 12 disputas: os intervalos se sobrepõem.
+
+Chance com dados reais: 26 disputas de Governador + 2 de Presidente; nenhuma previsão (≥50% apurado) apontou o favorito errado, e a chance foi cautelosa. Com esse número de disputas, a calibração por faixa não pode ser avaliada com precisão útil.
+
 #### Limitações conhecidas (abertas até a validação com dados reais)
 
-Decisão de 18/10/2026: a versão em produção fica como está até a validação retrospectiva. Estas três limitações valem para o dia 25/10:
+Decisão de 18/10/2026: a versão em produção fica como está até a validação retrospectiva. Estas limitações valem para o dia 25/10:
 
 1. **Comparecimento das seções que faltam.** O motor supõe que, em cada estrato, as seções que faltam têm o mesmo comparecimento (válidos por eleitor apto) das já apuradas. Se as seções tardias de uma região tiverem comparecimento diferente, a estimativa pende para o candidato forte nessa região. No simulador essa hipótese explica todo o desvio de +0,1 a +0,18 pp; que ela ocorra (e com que tamanho) na eleição real **não está demonstrado** e é a primeira coisa que o teste com boletins de urna mede.
 2. **Margem estreita perto do fim.** Com 90% apurado o IC95 cobriu 88,4% a 91,7% do resultado real nos cenários adversos do simulador: abaixo do nominal. O site mostra a margem como faixa de 95%; nesses cenários ela está otimista.
 3. **Chance na faixa 50–70%.** Nos cenários adversos a chance de 60% virou vitória em cerca de 55% das eleições. Em outras faixas e cenários ela é cautelosa.
 
-Nenhum parâmetro foi alterado por causa dessas simulações.
+4. **Governador: viés a favor do líder do 1º turno** (dados reais acima): +1,6 pp com 50% apurado em 2022, +0,8 pp em 2018. Afeta os 2ºs turnos de 2026 (AC, AM, DF, ES, RN, TO).
+5. **Presidente: a virada medida nas primeiras seções de cada estado pode não valer para as últimas** (2022: −0,8 pp para o 1º colocado do 1T entre 20% e 50% apurado). A margem cobriu o resultado.
+
+O item 1 não apareceu nos dados reais com tamanho relevante. Nenhum parâmetro foi alterado.
 
 #### Plano de validação retrospectiva (pós-eleição, sem vazamento)
 
