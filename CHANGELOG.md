@@ -4,6 +4,12 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Bot do Telegram (18/10)
+- `/estimativa` (também `/projecao`, `/previsao` e botão no menu): estimativa não oficial do 2º turno para 100% apurado, com ± e chance quando já há dado suficiente.
+- `/placar` vem com botões: Atualizar, Estimativa, Mapa e Abrir no site.
+- Novos alertas opcionais: **boletins** (início da apuração, 25, 50, 75, 90 e 100% das seções) e **viradas nos estados** (para quem assina Presidente/Brasil). Assinaturas antigas não recebem boletins sem marcar a opção.
+- `df` não vira mais Deputado Federal (é Distrito Federal); `/proporcional` voltou a funcionar.
+
 ### Modo TV — quadro de transmissão (18/10)
 - **Dado novo chegava com um ciclo de atraso (aparecia "preso em 0%")**: a API manda `max-age=3, stale-while-revalidate=15` e o navegador devolvia a resposta anterior quando o WebSocket avisava de dado novo. Toda leitura de `/api/*` no front agora usa `cache: "no-cache"`. Teste de transição 0% → 70% em computador, TV e celular: apurado, placar, duelo, mapa (0 → 28 UFs coloridas), gráfico e estimativa atualizam sozinhos.
 - Quadro da TV ocupa a janela inteira (sem faixas pretas em modo janela); cronômetro antes da apuração não pisca mais a cada 30 s; no celular o modo TV não liga (nem fica salvo), e um toque em qualquer lugar mostra "Sair do modo TV".

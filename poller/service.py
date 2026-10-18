@@ -511,6 +511,20 @@ async def processar_alvo(
             except Exception:
                 log.exception("notificação telegram falhou")
 
+        # Boletins por marco de apuração e viradas nos estados (Telegram).
+        # Não são eventos do motor: guard de Presidente×UF continua valendo
+        # pra eventos; aqui é só aviso.
+        if not suspeito:
+            try:
+                from notif.telegram_bot import observar_snapshot
+                lider = ordenados[0] if ordenados else None
+                await observar_snapshot(
+                    alvo.cod_cargo, alvo.abrangencia, alvo.turno, ultimo,
+                    parsed.totais.qt_secoes_totalizadas, parsed.totais.qt_secoes_total,
+                    lider.sq_candidato if lider else None, lider.votos if lider else 0)
+            except Exception:
+                log.exception("boletim telegram falhou")
+
 
 async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
     """Loop principal. Processa alvos em paralelo (limitado por semáforo)

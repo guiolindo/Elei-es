@@ -39,6 +39,7 @@ Este documento é otimizado pra IAs e desenvolvedores novos que precisam entrar 
 - `_tratar_mensagem` — dispatcher de comandos texto
 - `loop_bot` — long polling principal
 - `enviar_notificacoes` — chamado pelo poller quando um evento novo é emitido
+- `observar_snapshot` — chamado pelo poller a cada snapshot não suspeito; manda boletins (25/50/75/90/100%) e viradas por UF. Não é evento do motor: a memória do líder por UF fica só na RAM (reinício não gera alerta falso)
 
 **Testar mudança**: `tests/test_telegram_bot.py` cobre as regras puras (turno, família de alertas, nº → cargo). Fluxo completo: setar `TELEGRAM_BOT_TOKEN` no `.env` e conversar com o bot.
 

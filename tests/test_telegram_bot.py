@@ -34,9 +34,26 @@ def test_turno_vigente_vira_no_fechamento_do_1t():
     assert tb._turno_vigente(depois) == 2
 
 
-def test_opcoes_do_2t_so_eleito_e_virada():
-    assert tb._opcoes_do_turno(2) == ["ELEITO", "VIRADA"]
+def test_opcoes_do_2t():
+    assert tb._opcoes_do_turno(2, cargo=1) == ["ELEITO", "VIRADA", "BOLETIM", "VIRADA_UF"]
+    assert tb._opcoes_do_turno(2, cargo=3) == ["ELEITO", "VIRADA", "BOLETIM"]  # governador: sem "nos estados"
     assert "SEGUNDO_TURNO_DEFINIDO" in tb._opcoes_do_turno(1)
+
+
+def test_marcos_do_boletim():
+    assert tb._marco_cruzado(0.0, 0.001) == 0.0          # começou
+    assert tb._marco_cruzado(0.0, 0.30) == 0.25          # pulou direto: só o maior marco
+    assert tb._marco_cruzado(0.24, 0.26) == 0.25
+    assert tb._marco_cruzado(0.26, 0.49) is None
+    assert tb._marco_cruzado(0.49, 0.80) == 0.75         # 50 e 75 no mesmo ciclo: um boletim só
+    assert tb._marco_cruzado(0.95, 1.0) == 1.0
+    assert tb._marco_cruzado(1.0, 1.0) is None
+
+
+def test_boletim_e_virada_uf_sao_familias_proprias():
+    assert tb._deve_enviar(["BOLETIM"], "BOLETIM", 2)
+    assert not tb._deve_enviar(["ELEITO_1T", "VIRADA"], "BOLETIM", 2)   # assinaturas antigas não recebem boletim
+    assert not tb._deve_enviar(["VIRADA"], "VIRADA_UF", 2)
 
 
 def test_parse_turno():

@@ -87,10 +87,16 @@ OPCOES_ALERTA = {
     "VIRADA": ("🔄 Virada (troca de líder)", ["VIRADA"]),
     "SEGUNDO_TURNO_DEFINIDO": ("⚡ 2º turno definido", ["SEGUNDO_TURNO_DEFINIDO"]),
     "MATEMATICAMENTE_ELIMINADO": ("❌ Candidato sem chance matemática", ["MATEMATICAMENTE_ELIMINADO"]),
+    # Não vêm do motor: o poller avisa a cada snapshot (observar_snapshot).
+    "BOLETIM": ("📊 Boletins (início, 25, 50, 75, 90 e 100%)", ["BOLETIM"]),
+    "VIRADA_UF": ("🗺 Viradas nos estados", ["VIRADA_UF"]),
 }
+# Marcos de apuração que geram boletim (fração do eleitorado/seções).
+MARCOS_BOLETIM = (0.25, 0.50, 0.75, 0.90, 1.0)
 ROTULO_CURTO = {"ELEITO": "eleito", "VIRADA": "virada",
                 "SEGUNDO_TURNO_DEFINIDO": "2º turno definido",
-                "MATEMATICAMENTE_ELIMINADO": "sem chance matemática"}
+                "MATEMATICAMENTE_ELIMINADO": "sem chance matemática",
+                "BOLETIM": "boletins", "VIRADA_UF": "viradas nos estados"}
 # 17h BRT dos dias de votação (fechamento das urnas).
 FIM_1T = datetime(2026, 10, 4, 20, 0, tzinfo=timezone.utc)
 INICIO_APURACAO_2T = datetime(2026, 10, 25, 20, 0, tzinfo=timezone.utc)
@@ -202,8 +208,10 @@ def _turno_vigente(agora: datetime | None = None) -> int:
     return 2 if (agora or datetime.now(timezone.utc)) >= FIM_1T else 1
 
 
-def _opcoes_do_turno(turno: int) -> list[str]:
-    return ["ELEITO", "VIRADA"] if turno == 2 else list(OPCOES_ALERTA)
+def _opcoes_do_turno(turno: int, cargo: int = 1) -> list[str]:
+    if turno == 2:
+        return ["ELEITO", "VIRADA", "BOLETIM"] + (["VIRADA_UF"] if cargo == 1 else [])
+    return ["ELEITO", "VIRADA", "SEGUNDO_TURNO_DEFINIDO", "MATEMATICAMENTE_ELIMINADO", "BOLETIM"]
 
 
 def _parse_turno(args: list[str]) -> int | None:
@@ -247,7 +255,8 @@ def _fmt_pct(x: float, casas: int = 2) -> str:
 def _kb_principal() -> dict:
     return {"inline_keyboard": [
         [{"text": "📊 Placar agora", "callback_data": "menu:placar"}],
-        [{"text": "🗺 Mapa por UF", "callback_data": "menu:mapa"}],
+        [{"text": "📈 Estimativa", "callback_data": "menu:estimativa"},
+         {"text": "🗺 Mapa por UF", "callback_data": "menu:mapa"}],
         [{"text": "🔔 Receber alertas", "callback_data": "sub:cargo"}],
         [{"text": "📋 Meus alertas", "callback_data": "menu:minhas"}],
         [{"text": "⚙ Configurações", "callback_data": "menu:config"}],
@@ -278,11 +287,11 @@ def _kb_escolher_uf(prefix: str, cargo: int, ufs: list[str] | None = None) -> di
     return {"inline_keyboard": linhas}
 
 
-def _kb_tipos(marcados: list[str], turno: int | None = None) -> dict:
+def _kb_tipos(marcados: list[str], turno: int | None = None, cargo: int = 1) -> dict:
     turno = turno or _turno_vigente()
     marcadas = {_familia(t) for t in marcados}
     kb = [[{"text": ("✅ " if f in marcadas else "◻ ") + OPCOES_ALERTA[f][0],
-            "callback_data": f"tipo:{f}"}] for f in _opcoes_do_turno(turno)]
+            "callback_data": f"tipo:{f}"}] for f in _opcoes_do_turno(turno, cargo)]
     kb.append([{"text": "✓ Salvar", "callback_data": "sub:salvar"},
                {"text": "‹ Voltar", "callback_data": "sub:cargo"}])
     return {"inline_keyboard": kb}
@@ -451,7 +460,64 @@ async def cmd_placar(client, chat_id: int, args: list[str]) -> None:
         if cargo == 3 and turno == 1 and _turno_vigente() == 2 and not _parse_turno(args):
             linhas.append("\n_Decidido no 1º turno, sem 2º turno neste estado._")
     linhas.append(f"\n_Atualizado às {snap.coletado_em.astimezone(BRT).strftime('%H:%M:%S')}_")
-    await _send(client, chat_id, "\n".join(linhas))
+    await _send(client, chat_id, "\n".join(linhas), keyboard=_kb_acoes(cargo, uf, turno))
+
+
+def _kb_acoes(cargo: int, uf: str, turno: int) -> dict:
+    """Botões sob placar/estimativa/boletim: atualizar sem digitar."""
+    alvo = f"{cargo}:{uf}"
+    linha1 = [{"text": "🔄 Atualizar", "callback_data": f"plcu:{alvo}"}]
+    if turno == 2 and cargo in (1, 3):
+        linha1.append({"text": "📈 Estimativa", "callback_data": f"est:{alvo}"})
+    linha2 = [{"text": "🗺 Mapa", "callback_data": f"mp:{cargo}"}] if cargo == 1 else []
+    q = f"?turno={turno}&cargo={cargo}&uf={uf}"
+    linha2.append({"text": "🌐 Abrir no site", "url": SITE_URL + "/" + q})
+    return {"inline_keyboard": [linha1, linha2]}
+
+
+async def _texto_estimativa(sess, cargo: int, uf: str) -> str | None:
+    """Estimativa não oficial (mesma de /api/apuracao/projecao). None se não
+    se aplica ainda (antes de 10% ou 100%)."""
+    try:
+        from app.api import apuracao_projecao
+        pj = await apuracao_projecao(cargo=cargo, abrangencia=uf, turno=2, sess=sess)
+    except Exception:
+        log.exception("estimativa falhou")
+        return None
+    if not pj.get("disponivel"):
+        return None
+    linhas = []
+    for c in sorted(pj["candidatos"], key=lambda c: -c["pct"]):
+        nome, _ = await _nome_partido(sess, c["sq_candidato"])
+        m = (c["ic95"][1] - c["ic95"][0]) / 2
+        ch = f" · {round(c['p_vitoria'] * 100)}% de chance" if c.get("p_vitoria") is not None else ""
+        linhas.append(f"{nome}: ≈{_fmt_pct(c['pct'], 1)} ±{str(round(m, 1)).replace('.', ',')}{ch}")
+    if pj.get("exibir_probabilidade") is False:
+        linhas.append("_Chance a partir de 50% apurado._")
+    return "\n".join(linhas)
+
+
+async def cmd_estimativa(client, chat_id: int, args: list[str]) -> None:
+    cargo, uf = _parse_cargo_uf(args)
+    if cargo not in (1, 3):
+        cargo = 1
+    if await _pedir_uf(client, chat_id, cargo, args):
+        return
+    abr = "BR" if cargo == 1 else uf
+    async with SessionLocal() as sess:
+        txt = await _texto_estimativa(sess, cargo, abr)
+        res = await _snapshot_atual(sess, cargo, abr, 2)
+    if not txt:
+        pct = _pct_apurado(res[1]) if res else 0
+        msg = ("A estimativa começa com 10% apurado"
+               + (f" (agora {_fmt_pct(pct, 1)})." if pct else ".")
+               if pct < 100 else "Apuração encerrada: vale o resultado oficial.")
+        await _send(client, chat_id, f"📈 *Estimativa · {_rotulo(cargo, abr, 2)}*\n\n{msg}")
+        return
+    await _send(client, chat_id,
+        f"📈 *Estimativa para 100% apurado · {_rotulo(cargo, abr, 2)}*\n"
+        f"_Não oficial. Calculada com a apuração parcial do TSE e o 1º turno de cada estado._\n\n{txt}",
+        keyboard=_kb_acoes(cargo, abr, 2))
 
 
 async def cmd_lider(client, chat_id: int, args: list[str]) -> None:
@@ -822,6 +888,15 @@ async def _tratar_callback(client, cb: dict) -> None:
                        text=f"{CARGOS[cargo]}: escolha o estado",
                        reply_markup=_kb_escolher_uf("plcu", cargo))
         return
+    if data.startswith("est:"):
+        _, cargo, uf = data.split(":")
+        await ack()
+        await cmd_estimativa(client, chat_id, [cargo, uf])
+        return
+    if data == "menu:estimativa":
+        await ack()
+        await cmd_estimativa(client, chat_id, ["1"])
+        return
     if data.startswith("plcu:"):
         _, cargo, uf = data.split(":")
         await ack()
@@ -860,12 +935,12 @@ async def _tratar_callback(client, cb: dict) -> None:
         est["cargo"] = cod
         if cod == 1:
             est["uf"] = "BR"
-            est["tipos"] = _opcoes_do_turno(_turno_vigente())
-            if "MATEMATICAMENTE_ELIMINADO" in est["tipos"]:
-                est["tipos"].remove("MATEMATICAMENTE_ELIMINADO")
+            # Padrão: eleito, virada e boletins; viradas nos estados é opcional
+            # (pode dar várias mensagens numa noite apertada).
+            est["tipos"] = ["ELEITO", "VIRADA", "BOLETIM"]
             await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
                        text="Presidente · Brasil: avisar quando",
-                       reply_markup=_kb_tipos(est["tipos"]))
+                       reply_markup=_kb_tipos(est["tipos"], cargo=1))
         else:
             ufs = None
             if cod == 3 and _turno_vigente() == 2:
@@ -881,10 +956,10 @@ async def _tratar_callback(client, cb: dict) -> None:
         await ack()
         est = _ESTADOS.setdefault(chat_id, {"tipos": [], "cargo": None, "uf": None})
         est["cargo"] = int(cargo); est["uf"] = uf
-        est["tipos"] = ["ELEITO", "VIRADA"]
+        est["tipos"] = ["ELEITO", "VIRADA", "BOLETIM"]
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
                    text=f"{CARGOS[int(cargo)]} · {uf}: avisar quando",
-                   reply_markup=_kb_tipos(est["tipos"]))
+                   reply_markup=_kb_tipos(est["tipos"], cargo=int(cargo)))
         return
     if data.startswith("tipo:"):
         t = _familia(data.split(":")[1])  # botões antigos traziam o tipo concreto
@@ -896,7 +971,7 @@ async def _tratar_callback(client, cb: dict) -> None:
         else:
             est["tipos"].append(t)
         await _api(client, "editMessageReplyMarkup", chat_id=chat_id, message_id=msg_id,
-                   reply_markup=_kb_tipos(est["tipos"]))
+                   reply_markup=_kb_tipos(est["tipos"], cargo=est.get("cargo") or 1))
         return
     if data == "sub:salvar":
         est = _ESTADOS.get(chat_id) or {}
@@ -998,6 +1073,7 @@ async def _tratar_mensagem(client, msg: dict) -> None:
             "/lider: quem lidera e a diferença\n"
             "/pct: quanto já foi apurado\n"
             "/mapa: quem lidera em cada estado\n"
+            "/estimativa: estimativa para 100% (não oficial)\n"
             "/eventos: viradas e eleitos\n"
             "Ex.: `/placar governador DF` · `/placar 1t` (1º turno)\n\n"
             "*Candidatos*\n"
@@ -1014,6 +1090,7 @@ async def _tratar_mensagem(client, msg: dict) -> None:
             "/status: código de verificação do TSE\n"
             "/proporcional <uf> · /estadual <uf>: deputados (1º turno)\n"
             "/tse: site oficial")
+    elif cmd in ("/estimativa", "/projecao", "/previsao"): await cmd_estimativa(client, chat_id, args)
     elif cmd == "/pct":            await cmd_pct(client, chat_id, args)
     elif cmd == "/placar":         await cmd_placar(client, chat_id, args)
     elif cmd == "/lider":          await cmd_lider(client, chat_id, args)
@@ -1135,6 +1212,7 @@ async def loop_bot() -> None:
                 {"command": "lider", "description": "Quem lidera e a diferença"},
                 {"command": "pct", "description": "Quanto já foi apurado"},
                 {"command": "mapa", "description": "Quem lidera em cada estado"},
+                {"command": "estimativa", "description": "Estimativa para 100% (não oficial)"},
                 {"command": "eventos", "description": "Viradas e eleitos"},
                 {"command": "assinar", "description": "Receber alertas"},
                 {"command": "minhas", "description": "Meus alertas"},
@@ -1269,3 +1347,115 @@ async def enviar_notificacoes(eventos: list[dict], cargo: int, uf: str, turno: i
                 tarefas.append(_enviar_um(client, s.chat_id, texto))
             if tarefas:
                 await asyncio.gather(*tarefas, return_exceptions=True)
+
+
+# ================== boletins e viradas nos estados ==================
+# Não são eventos do motor: o poller chama observar_snapshot depois de
+# gravar cada snapshot confiável. Boletim = a apuração cruzou um marco
+# (começou, 25, 50, 75, 90, 100%). Virada nos estados = o líder de uma UF
+# (Presidente) mudou entre dois snapshots. A memória do líder é só em RAM:
+# depois de reiniciar, a 1ª observação de cada UF não gera alerta
+# (sem falsa virada).
+_lider_uf: dict[tuple[int, str, int], str] = {}
+
+
+async def _enviar_familia(cargo: int, abr: str, tipo: str, texto: str, turno: int,
+                          teclado: dict | None = None) -> int:
+    """Manda `texto` pra quem assinou (cargo, abr) com a família de `tipo`,
+    respeitando pausa e silêncio. Devolve quantos envios."""
+    if not _api_base():
+        return 0
+    async with SessionLocal() as sess:
+        subs = (await sess.execute(select(TelegramSubscription).where(and_(
+            TelegramSubscription.cod_cargo == cargo,
+            TelegramSubscription.abrangencia == abr)))).scalars().all()
+        subs = [s for s in subs if _deve_enviar(s.tipos_evento, tipo, turno)]
+        if not subs:
+            return 0
+        cfgs = {c.chat_id: c for c in (await sess.execute(
+            select(TelegramChatConfig).where(TelegramChatConfig.chat_id.in_({s.chat_id for s in subs}))
+        )).scalars()}
+    alvos = [s.chat_id for s in subs
+             if not (cfgs.get(s.chat_id) and cfgs[s.chat_id].pausado_global) and not _em_silencio(cfgs.get(s.chat_id))]
+    sem = asyncio.Semaphore(20)
+
+    async def _um(client, chat_id):
+        async with sem:
+            extra = {"reply_markup": teclado} if teclado else {}
+            await _api(client, "sendMessage", chat_id=chat_id, text=texto, parse_mode="Markdown",
+                       disable_web_page_preview=True, **extra)
+
+    async with httpx.AsyncClient() as client:
+        await asyncio.gather(*(_um(client, c) for c in alvos), return_exceptions=True)
+    return len(alvos)
+
+
+def _marco_cruzado(antes: float, agora: float) -> float | None:
+    """Maior marco cruzado entre dois snapshots (0 = começou a apuração)."""
+    if antes <= 0 < agora:
+        cruzados = [0.0] + [m for m in MARCOS_BOLETIM if antes < m <= agora]
+        return max(cruzados)
+    cruzados = [m for m in MARCOS_BOLETIM if antes < m <= agora]
+    return max(cruzados) if cruzados else None
+
+
+async def _texto_boletim(sess, cargo: int, abr: str, turno: int, marco: float) -> str | None:
+    res = await _snapshot_atual(sess, cargo, abr, turno)
+    if not res:
+        return None
+    snap, tot, cands = res
+    pct = _pct_apurado(tot)
+    tit = ("Começou a apuração" if marco == 0 else
+           "Apuração encerrada" if marco >= 1 else f"{int(marco * 100)}% apurado")
+    linhas = [f"📊 *{tit}* · {_rotulo(cargo, abr, turno)}",
+              f"_{_fmt_pct(pct, 2)} das seções · dado do TSE das {snap.coletado_em.astimezone(BRT).strftime('%H:%M')}_\n"]
+    for c in cands[:2 if turno == 2 else 5]:
+        nome, sig = await _nome_partido(sess, c.sq_candidato)
+        linhas.append(f"*{nome}* ({sig}) {_fmt_pct(float(c.pct_validos))} · {_fmt_int(c.votos)} votos")
+    if len(cands) >= 2 and cands[0].votos != cands[1].votos:
+        a, _ = await _nome_partido(sess, cands[0].sq_candidato)
+        linhas.append(f"\n{a} à frente por {_fmt_int(cands[0].votos - cands[1].votos)} votos")
+    if turno == 2 and cargo in (1, 3) and 0 < marco < 1:
+        est = await _texto_estimativa(sess, cargo, abr)
+        if est:
+            linhas.append(f"\n📈 _Estimativa não oficial para 100%:_\n{est}")
+    return "\n".join(linhas)
+
+
+async def observar_snapshot(cargo: int, abr: str, turno: int, secoes_antes: int | None,
+                            secoes_agora: int, secoes_total: int, sq_lider: str | None,
+                            votos_lider: int) -> None:
+    """Chamado pelo poller depois de cada snapshot confiável."""
+    if not _api_base() or not secoes_total:
+        return
+    # Boletins: alvos que têm assinatura (Pres BR, Gov UF; 1º turno também
+    # Senador). Presidente por UF não tem assinatura própria.
+    if not (cargo == 1 and abr != "BR"):
+        marco = _marco_cruzado((secoes_antes or 0) / secoes_total, secoes_agora / secoes_total)
+        if marco is not None:
+            async with SessionLocal() as sess:
+                texto = await _texto_boletim(sess, cargo, abr, turno, marco)
+            if texto:
+                await _enviar_familia(cargo, abr, "BOLETIM", texto, turno, _kb_acoes(cargo, abr, turno))
+    # Viradas nos estados (Presidente, 2º turno)
+    if cargo == 1 and abr != "BR" and sq_lider and votos_lider > 0:
+        chave = (cargo, abr, turno)
+        antes = _lider_uf.get(chave)
+        _lider_uf[chave] = sq_lider
+        if antes and antes != sq_lider:
+            async with SessionLocal() as sess:
+                novo, sig = await _nome_partido(sess, sq_lider)
+                velho, _ = await _nome_partido(sess, antes)
+            uf_nome = NOMES_UF.get(abr, abr)
+            texto = (f"🗺 *Virada em {uf_nome}*\n{_rotulo(cargo, 'BR', turno)}\n\n"
+                     f"*{novo}* ({sig}) passa {velho} em {uf_nome}, com "
+                     f"{_fmt_pct(secoes_agora / secoes_total * 100, 1)} das seções do estado apuradas.")
+            await _enviar_familia(1, "BR", "VIRADA_UF", texto, turno, _kb_acoes(1, "BR", turno))
+
+
+NOMES_UF = {"AC": "Acre", "AL": "Alagoas", "AM": "Amazonas", "AP": "Amapá", "BA": "Bahia", "CE": "Ceará",
+            "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás", "MA": "Maranhão",
+            "MG": "Minas Gerais", "MS": "Mato Grosso do Sul", "MT": "Mato Grosso", "PA": "Pará",
+            "PB": "Paraíba", "PE": "Pernambuco", "PI": "Piauí", "PR": "Paraná", "RJ": "Rio de Janeiro",
+            "RN": "Rio Grande do Norte", "RO": "Rondônia", "RR": "Roraima", "RS": "Rio Grande do Sul",
+            "SC": "Santa Catarina", "SE": "Sergipe", "SP": "São Paulo", "TO": "Tocantins", "ZZ": "Exterior"}
