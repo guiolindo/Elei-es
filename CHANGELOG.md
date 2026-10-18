@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Estimativa — teste de viés (18/10)
+- `scripts/validacao_2t/` (simulador + `vies.py`): erro assinado, super/subestimação por candidato, cobertura e calibração da chance separados, com cenários de migração regional. Motor inalterado. Resultados em `docs/metodologia.md` §8.4.
+
 ### Bot do Telegram (18/10)
 - `/estimativa` (também `/projecao`, `/previsao` e botão no menu): estimativa não oficial do 2º turno para 100% apurado, com ± e chance quando já há dado suficiente.
 - `/placar` vem com botões: Atualizar, Estimativa, Mapa e Abrir no site.

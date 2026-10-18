@@ -358,7 +358,7 @@ IC95 = S ± 1,96 sd          P(A vence) = Φ((S − 0,5)/(k·sd)), k = 1,4      
 
 #### Simulador e resultados (17/10/2026)
 
-`scratchpad/agentB/sim.py` (fora do repositório): 28 estratos com seções em blocos; voto por bloco = logit(share da UF + choque nacional) + viés ligado à **posição na fila de apuração dentro da UF** (capital × interior) + ruído; comparecimento por bloco, correlacionado à ordem no N/NE; prior = share final − swing + ruído. Cenários: **base**; **hard** (viés intra-UF 2×, prior pior); **adverso** — criado depois do ajuste e **nunca usado para escolher nada**: viés intra-UF 3×, comparecimento ligado à ordem, prior pior (σ 5 pp), swing grande (σ 5 pp).
+`scripts/validacao_2t/sim.py`: 28 estratos com seções em blocos; voto por bloco = logit(share da UF + choque nacional) + viés ligado à **posição na fila de apuração dentro da UF** (capital × interior) + ruído; comparecimento por bloco, correlacionado à ordem no N/NE; prior = share final − swing + ruído. Cenários: **base**; **hard** (viés intra-UF 2×, prior pior); **adverso** — criado depois do ajuste e **nunca usado para escolher nada**: viés intra-UF 3×, comparecimento ligado à ordem, prior pior (σ 5 pp), swing grande (σ 5 pp).
 
 Medido só no que a tela mostra (≥30% apurado, 7 pontos de corte × 300 eleições = 2.100 previsões por cenário; pontos da mesma eleição são correlacionados, então o n efetivo é menor), semente de relatório 31337:
 
@@ -388,12 +388,60 @@ Governador (estrato único, UFs AC/AM/DF/ES/RN/TO, disputas recentradas perto de
 
 Leave-one-out no swing (Presidente): efeito nulo dentro do erro de simulação → desligado (`DELTA_LOO = False`).
 
+#### Teste de viés (18/10/2026)
+
+`scripts/validacao_2t/vies.py`. Motor sem nenhuma alteração. Semente nova (2610), nunca usada em decisão; 2.000 eleições por cenário. Em cada ponto a projeção vê só o snapshot do instante, um anterior e o 1T; o resultado final só pontua. Eleitorado e total de seções por UF entram desde o início porque o TSE publica esses números com 0% apurado.
+
+A = candidato forte no Nordeste/Norte (geografia de 2022); B = forte no Sul/Centro-Oeste. No simulador Sul e Sudeste apuram primeiro.
+
+Cenários novos, com erro do 1T **por região** (todas as UFs da região juntas, o que o motor não modela: ele supõe erro independente por UF mais o swing nacional):
+- **regional_aleatorio** / **adverso_regional**: cada região recebe um desvio aleatório de σ 3 pp na migração 1T→2T (sobre o base / sobre o adverso).
+- **dirigido_pro_A** / **dirigido_pro_B**: S, SE e CO desviam 2 pp para um lado e N e NE 2 pp para o outro. O swing medido cedo (Sul) é o errado para o Norte/Nordeste. É um teste de estresse com sinal fixo, não um cenário provável.
+
+Simetria da fórmula: trocar A e B em todas as 84.000 previsões dá o resultado espelhado (diferença máxima 2×10⁻¹¹). Isso prova só a simetria, não a ausência de viés empírico.
+
+Erro assinado da estimativa de A (estimado − real, pp; positivo = superestima A), com IC95 entre eleições:
+
+| cenário | 10% | 30% | 50% | 90% | IC95 cobre (50% / 90%) |
+|---|---|---|---|---|---|
+| base | +0,18 (±0,06) | +0,13 | +0,10 | +0,03 | 100% / 99,5% |
+| hard | +0,18 (±0,12) | +0,13 | +0,10 | +0,03 | 98,8% / 95,5% |
+| adverso | +0,17 (±0,17) | +0,12 | +0,09 | +0,04 | 97,8% / **91,6%** |
+| regional_aleatorio | +0,12 | +0,09 | +0,07 | +0,02 | 99,6% / 96,7% |
+| adverso_regional | +0,02 | +0,01 | +0,01 | +0,02 | 94,9% / **88,4%** |
+| dirigido_pro_A | −0,46 | −0,28 | −0,20 | −0,04 | 99,8% / 99,1% |
+| dirigido_pro_B | +0,82 | +0,55 | +0,39 | +0,10 | 98,8% / **91,7%** |
+| base sem comparecimento ligado à ordem | −0,02 (±0,06) | | −0,00 | +0,00 | 100% / 99,8% |
+
+Erro absoluto médio a 10% / 50% / 90%: base 1,14 / 0,46 / 0,10; adverso 3,19 / 1,24 / 0,27; dirigidos ~1,2–1,3 / ~0,5 / ~0,1.
+
+Leitura:
+- **O desvio de +0,1 a +0,18 pp para A nos cenários sem efeito regional vem de uma hipótese do simulador, não da fórmula**: no N/NE as seções que chegam por último têm comparecimento menor, e o motor estima os votos que faltam em cada UF pelo comparecimento já apurado. Desligando só esse termo o viés vai a −0,02 ± 0,06. Na eleição real o lado do viés depende de onde o comparecimento das seções tardias cai, não de qual candidato é.
+- **Swing regional diferente do nacional**: com 4 pp de diferença entre quem apura cedo e quem apura tarde, o erro sistemático (descontado o +0,18 do base) é ±0,64 pp a 10%, ±0,30 a 50% e ±0,07 a 90%. É contido porque cada UF já tem parte apurada desde cedo e esses votos pesam na própria UF.
+- **A margem não incorpora erro regional correlacionado** de forma explícita. Até 70% ela ainda cobre mais de 94% nos cenários regionais, porque já era conservadora. **A 90% a cobertura cai para 88–92%** nos cenários adversos e no dirigido_pro_B: banda estreita (fator 1,0) contra erro sistemático.
+
+Chance de vencer, só nos pontos em que o site mostra (≥50% apurado, 6.000 previsões por cenário), probabilidade média do favorito × frequência real de vitória:
+
+| cenário | geral | A favorito | B favorito | faixa 50–70% |
+|---|---|---|---|---|
+| base | 92,6 × 96,2 | 93,5 × 96,1 | 91,1 × 96,3 | 59,9 × 68,6 ±3,9 |
+| hard | 90,7 × 92,8 | 92,0 × 93,9 | 88,6 × 91,0 | 60,4 × 58,9 ±3,6 |
+| adverso | 88,8 × 89,4 | 90,4 × 91,7 | 86,2 × 85,8 | **60,0 × 54,8 ±3,3** |
+| regional_aleatorio | 92,6 × 95,8 | 93,5 × 96,3 | 90,9 × 94,9 | 60,3 × 65,5 ±3,9 |
+| adverso_regional | 88,8 × 89,3 | 90,2 × 92,4 | **86,3 × 84,1** | **60,6 × 55,4 ±3,2** |
+| dirigido_pro_A | 92,4 × 95,8 | 93,1 × 97,9 | 91,4 × 92,6 | 60,2 × 65,5 ±3,9 |
+| dirigido_pro_B | 92,8 × 94,9 | 93,7 × 93,1 | 91,1 × 98,3 | 60,2 × 59,1 ±4,3 |
+
+Leitura: no agregado a chance é cautelosa em todos os cenários. O problema fica localizado: **na faixa 50–70% ela é confiante demais nos dois cenários adversos (diz 60%, acontece 55%)**. Quando a estimativa pende para um lado (dirigidos), a chance do favorecido fica perto do correto e a do outro fica cautelosa demais. O viés da estimativa não vira excesso de confiança para quem ele favorece nesses testes.
+
+Limitações: o simulador é nosso (geografia 2022, ordem de apuração e efeitos regionais com tamanhos escolhidos, não medidos); as previsões da mesma eleição são correlacionadas (os IC95 são calculados por ponto de corte, entre eleições independentes); só Presidente; nada aqui substitui o backtest com seções reais abaixo, que também precisa medir se o comparecimento das seções tardias é de fato diferente.
+
 #### Plano de validação retrospectiva (pós-eleição, sem vazamento)
 
 1. **Dados**: arquivos públicos do TSE de 2018 e 2022 (dadosabertos.tse.jus.br) com resultado por seção nos dois turnos: votação por seção, boletins de urna e eleitorado por seção. Verificar se os boletins trazem horário de recebimento/totalização; se trouxerem, reconstruir a **ordem real** da apuração. Se não, usar ordens alternativas plausíveis (por zona e município, capital primeiro), marcadas como aproximação.
 2. **Reconstrução**: em cada instante `t`, só a informação disponível em `t` (seções totalizadas até `t`; 1T completo como prior). Nada do resultado final entra.
 3. **Separação**: ajustar constantes em **2018**; avaliar em **2022** sem tocar em nada. Depois do 2T de 2026, avaliar em 2026 como terceiro conjunto.
-4. **Métricas separadas**: erro absoluto do share final por % apurado; cobertura empírica do IC95; calibração da probabilidade (diagrama de confiabilidade com intervalos, Brier); acerto do vencedor — com bootstrap por eleição para os intervalos.
+4. **Métricas separadas**: erro absoluto e **erro assinado** (com contagem de super/subestimação por candidato) do share final por % apurado; comparecimento das seções tardias × já apuradas por UF; cobertura empírica do IC95; calibração da probabilidade (diagrama de confiabilidade com intervalos, Brier); acerto do vencedor — com bootstrap por eleição para os intervalos.
 5. **Comparação** de variantes nos mesmos instantes: atual × estratificação municipal (Governador e UFs grandes), medindo também custo (requisições por ciclo ao TSE).
 6. Só então decidir constantes novas e a versão municipal.
 
