@@ -436,6 +436,16 @@ Leitura: no agregado a chance é cautelosa em todos os cenários. O problema fic
 
 Limitações: o simulador é nosso (geografia 2022, ordem de apuração e efeitos regionais com tamanhos escolhidos, não medidos); as previsões da mesma eleição são correlacionadas (os IC95 são calculados por ponto de corte, entre eleições independentes); só Presidente; nada aqui substitui o backtest com seções reais abaixo, que também precisa medir se o comparecimento das seções tardias é de fato diferente.
 
+#### Limitações conhecidas (abertas até a validação com dados reais)
+
+Decisão de 18/10/2026: a versão em produção fica como está até a validação retrospectiva. Estas três limitações valem para o dia 25/10:
+
+1. **Comparecimento das seções que faltam.** O motor supõe que, em cada estrato, as seções que faltam têm o mesmo comparecimento (válidos por eleitor apto) das já apuradas. Se as seções tardias de uma região tiverem comparecimento diferente, a estimativa pende para o candidato forte nessa região. No simulador essa hipótese explica todo o desvio de +0,1 a +0,18 pp; que ela ocorra (e com que tamanho) na eleição real **não está demonstrado** e é a primeira coisa que o teste com boletins de urna mede.
+2. **Margem estreita perto do fim.** Com 90% apurado o IC95 cobriu 88,4% a 91,7% do resultado real nos cenários adversos do simulador: abaixo do nominal. O site mostra a margem como faixa de 95%; nesses cenários ela está otimista.
+3. **Chance na faixa 50–70%.** Nos cenários adversos a chance de 60% virou vitória em cerca de 55% das eleições. Em outras faixas e cenários ela é cautelosa.
+
+Nenhum parâmetro foi alterado por causa dessas simulações.
+
 #### Plano de validação retrospectiva (pós-eleição, sem vazamento)
 
 1. **Dados**: arquivos públicos do TSE de 2018 e 2022 (dadosabertos.tse.jus.br) com resultado por seção nos dois turnos: votação por seção, boletins de urna e eleitorado por seção. Verificar se os boletins trazem horário de recebimento/totalização; se trouxerem, reconstruir a **ordem real** da apuração. Se não, usar ordens alternativas plausíveis (por zona e município, capital primeiro), marcadas como aproximação.
