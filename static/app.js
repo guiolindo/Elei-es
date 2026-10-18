@@ -1903,6 +1903,7 @@ async function atualizarMapa() {
       const r = await fetch(`/api/apuracao/lideres-por-uf?cargo=${state.cargo}&turno=${state.turno}`);
       if (r.ok) {
         const j = await r.json();
+        state.secoesUF = j.secoes || {};
         for (const [uf, d] of Object.entries(j.ufs || {})) {
           const partidoNum = state.ficha?.[d.sq_candidato]?.partido;
           dadosPorUF[uf] = {
@@ -2124,8 +2125,9 @@ async function atualizarGrafHome() {
 function renderLegenda(leg, dados, texto) {
   // Quantas áreas (UFs ou municípios) cada um lidera — o placar do mapa.
   const nomes = new Map();
-  for (const d of Object.values(dados)) {
-    if (!d.nome_lider) continue;
+  for (const [area, d] of Object.entries(dados)) {
+    // Exterior (ZZ) não é estado: fica fora do "lidera em N estados".
+    if (!d.nome_lider || area === "ZZ") continue;
     const atual = nomes.get(d.nome_lider) || { cor: d.cor, n: 0 };
     atual.n += 1;
     nomes.set(d.nome_lider, atual);
@@ -3358,6 +3360,7 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
     const i = v[0].votos >= v[1].votos ? 0 : 1;
     if (v[0].votos !== v[1].votos && !eleito) itens.push(`${ativos[i].nome_urna} à frente por ${fmtNum(Math.abs(v[0].votos - v[1].votos))} votos`);
     itens.push(`${dec(pct, 2)}% apurado · ${fmtNum(t.secoes_totalizadas || 0)} de ${fmtNum(t.secoes_total || 0)} seções`);
+    itens.push(...itensApuracaoTicker(t, pct));
     const cm = state.contagemMapa;
     if (cm?.nomes?.size) {
       const partes = [...cm.nomes.entries()].sort((a, b) => b[1].n - a[1].n)
@@ -3374,6 +3377,45 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
   _ticker.html = html;
   if (!fita.firstElementChild) trocarFitaTicker(); else _ticker.pendente = html;
   if (!_ticker.raf) _ticker.raf = requestAnimationFrame(passoTicker);
+}
+const REGIOES_UF = {
+  Norte: ["AC", "AM", "AP", "PA", "RO", "RR", "TO"],
+  Nordeste: ["AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"],
+  "Centro-Oeste": ["DF", "GO", "MS", "MT"],
+  Sudeste: ["ES", "MG", "RJ", "SP"],
+  Sul: ["PR", "RS", "SC"],
+};
+// Só dado oficial do próprio boletim: comparecimento, brancos e nulos,
+// apuração por região e estados encerrados.
+function itensApuracaoTicker(t, pct) {
+  const itens = [];
+  const aptoTot = t.eleitorado_apto_totalizado || 0;
+  if (aptoTot > 0 && t.comparecimento > 0) {
+    itens.push(`Comparecimento: ${dec(t.comparecimento / aptoTot * 100, 1)}% dos eleitores das seções apuradas`);
+  }
+  if (t.comparecimento > 0) {
+    const bn = (t.votos_brancos || 0) + (t.votos_nulos || 0);
+    itens.push(`Brancos e nulos: ${dec(bn / t.comparecimento * 100, 1)}% (${fmtNum(t.votos_brancos || 0)} brancos, ${fmtNum(t.votos_nulos || 0)} nulos)`);
+  }
+  if (pct < 100 && t.eleitorado_apto > aptoTot && aptoTot > 0) {
+    const falta = t.eleitorado_apto - aptoTot;
+    itens.push(`Faltam seções com ${falta >= 1e6 ? `${dec(falta / 1e6, 1)} milhões de` : fmtNum(falta)} eleitores`);
+  }
+  const sec = state.abrangencia === "BR" ? state.secoesUF : null;
+  if (sec && Object.keys(sec).length) {
+    const partes = [];
+    for (const [reg, ufs] of Object.entries(REGIOES_UF)) {
+      let a = 0, tt = 0;
+      for (const uf of ufs) { a += sec[uf]?.totalizadas || 0; tt += sec[uf]?.total || 0; }
+      if (tt) partes.push(`${reg} ${dec(a / tt * 100, 1)}%`);
+    }
+    if (partes.length) itens.push(`Apurado por região: ${partes.join(" · ")}`);
+    const fechadas = Object.entries(sec).filter(([uf, x]) => uf !== "ZZ" && x.total && x.totalizadas >= x.total).map(([uf]) => uf).sort();
+    if (fechadas.length && fechadas.length < 27) {
+      itens.push(`${fechadas.length === 1 ? "Estado" : "Estados"} com 100% apurado: ${fechadas.join(", ")}`);
+    } else if (fechadas.length >= 27) itens.push("Todos os estados com 100% apurado");
+  }
+  return itens;
 }
 // Monta duas cópias idênticas; cada cópia repete os itens até ficar mais
 // larga que a faixa, então a emenda nunca deixa espaço vazio.

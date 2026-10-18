@@ -15,6 +15,7 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 - Quadro da TV ocupa a janela inteira (sem faixas pretas em modo janela); cronômetro antes da apuração não pisca mais a cada 30 s; no celular o modo TV não liga (nem fica salvo), e um toque em qualquer lugar mostra "Sair do modo TV".
 - No 2º turno o modo TV vira um quadro 16:9 estilo telejornal que escala inteiro (mesma composição em 960×540 e 1920×1080): faixa "AO VIVO" + % apurado + relógio; placar de dois lados com barra e marca dos 50%; mapa com placar de estados; estimativa; gráfico de evolução; letreiro "ÚLTIMAS" correndo. Controles (turno, cargo, UF, sair) escondidos — descem com o mouse no topo, toque no topo ou tecla do controle. Mapa e gráfico são os do site, emprestados ao quadro e devolvidos ao sair.
 - Corrige TV 32" (navegador ~960×540) com blocos sobrepostos.
+- Letreiro com mais dado oficial do boletim: comparecimento, brancos e nulos, eleitores que faltam apurar, % apurado por região e estados já com 100%. `lideres-por-uf` passa a devolver `secoes` por UF. O "lidera em N estados" não conta mais o Exterior.
 
 ## 2026-10-12 / 2026-10-17 — Preparação do 2º turno (25/10)
 

@@ -611,6 +611,7 @@ async def apuracao_atual(
             "secoes_totalizadas": tot.qt_secoes_totalizadas,
             "pct_apurado": (tot.qt_secoes_totalizadas / tot.qt_secoes_total * 100) if tot.qt_secoes_total else 0,
             "eleitorado_apto": tot.qt_eleitorado_apto,
+            "eleitorado_apto_totalizado": tot.qt_eleitorado_apto_totalizadas,
             "comparecimento": tot.qt_comparecimento,
             "abstencoes": tot.qt_abstencoes,
             "votos_validos": tot.qt_votos_validos,
@@ -1231,7 +1232,20 @@ async def lideres_por_uf(
             "votos": lider.votos,
             "cor_idx": sq_para_idx[lider.sq_candidato],
         }
-    return {"ufs": ufs}
+    # Seções apuradas por UF (inclusive UFs ainda sem voto): o letreiro da
+    # TV soma por região ("Nordeste 82% apurado").
+    rt = await sess.execute(
+        select(Snapshot.abrangencia, SnapshotTotais.qt_secoes_totalizadas,
+               SnapshotTotais.qt_secoes_total)
+        .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
+        .join(subq, and_(subq.c.abr == Snapshot.abrangencia,
+                         subq.c.ts == Snapshot.coletado_em))
+        .where(Snapshot.cod_cargo == cargo)
+    )
+    secoes = {row.abrangencia: {"totalizadas": row.qt_secoes_totalizadas or 0,
+                                "total": row.qt_secoes_total or 0}
+              for row in rt.all()}
+    return {"ufs": ufs, "secoes": secoes}
 
 
 @router.get("/eventos")
