@@ -1,6 +1,23 @@
 import { renderMapa } from "/static/mapa-br.js?v=20261017p";
 import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017p";
 
+// Dados ao vivo nunca vêm do cache do navegador. A API manda
+// "max-age=3, stale-while-revalidate=15" (bom pra proxies), e com isso o
+// navegador podia devolver a resposta ANTERIOR quando o aviso de dado novo
+// chegava: o site ficava um ciclo atrasado (no começo, "preso" em 0%).
+// "no-cache" obriga a buscar de novo a cada pedido.
+{
+  const _fetch = window.fetch.bind(window);
+  window.fetch = (input, init = {}) => {
+    const url = typeof input === "string" ? input : input?.url || "";
+    const metodo = (init.method || "GET").toUpperCase();
+    if (metodo === "GET" && /^\/api\/|^https?:\/\/[^/]*\/api\//.test(url.replace(location.origin, "")) && !init.cache) {
+      init = { ...init, cache: "no-cache" };
+    }
+    return _fetch(input, init);
+  };
+}
+
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
 // votos + accent da esquerda). Fallback pra paleta genérica quando o
@@ -121,6 +138,10 @@ const REDUCED_MOTION = window.matchMedia?.("(prefers-reduced-motion: reduce)").m
 // mesmo tempo), fontes maiores, sem elementos que exigem touch/mouse.
 // Pode ser forçado via ?tv=1 pra teste no desktop.
 const TV_KEY = "elei-es:tv";
+function ehCelular() {
+  return matchMedia("(pointer: coarse)").matches
+    && Math.min(screen.width, screen.height) < 600;
+}
 function detectarTV() {
   try {
     const forcado = new URLSearchParams(location.search).get("tv");
@@ -130,6 +151,9 @@ function detectarTV() {
     // — útil quando o navegador da TV se identifica como mobile (caso
     // comum em Android TV com browsers de terceiros).
     const salvo = localStorage.getItem(TV_KEY);
+    // Celular: modo TV ligado sem querer ficava salvo e prendia a pessoa
+    // nele a cada abertura. Em tela de celular a preferência salva não vale.
+    if (salvo === "1" && ehCelular()) { localStorage.setItem(TV_KEY, "0"); return false; }
     if (salvo === "1") return true;
     if (salvo === "0") return false;
   } catch(e) {}
@@ -149,6 +173,10 @@ function _sincronizarClasseTurno() {
 // Toggle manual do modo TV (botão no rodapé).
 function alternarModoTV() {
   const ativar = !document.body.classList.contains("is-tv");
+  if (ativar && ehCelular()) {
+    toast("O modo TV é para TV ou computador. No celular, use o placar normal.", "warn");
+    return;
+  }
   document.body.classList.toggle("is-tv", ativar);
   // O botão sempre prometeu "TV" — agora entra em tela cheia de verdade.
   if (ativar) entrarTelaCheia();
@@ -2753,16 +2781,21 @@ function renderDuelo() {
 // TV antes da apuração: o painel do gráfico (vazio) vira uma contagem
 // regressiva grande — é o que interessa a quem olha a TV de longe.
 function tickContagemTV() {
-  const grid = $("status-coleta-grid");
-  if (!grid || !document.body.classList.contains("is-tv")) return;
+  // Fica ao lado do grid, não dentro: renderPainelStatusColeta limpa o
+  // grid a cada 30s e o cronômetro sumia por um segundo.
+  const box = $("status-coleta");
+  if (!box || !document.body.classList.contains("is-tv")) return;
   const alvo = state.turno === 2 ? DIA_D_2T : DIA_D;
   const diff = alvo.getTime() - Date.now();
-  if (diff <= 0 || !$("status-coleta")?.offsetParent) { grid.querySelector(".tv-cd")?.remove(); return; }
+  if (diff <= 0 || !box.offsetParent) { box.querySelector(".tv-cd")?.remove(); return; }
   const d = Math.floor(diff / 86_400_000), h = Math.floor(diff % 86_400_000 / 3_600_000),
         m = Math.floor(diff % 3_600_000 / 60_000), sg = Math.floor(diff % 60_000 / 1000);
   const p2 = n => String(n).padStart(2, "0");
-  let el = grid.querySelector(".tv-cd");
-  if (!el) { el = document.createElement("div"); el.className = "tv-cd"; el.setAttribute("aria-hidden", "true"); grid.appendChild(el); }
+  let el = box.querySelector(".tv-cd");
+  if (!el) {
+    el = document.createElement("div"); el.className = "tv-cd"; el.setAttribute("aria-hidden", "true");
+    box.insertBefore(el, $("status-coleta-rodape"));
+  }
   el.innerHTML = (d ? `<b>${d}</b><small>${d === 1 ? "dia" : "dias"}</small> ` : "")
     + `<b>${p2(h)}</b><small>h</small> <b>${p2(m)}</b><small>min</small> <b>${p2(sg)}</b><small>s</small>`;
 }
@@ -3329,8 +3362,10 @@ function esconderControlesTV() {
 document.addEventListener("mousemove", (e) => {
   if (e.clientY < Math.max(70, innerHeight * 0.12)) mostrarControlesTV();
 });
+// Toque em qualquer ponto da tela mostra os controles (com "Sair do modo
+// TV"): no celular não há mouse pra levar ao topo.
 document.addEventListener("pointerdown", (e) => {
-  if (e.clientY < innerHeight * 0.15) mostrarControlesTV(6000);
+  if (e.pointerType !== "mouse" || e.clientY < innerHeight * 0.15) mostrarControlesTV(6000);
 });
 document.addEventListener("keydown", (e) => {
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Tab", "Escape", "m"].includes(e.key)) mostrarControlesTV(6000);

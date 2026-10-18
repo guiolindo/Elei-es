@@ -5,6 +5,8 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 ## [Unreleased]
 
 ### Modo TV — quadro de transmissão (18/10)
+- **Dado novo chegava com um ciclo de atraso (aparecia "preso em 0%")**: a API manda `max-age=3, stale-while-revalidate=15` e o navegador devolvia a resposta anterior quando o WebSocket avisava de dado novo. Toda leitura de `/api/*` no front agora usa `cache: "no-cache"`. Teste de transição 0% → 70% em computador, TV e celular: apurado, placar, duelo, mapa (0 → 28 UFs coloridas), gráfico e estimativa atualizam sozinhos.
+- Quadro da TV ocupa a janela inteira (sem faixas pretas em modo janela); cronômetro antes da apuração não pisca mais a cada 30 s; no celular o modo TV não liga (nem fica salvo), e um toque em qualquer lugar mostra "Sair do modo TV".
 - No 2º turno o modo TV vira um quadro 16:9 estilo telejornal que escala inteiro (mesma composição em 960×540 e 1920×1080): faixa "AO VIVO" + % apurado + relógio; placar de dois lados com barra e marca dos 50%; mapa com placar de estados; estimativa; gráfico de evolução; letreiro "ÚLTIMAS" correndo. Controles (turno, cargo, UF, sair) escondidos — descem com o mouse no topo, toque no topo ou tecla do controle. Mapa e gráfico são os do site, emprestados ao quadro e devolvidos ao sair.
 - Corrige TV 32" (navegador ~960×540) com blocos sobrepostos.
 

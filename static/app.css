@@ -3305,7 +3305,7 @@ body.is-tv .brand, body.is-tv .turno-toggle { flex: 0 0 auto; }
 .tvq { display: none; }
 body.tv-quadro .tvq {
   display: grid; place-items: center;
-  position: fixed; inset: 0; z-index: 40; background: #000;
+  position: fixed; inset: 0; z-index: 40; background: #070b14;
   --u: min(calc(100vw / 1920), calc(100vh / 1080));
   --tvq-bg: #070b14; --tvq-painel: #0d1424; --tvq-linha: #1c2740;
   --tvq-txt: #eef2f8; --tvq-sub: #8d9ab3; --tvq-ouro: #f0b429; --tvq-vivo: #e11d2e;
@@ -3314,8 +3314,11 @@ body.tv-quadro .tvq {
 body.tv-quadro main.page > :not(#tv-quadro):not(.rodape) { display: none !important; }
 body.tv-quadro .rodape > :not(.rodape-tv) { display: none !important; }
 body.tv-quadro .tvq[hidden] { display: none; }
+/* Ocupa a janela inteira (sem faixas pretas): tamanhos de letra e faixas
+   seguem a escala --u; o que sobra de largura/altura vai pro mapa, painéis
+   e placar, que são flexíveis. */
 .tvq-quadro {
-  width: calc(1920 * var(--u)); height: calc(1080 * var(--u));
+  width: 100vw; height: 100vh; height: 100dvh;
   position: relative; overflow: hidden; color: var(--tvq-txt);
   background: radial-gradient(120% 80% at 50% 0%, #0f1a33 0%, var(--tvq-bg) 60%);
   display: grid; grid-template-rows: calc(72 * var(--u)) calc(230 * var(--u)) minmax(0, 1fr) calc(64 * var(--u));
@@ -3403,7 +3406,7 @@ body.tv-quadro .tvq[hidden] { display: none; }
 }
 /* Corpo */
 .tvq-corpo {
-  display: grid; grid-template-columns: calc(1040 * var(--u)) minmax(0, 1fr); gap: calc(24 * var(--u));
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: calc(24 * var(--u));
   padding: calc(20 * var(--u)) calc(36 * var(--u)); min-height: 0;
 }
 .tvq-painel { background: var(--tvq-painel); border: calc(1 * var(--u)) solid var(--tvq-linha); border-radius: calc(6 * var(--u)); position: relative; min-height: 0; overflow: hidden; }
