@@ -487,6 +487,10 @@ Causa: o líder do 1T perde participação no 2T (média −4,25 pp, dp 9,7 em 2
 
 Chance com dados reais: 26 disputas de Governador + 2 de Presidente; nenhuma previsão (≥50% apurado) apontou o favorito errado, e a chance foi cautelosa. Com esse número de disputas, a calibração por faixa não pode ser avaliada com precisão útil.
 
+#### Horário previsto para 99% apurado (`math_engine/ritmo.py`)
+
+A fração de seções que falta, R(t), é tratada como R0·e^(−k·t); k sai dos últimos ~15 minutos de dados do TSE (horário de geração do arquivo). Mostrado só entre 90% e 99% apurado. Validado com o horário de recebimento de cada boletim em 2022 (`scripts/validacao_2t`): no 2º turno de Presidente, erro de −8 min com 90% e −4 min com 95%; nos 12 de Governador, erro médio de 10 min com 90% (pior +20) e 4 min com 95%. Com 80% o erro médio era 27 min (pior +49), por isso o corte em 90%. Ritmo constante (linear) errava sempre para cedo, 25 a 95 min. No 1º turno de 2022 (mais cargos por urna) o erro a 90% foi −58 min: o 2º turno é o caso validado. Alvo 99% e não 100%: em 2022 o 2º turno chegou a 99% às 20h00 e a 100% à 0h17.
+
 #### Limitações conhecidas (abertas até a validação com dados reais)
 
 Decisão de 18/10/2026: a versão em produção fica como está até a validação retrospectiva. Estas limitações valem para o dia 25/10:

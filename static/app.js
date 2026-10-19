@@ -2364,6 +2364,21 @@ function renderProjecaoPainel() {
 // % projetado ± margem (IC95) e chance de vitória por candidato. Quem já
 // foi eleito matematicamente vê "Eleito" no lugar da chance (certeza
 // aritmética > estatística).
+// Linha "≈ 99% apurado por volta das 20h05" (math_engine/ritmo.py). Só a
+// partir de 90% apurado; antes, avisa quando aparece. Alvo 99%, não 100%:
+// as últimas urnas atrasam sem padrão (2022: 99% às 20h00, 100% à 0h17).
+function textoHorario99() {
+  const pct = state.ultimoSnapshot?.totais?.pct_apurado || 0;
+  if (pct >= 99) return "";
+  const iso = state.projecao?.previsao_99;
+  if (iso) {
+    const d = new Date(Math.round(Date.parse(iso) / 300000) * 300000);
+    const [h, m] = d.toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).split(":");
+    return `≈ 99% apurado por volta das ${+h}h${m}`;
+  }
+  return pct >= 90 ? "Horário dos 99% apurado: medindo o ritmo" : "Horário dos 99% apurado: aparece com 90%";
+}
+
 function renderBlocoProjecao(box, linhas, aviso, mostrar) {
   if (!mostrar) { box.hidden = true; return; }
   box.hidden = false;
@@ -2387,7 +2402,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
           <span class="tv2t-proj-pct" aria-label="Estimativa ainda não disponível">≈ —</span>
           <span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 50%</span>
         </div>`;
-      }).join("");
+      }).join("") + `<p class="proj-horario">${textoHorario99()}</p>`;
     aviso.textContent = "";
     return;
   }
@@ -2411,7 +2426,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
       <span class="tv2t-proj-pct" aria-label="Estimativa: cerca de ${fmtPct1(c.pct)}, margem de ${dec(margem, 1)} pontos">≈${fmtPct1(c.pct)}<small> ±${dec(margem, 1)}</small></span>
       ${chance}
     </div>`;
-  }).join("");
+  }).join("") + (textoHorario99() ? `<p class="proj-horario">${textoHorario99()}</p>` : "");
   aviso.textContent = pj.aviso || "";
 }
 
@@ -3283,7 +3298,8 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
   };
   if (!pj?.disponivel) {
     box.innerHTML = tit + `<p class="tvq-est-espera">Começa com 10% apurado${pct > 0 ? ` · agora ${dec(pct, 1)}%` : ""}</p>`
-      + ativos.map(c => linha(c, `<span class="tvq-est-p tvq-mudo">≈ —</span>`, `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 50%</span></span>`)).join("");
+      + ativos.map(c => linha(c, `<span class="tvq-est-p tvq-mudo">≈ —</span>`, `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 50%</span></span>`)).join("")
+      + `<p class="tvq-est-hora">${textoHorario99()}</p>`;
     return;
   }
   const porSq = new Map(pj.candidatos.map(c => [c.sq_candidato, c]));
@@ -3295,7 +3311,7 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
       ? `<span class="tvq-est-c">${Math.round(e.p_vitoria * 100)}%<span>chance</span></span>`
       : `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 50%</span></span>`;
     return linha(c, `<span class="tvq-est-p">≈${dec(e.pct, 1)}<small>± ${dec(m, 1)}</small></span>`, chance);
-  }).join("");
+  }).join("") + (textoHorario99() ? `<p class="tvq-est-hora">${textoHorario99()}</p>` : "");
 }
 
 // Letreiro "ÚLTIMAS". Rola por requestAnimationFrame (não animação CSS):

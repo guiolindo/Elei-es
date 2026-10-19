@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Horário previsto para 99% apurado (19/10)
+- A caixa da estimativa (computador, celular e TV) mostra "≈ 99% apurado por volta das 20h05" a partir de 90% apurado, pelo ritmo dos últimos 15 minutos (`math_engine/ritmo.py`, campo `previsao_99` em `/api/apuracao/projecao`). Validado com o horário real de recebimento das urnas em 2022: erro médio de 10 min. Antes de 90% a caixa avisa quando o horário aparece.
+
 ### Estimativa — validação com boletins de urna reais (18/10)
 - `scripts/validacao_2t/`: download dos boletins de 2018 e 2022 (`baixar_bu.py`), reconstrução da apuração seção por seção (`backtest.py`), diagnóstico da virada (`diag_swing.py`), protótipo de margem regional e calibração por eleição (`vies2.py`). Resultados e limitações conhecidas em `docs/metodologia.md` §8.4. Motor inalterado.
 - `/sobre`: a margem é descrita como "calculada para acertar 95%", com o caso em que ela acerta menos, e a hipótese de comparecimento.

@@ -410,6 +410,29 @@ AVISO_PROJECAO = (
 )
 
 
+async def _previsao_99(sess: AsyncSession, cargo: int, abr: str, turno: int) -> str | None:
+    """Horário previsto para 99% das seções (math_engine/ritmo.py), pelo
+    ritmo dos últimos minutos. Usa o horário de geração do TSE quando há."""
+    from datetime import timedelta
+    from math_engine.ritmo import prever_horario_99
+
+    desde = datetime.now(timezone.utc) - timedelta(hours=1)
+    rows = (await sess.execute(
+        select(Snapshot.gerado_em_tse, Snapshot.coletado_em,
+               SnapshotTotais.qt_secoes_totalizadas, SnapshotTotais.qt_secoes_total)
+        .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
+        .where(Snapshot.cod_cargo == cargo, Snapshot.abrangencia == abr,
+               Snapshot.turno == turno, Snapshot.suspeito.is_(False),
+               Snapshot.coletado_em >= desde)
+        .order_by(Snapshot.coletado_em)
+    )).all()
+    pontos = [((r.gerado_em_tse or r.coletado_em), r.qt_secoes_totalizadas or 0, r.qt_secoes_total or 0)
+              for r in rows]
+    pontos.sort(key=lambda p: p[0])
+    eta = prever_horario_99(pontos)
+    return eta.isoformat() if eta else None
+
+
 @router.get("/apuracao/projecao")
 async def apuracao_projecao(
     cargo: int = Query(..., description="1 (Presidente) ou 3 (Governador)"),
@@ -545,6 +568,7 @@ async def apuracao_projecao(
                  "p_vitoria": _p(proj.p_vitoria_b), "votos": proj.votos_b},
             ],
             "aviso": AVISO_PROJECAO,
+            "previsao_99": await _previsao_99(sess, cargo, abr, turno),
         }
     _CACHE_PROJECAO[chave] = (monotonic(), out)
     return out

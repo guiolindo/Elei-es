@@ -3529,3 +3529,7 @@ body.tv-quadro .hero .hero-bg { display: none; }
 .tvq-tse.stale-warn em { color: var(--tvq-ouro); }
 .tvq-tse.stale-stale em { color: #ff6b72; }
 .tvq-barra { width: calc(200 * var(--u)); }
+
+/* Horário previsto para 99% apurado (math_engine/ritmo.py) */
+.proj-horario { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.tvq-est-hora { margin: calc(8 * var(--u)) 0 0; font: 600 calc(19 * var(--u)) var(--tvq-cond); letter-spacing: .02em; color: #9fb0cc; }
