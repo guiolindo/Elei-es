@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Modo TV: outras disputas no letreiro (21/10)
+- Durante a apuração, o letreiro "ÚLTIMAS" mostra também as disputas que não estão na tela (presidente e cada governador com 2º turno): % apurado e placar, ou o eleito com o percentual. Antes da apuração: resultado dos dois finalistas no 1º turno e os estados com 2º turno de governador.
+- Novo `GET /api/apuracao/resumo-2t`: todas as disputas do 2º turno numa chamada (cache de 10 s); o letreiro consulta no máximo a cada 30 s e só no modo TV.
+
 ### Modo TV: logo do partido no placar (21/10)
 - O placar do quadro da TV mostra o logo do partido entre o número e a sigla, como no computador e no celular. Se o logo não carregar, fica só a sigla.
 

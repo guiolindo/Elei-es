@@ -433,6 +433,63 @@ async def _previsao_99(sess: AsyncSession, cargo: int, abr: str, turno: int) -> 
     return eta.isoformat() if eta else None
 
 
+_CACHE_RESUMO_2T: dict[str, tuple[float, dict]] = {}
+_CACHE_RESUMO_2T_TTL = 10.0
+
+
+@router.get("/apuracao/resumo-2t")
+async def resumo_2t(sess: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Todas as disputas do 2º turno numa chamada (letreiro do modo TV):
+    Presidente/BR e cada Governador com arquivo do 2T. Para cada uma: %
+    apurado, os dois finalistas (nome, número, % dos válidos), quem já foi
+    eleito e o % de cada um no 1º turno (entre todos os válidos)."""
+    from time import monotonic
+    hit = _CACHE_RESUMO_2T.get("x")
+    if hit and monotonic() - hit[0] < _CACHE_RESUMO_2T_TTL:
+        return hit[1]
+    ufs_gov = sorted(set((await sess.execute(
+        select(Snapshot.abrangencia).where(Snapshot.cod_cargo == 3, Snapshot.turno == 2).distinct()
+    )).scalars()))
+    eleitos = {(e.cod_cargo, e.abrangencia): e.sq_candidato_a for e in (await sess.execute(
+        select(Evento).join(Snapshot, Snapshot.id == Evento.snapshot_id)
+        .where(Snapshot.turno == 2, Evento.tipo.in_(("ELEITO_2T", "ELEITO_MAJORITARIO", "ELEITO_1T")))
+    )).scalars()}
+    disputas = []
+    for cargo, abr in [(1, "BR")] + [(3, uf) for uf in ufs_gov]:
+        snap = await _ultimo_snapshot(sess, cargo, abr, turno=2)
+        if not snap:
+            continue
+        tot = await sess.get(SnapshotTotais, snap.id)
+        rows = (await sess.execute(
+            select(SnapshotCandidato.sq_candidato, SnapshotCandidato.votos, SnapshotCandidato.pct_validos,
+                   Candidato.nome_urna, Candidato.numero, Candidato.partido_numero)
+            .join(Candidato, Candidato.sq_candidato == SnapshotCandidato.sq_candidato)
+            .where(SnapshotCandidato.snapshot_id == snap.id)
+            .order_by(SnapshotCandidato.posicao)
+        )).all()
+        if len(rows) != 2:
+            continue
+        snap1 = await _ultimo_snapshot(sess, cargo, abr, turno=1)
+        pct1 = {}
+        if snap1:
+            pct1 = {sq: float(p) for sq, p in (await sess.execute(
+                select(SnapshotCandidato.sq_candidato, SnapshotCandidato.pct_validos)
+                .where(SnapshotCandidato.snapshot_id == snap1.id,
+                       SnapshotCandidato.sq_candidato.in_([r.sq_candidato for r in rows]))
+            )).all()}
+        disputas.append({
+            "cargo": cargo, "abrangencia": abr,
+            "pct_apurado": (tot.qt_secoes_totalizadas / tot.qt_secoes_total * 100) if tot and tot.qt_secoes_total else 0,
+            "eleito": eleitos.get((cargo, abr)),
+            "candidatos": [{"sq_candidato": r.sq_candidato, "nome_urna": r.nome_urna, "numero": r.numero,
+                            "partido": r.partido_numero, "votos": r.votos, "pct": float(r.pct_validos),
+                            "pct_1t": pct1.get(r.sq_candidato)} for r in rows],
+        })
+    out = {"disputas": disputas}
+    _CACHE_RESUMO_2T["x"] = (monotonic(), out)
+    return out
+
+
 @router.get("/apuracao/projecao")
 async def apuracao_projecao(
     cargo: int = Query(..., description="1 (Presidente) ou 3 (Governador)"),

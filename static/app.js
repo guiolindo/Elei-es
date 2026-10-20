@@ -182,6 +182,8 @@ function alternarModoTV() {
   if (ativar) entrarTelaCheia();
   else { sairTelaCheia(); try { localStorage.removeItem(FS_KEY); } catch (e) {} }
   try { aplicarQuadroTV(); } catch (e) { console.error(e); }
+  // Ao entrar, busca já as outras disputas para o letreiro.
+  if (ativar) atualizarResumo2T().then(() => { try { aplicarQuadroTV(); } catch (e) {} });
   try { localStorage.setItem(TV_KEY, ativar ? "1" : "0"); } catch(e) {}
   atualizarBotaoTV();
   // CSS do grid demora alguns ms pra aplicar; re-renderiza ECharts
@@ -2331,6 +2333,7 @@ async function refreshApuracao() {
   try { renderProjecaoTV(); } catch(e) {}
   try { renderProjecaoPainel(); } catch(e) {}
   try { renderDuelo(); } catch(e) {}
+  if (quadroTVAtivo()) await atualizarResumo2T();
   try { aplicarQuadroTV(); } catch(e) { console.error(e); }
 }
 
@@ -3394,9 +3397,11 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
         .map(([n, { n: k }]) => `${n} em ${k} ${cm.unidade === "UF" ? (k === 1 ? "estado" : "estados") : (k === 1 ? "município" : "municípios")}`);
       itens.push(`Lidera: ${partes.join(" · ")}`);
     }
+    itens.push(...itensOutrasDisputas());
   } else {
     itens.push(`A apuração do 2º turno começa domingo, ${DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" })}, às 17h (Brasília)`);
     itens.push(`${ativos[0].nome_urna} (${ativos[0].numero}) × ${ativos[1].nome_urna} (${ativos[1].numero})`);
+    itens.push(...itensAntesDaApuracao());
   }
   itens.push("Resultado oficial: resultados.tse.jus.br");
   const html = itens.map(x => `<span class="tvq-item">${x}</span><span class="tvq-sep" aria-hidden="true">◆</span>`).join("");
@@ -3404,6 +3409,50 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
   _ticker.html = html;
   if (!fita.firstElementChild) trocarFitaTicker(); else _ticker.pendente = html;
   if (!_ticker.raf) _ticker.raf = requestAnimationFrame(passoTicker);
+}
+// Resumo de todas as disputas do 2º turno (/api/apuracao/resumo-2t), para
+// o letreiro mostrar as outras disputas da noite. No máximo a cada 30 s.
+state.resumo2T = null;
+let _resumo2TEm = 0;
+async function atualizarResumo2T() {
+  if (state.turno !== 2 || Date.now() - _resumo2TEm < 30000) return;
+  _resumo2TEm = Date.now();
+  try { state.resumo2T = await get("/api/apuracao/resumo-2t"); } catch (e) { /* letreiro segue sem elas */ }
+}
+function rotuloDisputa(d) {
+  return d.cargo === 1 ? "Presidente" : `Governador · ${NOMES_UF_EXT[d.abrangencia] || d.abrangencia}`;
+}
+function listaComE(xs) {
+  return xs.length > 1 ? `${xs.slice(0, -1).join(", ")} e ${xs.at(-1)}` : (xs[0] || "");
+}
+// Durante a apuração: as disputas que não estão na tela.
+function itensOutrasDisputas() {
+  const sig = c => siglaDoPartido(+c.partido) || "";
+  const out = [];
+  for (const d of state.resumo2T?.disputas || []) {
+    if (d.cargo === state.cargo && d.abrangencia === state.abrangencia) continue;
+    const [a, b] = d.candidatos;
+    if (d.eleito) {
+      const e = d.candidatos.find(c => c.sq_candidato === d.eleito) || a;
+      out.push(`${rotuloDisputa(d)}: <b>${e.nome_urna}</b> (${sig(e)}) eleito com ${dec(e.pct, 1)}%`);
+    } else if (d.pct_apurado > 0) {
+      out.push(`${rotuloDisputa(d)} · ${dec(d.pct_apurado, 1)}% apurado: ${a.nome_urna} ${dec(a.pct, 1)}% × ${b.nome_urna} ${dec(b.pct, 1)}%`);
+    }
+  }
+  return out;
+}
+// Antes da apuração: 1º turno da disputa na tela e onde mais há 2º turno.
+function itensAntesDaApuracao() {
+  const ds = state.resumo2T?.disputas || [];
+  const out = [];
+  const atual = ds.find(d => d.cargo === state.cargo && d.abrangencia === state.abrangencia);
+  if (atual && atual.candidatos.every(c => c.pct_1t != null)) {
+    const [x, y] = [...atual.candidatos].sort((p, q) => q.pct_1t - p.pct_1t);
+    out.push(`No 1º turno: ${x.nome_urna} ${dec(x.pct_1t, 1)}% × ${y.nome_urna} ${dec(y.pct_1t, 1)}% dos válidos`);
+  }
+  const ufs = ds.filter(d => d.cargo === 3).map(d => d.abrangencia).sort();
+  if (state.cargo === 1 && ufs.length) out.push(`Também há 2º turno para governador em ${listaComE(ufs)}`);
+  return out;
 }
 const REGIOES_UF = {
   Norte: ["AC", "AM", "AP", "PA", "RO", "RR", "TO"],
