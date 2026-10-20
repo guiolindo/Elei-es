@@ -68,6 +68,11 @@ const EXT_LOGO = {
   55: "svg", 65: "svg", 70: "svg", 77: "png", 80: "png",
 };
 
+// Caminho do logo local do partido (SVG ou PNG, conforme o arquivo enviado).
+export function urlLogoPartido(numero) {
+  return `/static/partidos/${numero}.${EXT_LOGO[numero] || "svg"}`;
+}
+
 // Retorna HTML de badge do partido: tenta logo local, cai na pill colorida.
 // Estrutura: <img> primeiro (some se falhar) + <span pill> escondido que
 // aparece via onerror. Loading lazy pra não sobrecarregar a listagem.

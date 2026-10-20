@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Modo TV: logo do partido no placar (21/10)
+- O placar do quadro da TV mostra o logo do partido entre o número e a sigla, como no computador e no celular. Se o logo não carregar, fica só a sigla.
+
 ### /sobre e bot: termos e privacidade revisados (20/10)
 - `/apagar_tudo` passa a apagar também a configuração do chat (pausa e horário de silêncio), como a política de privacidade promete.
 - `/sobre`: artigos corrigidos (CE art. 109 para maiores médias; LGPD art. 7º §§ 3º e 4º para dados de candidatos; LPI art. 132, IV para logos); base legal separada para bot (consentimento) e site (legítimo interesse); cláusula de responsabilidade "na extensão máxima permitida pela lei"; "software livre" trocado por "código público para consulta" (o repositório não tem licença); bot com boletins, viradas nos estados e /estimativa; prazo de logs do provedor sem número que não dá para garantir.

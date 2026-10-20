@@ -3541,3 +3541,7 @@ body.tv-quadro .hero .hero-bg { display: none; }
   border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; opacity: .85; }
 .tvq-previa { color: #9fb0cc; }
 .tvq-indef { font-size: calc(22 * var(--u)); }
+
+/* Logo do partido no placar da TV, entre o número e a sigla */
+.tvq-logo { height: calc(34 * var(--u)); width: auto; max-width: calc(60 * var(--u)); object-fit: contain;
+  background: #fff; border-radius: calc(4 * var(--u)); padding: calc(2 * var(--u)); }

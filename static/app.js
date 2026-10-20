@@ -1,5 +1,5 @@
 import { renderMapa } from "/static/mapa-br.js?v=20261017p";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml } from "/static/partidos.js?v=20261017p";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml, urlLogoPartido } from "/static/partidos.js?v=20261021a";
 
 // Dados ao vivo nunca vêm do cache do navegador. A API manda
 // "max-age=3, stale-while-revalidate=15" (bom pra proxies), e com isso o
@@ -3248,7 +3248,7 @@ function renderTVQuadro() {
       return `<div class="tvq-lado ${i ? "dir" : ""}" data-sq="${c.sq_candidato}" style="--cor:${cor};--cor-txt:${corLegivel(cor, "#0d1424")}">
         <div class="tvq-foto-box"><img class="tvq-foto" src="${c.foto}" alt=""></div>
         <div class="tvq-id"><div class="tvq-nome">${c.nome_urna}</div>
-          <div class="tvq-part"><span class="tvq-numero">${c.numero}</span>${siglaDoPartido(+c.partido) || ""}</div></div>
+          <div class="tvq-part"><span class="tvq-numero">${c.numero}</span><img class="tvq-logo" src="${urlLogoPartido(+c.partido)}" alt="" decoding="async">${siglaDoPartido(+c.partido) || ""}</div></div>
         <div class="tvq-valores"><div class="tvq-pct"></div><div class="tvq-votos"></div></div>
       </div>`;
     };
@@ -3260,6 +3260,9 @@ function renderTVQuadro() {
     placar.dataset.chave = chave;
     placar.querySelectorAll(".tvq-foto").forEach((img, i) =>
       anexarFotoComRetry(img, ativos[i].nome_urna, ativos[i].partido));
+    // Logo que não carrega some; a sigla escrita continua ao lado.
+    placar.querySelectorAll(".tvq-logo").forEach(img =>
+      img.addEventListener("error", () => img.remove(), { once: true }));
   }
   const porSq = new Map((snap.candidatos || []).map(c => [c.sq_candidato, c]));
   const v = ativos.map(c => porSq.get(c.sq_candidato) || { votos: 0, pct_validos: 0 });
