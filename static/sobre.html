@@ -114,7 +114,7 @@
 
   <details class="faq-item">
     <summary>Como funciona o bot do Telegram?</summary>
-    <p>No 2º turno você escolhe presidente ou governador (dos estados com 2º turno) e se quer aviso de eleito, de virada ou dos dois. O placar também sai por comando: <code>/placar</code>, <code>/lider</code>, <code>/vs</code>, <code>/mapa</code>. A lista completa está em <code>/help</code>.</p>
+    <p>No 2º turno você escolhe presidente ou governador (dos estados com 2º turno) e quais avisos quer receber: eleito, virada, boletins da apuração (início, 25%, 50%, 75%, 90% e 100%) e, para presidente, viradas em cada estado. O placar e a estimativa também saem por comando: <code>/placar</code>, <code>/estimativa</code>, <code>/lider</code>, <code>/vs</code>, <code>/mapa</code>. A lista completa está em <code>/help</code>.</p>
   </details>
 
   <details class="faq-item">
@@ -145,10 +145,10 @@
   <h2 id="metodologia">3. Metodologia matemática</h2>
   <p>As regras estão no arquivo <code>math_engine/engine.py</code>:</p>
   <ul>
-    <li>Os votos que ainda podem entrar são estimados pelo total de eleitores aptos das seções não apuradas. Na prática uns 20% deles faltam e parte dos votos é branco ou nulo, então essa conta sempre sobra. O aviso de eleito pode sair um pouco tarde, mas não cedo.</li>
+    <li>Os votos que ainda podem entrar são estimados pelo total de eleitores aptos das seções não apuradas. Na prática cerca de 20% desses eleitores não comparecem e parte dos votos é branco ou nulo, então essa conta sempre sobra. O aviso de eleito pode sair um pouco tarde, mas não cedo.</li>
     <li>Todas as comparações são estritas: empate não elege ninguém. Num empate exato no fim da apuração, a lei (art. 110 do Código Eleitoral) elege o candidato mais velho, e o site só aplica isso quando a idade dos dois está disponível.</li>
     <li>Nenhum aviso sai antes de 20% das seções apuradas.</li>
-    <li>Deputados: quociente eleitoral (art. 106 do Código Eleitoral), distribuição das vagas por maiores médias (art. 108), barreira de 10% do quociente e federações partidárias (Lei 14.208/2021).</li>
+    <li>Deputados: quociente eleitoral (art. 106 do Código Eleitoral), quociente partidário (art. 107), exigência de votação mínima de 10% do quociente eleitoral (art. 108), distribuição das sobras pelas maiores médias (art. 109) e federações partidárias (Lei 14.208/2021).</li>
     <li>Se o TSE reprocessa e uma atualização vem com menos seções que a anterior, ela fica marcada e não gera aviso de eleito nem alerta.</li>
   </ul>
 
@@ -163,7 +163,7 @@
 
   <h3>4.3. Uso proibido</h3>
   <ul>
-    <li>Fazer scraping automatizado agressivo do site (respeite o <code>Cache-Control</code> de 5 segundos). Para acesso em massa, baixe diretamente do TSE.</li>
+    <li>Fazer coleta automatizada em volume que prejudique o serviço. As respostas da API já indicam por quanto tempo podem ser reaproveitadas (cabeçalho <code>Cache-Control</code>); para acesso em massa, use diretamente os arquivos do TSE.</li>
     <li>Tentar sobrecarregar, invadir, ou explorar vulnerabilidades da infraestrutura.</li>
     <li>Usar os dados para propaganda eleitoral irregular, desinformação, ou qualquer prática vedada pela <strong>Lei 9.504/1997</strong> (Lei das Eleições) e resoluções do TSE.</li>
     <li>Distorcer ou manipular capturas de tela para atribuir ao site informações que ele não produziu.</li>
@@ -191,7 +191,7 @@
   <ul>
     <li>O site não pede cadastro e não usa cookies de rastreio nem ferramentas de estatística de terceiros.</li>
     <li>A cada página aberta guardamos horário, página, site de origem (referrer), tipo de navegador e o IP <em>transformado em código irreversível</em> (hash SHA-256 com chave secreta), que serve só para contar visitantes únicos. Apagado após 90 dias.</li>
-    <li>Registros técnicos do provedor (Railway), com endereço IP, navegador e horário, guardados por até 30 dias apenas para fins de segurança e diagnóstico.</li>
+    <li>Registros técnicos do provedor de hospedagem (Railway), com endereço IP, navegador e horário, mantidos pelo prazo definido pelo provedor e usados apenas para segurança e diagnóstico.</li>
   </ul>
 
   <h3>5.2. O que coletamos no bot do Telegram</h3>
@@ -203,7 +203,7 @@
   <p>Não coletamos: nome, e-mail, telefone, endereço, título de eleitor, CPF, foto de perfil, mensagens privadas fora do bot.</p>
 
   <h3>5.3. Base legal (LGPD art. 7º)</h3>
-  <p>O tratamento é feito com base no <strong>consentimento</strong> do titular (você inicia interação com o bot voluntariamente) e no <strong>legítimo interesse</strong> para executar o serviço solicitado (art. 7º, I e IX).</p>
+  <p>No bot, o tratamento se baseia no <strong>consentimento</strong> (art. 7º, I): você inicia a conversa e escolhe os avisos, e pode retirar o consentimento a qualquer momento com <code>/apagar_tudo</code>. No site, a contagem de acessos se baseia no <strong>legítimo interesse</strong> (art. 7º, IX) em medir o uso e proteger o serviço, com o IP já transformado em código irreversível.</p>
 
   <h3>5.4. Compartilhamento</h3>
   <p>Não compartilhamos nem vendemos dados a terceiros. Eles ficam apenas em nossa base PostgreSQL hospedada na Railway.</p>
@@ -212,24 +212,24 @@
   <p>Nos termos do art. 18 da LGPD, você pode a qualquer momento:</p>
   <ul>
     <li><strong>Consultar</strong> seus dados: comando <code>/minhas</code> no bot.</li>
-    <li><strong>Deletar</strong> seus dados: comando <code>/apagar_tudo</code> no bot (remove todas as assinaturas). Para deletar também a configuração, basta apagar a conversa: o registro fica sem uso e é apagado depois.</li>
-    <li><strong>Portabilidade</strong>: solicite via contato (seção 8).</li>
+    <li><strong>Apagar</strong> seus dados: comando <code>/apagar_tudo</code> no bot. Ele remove na hora todas as assinaturas e a configuração (pausa e horário de silêncio).</li>
+    <li><strong>Portabilidade e demais pedidos</strong>: pelo contato da seção 8. Na contagem de acessos do site o IP fica guardado só como código irreversível, então não há como associar esses registros a uma pessoa.</li>
   </ul>
 
   <h3>5.6. Cookies</h3>
-  <p>O site usa apenas <code>localStorage</code> do próprio navegador para lembrar preferências (filtros, candidatos favoritos). Nada é enviado a nenhum servidor. Não usamos cookies de terceiros, pixels, fingerprint, ou qualquer rastreio publicitário.</p>
+  <p>O site não usa cookies. Ele usa o armazenamento local do navegador (<code>localStorage</code>) só para lembrar preferências no seu aparelho, como filtros, candidatos selecionados, o modo TV e quais avisos de vitória já foram exibidos. Essas informações não são enviadas ao servidor. Não usamos cookies de terceiros, pixels, fingerprint, ou qualquer rastreio publicitário.</p>
 
   <!-- ===================== LEGAL ===================== -->
   <h2 id="legal">6. Bases legais e propriedade intelectual</h2>
 
   <h3>6.1. Dados eleitorais</h3>
-  <p>Os dados de apuração, candidatos e partidos são <strong>dados públicos</strong> divulgados pelo TSE em cumprimento à <strong>Lei de Acesso à Informação (Lei 12.527/2011)</strong> e à <strong>Lei 9.504/1997</strong>. Sua consulta, reprodução e reuso são explicitamente permitidos ao cidadão brasileiro.</p>
+  <p>Os dados de apuração, candidatos e partidos são <strong>dados públicos</strong> divulgados pelo TSE em cumprimento à <strong>Lei de Acesso à Informação (Lei 12.527/2011)</strong> e à <strong>Lei 9.504/1997</strong>. Podem ser consultados, reproduzidos e reutilizados, com citação do TSE como fonte.</p>
 
   <h3>6.2. Fotos e nomes de candidatos</h3>
-  <p>Candidatos a cargo eletivo são <strong>pessoas públicas em contexto de exposição voluntária</strong>. Suas fotos oficiais e nomes de urna são disponibilizados pelo próprio TSE para consulta cidadã na plataforma DivulgaCandContas, sob a mesma base legal acima. A LGPD (art. 4º, III) exclui do seu escopo o tratamento de dados para fins jornalísticos e de interesse público quando limitado ao necessário para a finalidade, o que enquadra o uso feito aqui.</p>
+  <p>Candidatos a cargo eletivo são <strong>pessoas públicas em contexto de exposição voluntária</strong>. Suas fotos oficiais e nomes de urna são disponibilizados pelo próprio TSE para consulta cidadã na plataforma DivulgaCandContas, sob a mesma base legal acima. São dados tornados públicos para fins de transparência eleitoral (LGPD, art. 7º, §§ 3º e 4º), usados aqui só para identificar cada candidatura, de acordo com a finalidade com que foram publicados e com o interesse público da divulgação dos resultados.</p>
 
   <h3>6.3. Logos e siglas de partidos políticos</h3>
-  <p>Os logos e siglas dos partidos são usados neste site em caráter <strong>estritamente nominativo e informativo</strong>, apenas para identificar visualmente o partido ao qual cada candidato está filiado, sem nenhum vínculo, endosso ou associação comercial. Este uso enquadra-se no princípio do <strong>uso justo nominativo</strong> e não configura infração ao art. 195 da <strong>Lei de Propriedade Industrial (Lei 9.279/1996)</strong>, tampouco à <strong>Lei 9.096/1995</strong> (Lei dos Partidos Políticos). As logomarcas permanecem propriedade de seus respectivos detentores.</p>
+  <p>Os logos e siglas dos partidos são usados neste site em caráter <strong>estritamente nominativo e informativo</strong>, apenas para identificar visualmente o partido ao qual cada candidato está filiado, sem nenhum vínculo, endosso ou associação comercial. A <strong>Lei de Propriedade Industrial (Lei 9.279/1996, art. 132, IV)</strong> permite a citação de marca em publicação sem conotação comercial e sem prejuízo ao seu caráter distintivo, que é o uso feito aqui. As logomarcas permanecem propriedade de seus respectivos detentores.</p>
 
   <h3>6.4. Marcos legais aplicáveis</h3>
   <ul>
@@ -246,20 +246,20 @@
   </ul>
 
   <h3>6.5. Código-fonte</h3>
-  <p>O código-fonte deste projeto é software livre. Contribuições e revisões são bem-vindas. Você pode inspecionar todo o algoritmo do motor matemático no arquivo <code>math_engine/engine.py</code>.</p>
+  <p>O código-fonte é público para consulta em <a href="https://github.com/guiolindo/Elei-es" target="_blank" rel="noopener">github.com/guiolindo/Elei-es</a>. As regras de eleito estão em <code>math_engine/engine.py</code>, a estimativa do 2º turno em <code>math_engine/projecao.py</code> e os testes com dados reais de 2018 e 2022 em <code>scripts/validacao_2t</code>. Sugestões e correções são bem-vindas.</p>
 
   <!-- ===================== RESPONSABILIDADE ===================== -->
   <h2 id="responsabilidade">7. Limitação de responsabilidade</h2>
   <div class="aviso warn">
     <strong>Este site é uma ferramenta de acompanhamento independente e informativo.</strong> As informações aqui exibidas são derivadas de dados públicos do TSE, mas <em>não têm fé pública</em> e <em>não substituem</em> o resultado oficial da Justiça Eleitoral. Nenhuma decisão eleitoral, jurídica ou administrativa deve ser tomada com base neste site. Consulte sempre a fonte oficial.
   </div>
-  <p>Em nenhuma hipótese os operadores deste site serão responsáveis por danos diretos, indiretos, morais, materiais, lucros cessantes ou qualquer outro prejuízo decorrente do uso ou impossibilidade de uso das informações aqui apresentadas. O uso é por conta e risco do usuário.</p>
+  <p>Na extensão máxima permitida pela lei, os responsáveis por este site não respondem por danos decorrentes do uso das informações aqui apresentadas ou da indisponibilidade do serviço. O site é gratuito e oferecido como está.</p>
   <p>Divergências entre este site e o resultado oficial do TSE devem sempre ser resolvidas a favor do TSE.</p>
 
   <!-- ===================== CONTATO ===================== -->
   <h2 id="contato">8. Contato</h2>
-  <p>Para reportar erros, solicitar remoção de dados ou tirar dúvidas legais, entre em contato via GitHub Issues do repositório do projeto.</p>
-  <p><small>Última atualização: 18 de outubro de 2026.</small></p>
+  <p>Para reportar erros, fazer pedidos sobre seus dados ou tirar dúvidas, abra uma issue no <a href="https://github.com/guiolindo/Elei-es/issues" target="_blank" rel="noopener">repositório do projeto</a>. Para apagar os dados do bot não é preciso contato: use <code>/apagar_tudo</code>. Não inclua dados pessoais na issue, porque ela é pública.</p>
+  <p><small>Última atualização: 20 de outubro de 2026.</small></p>
 </main>
 
 </body>

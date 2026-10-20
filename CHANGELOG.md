@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### /sobre e bot: termos e privacidade revisados (20/10)
+- `/apagar_tudo` passa a apagar também a configuração do chat (pausa e horário de silêncio), como a política de privacidade promete.
+- `/sobre`: artigos corrigidos (CE art. 109 para maiores médias; LGPD art. 7º §§ 3º e 4º para dados de candidatos; LPI art. 132, IV para logos); base legal separada para bot (consentimento) e site (legítimo interesse); cláusula de responsabilidade "na extensão máxima permitida pela lei"; "software livre" trocado por "código público para consulta" (o repositório não tem licença); bot com boletins, viradas nos estados e /estimativa; prazo de logs do provedor sem número que não dá para garantir.
+
 ### Chance em prévia a partir de 30% (20/10)
 - Entre 30% e 50% apurado, a chance aparece em cinza com o selo "prévia" quando o favorito tem 70% ou mais; se não, "disputa indefinida". A partir de 50%, como antes. Site (computador, celular, TV) e `/estimativa` do bot. `/api/apuracao/projecao` ganha `probabilidade_previa` e `disputa_indefinida`. Validação em `docs/metodologia.md` §8.4.
 

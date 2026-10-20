@@ -1039,13 +1039,9 @@ async def _tratar_callback(client, cb: dict) -> None:
         return
     if data == "cfg:apagar_tudo":
         await ack()
-        async with SessionLocal() as sess:
-            await sess.execute(
-                delete(TelegramSubscription).where(TelegramSubscription.chat_id == chat_id)
-            )
-            await sess.commit()
+        await _apagar_dados_do_chat(chat_id)
         await _api(client, "editMessageText", chat_id=chat_id, message_id=msg_id,
-                   text="🗑 Seus alertas foram removidos.",
+                   text="🗑 Pronto: seus alertas e suas configurações foram apagados.",
                    reply_markup=_kb_principal())
         return
 
@@ -1166,15 +1162,20 @@ async def _tratar_mensagem(client, msg: dict) -> None:
             await sess.commit()
         await _send(client, chat_id, f"🌙 Silêncio: {ini:02d}h → {fim:02d}h BRT")
     elif cmd == "/apagar_tudo":
-        async with SessionLocal() as sess:
-            await sess.execute(
-                delete(TelegramSubscription).where(TelegramSubscription.chat_id == chat_id)
-            )
-            await sess.commit()
-        await _send(client, chat_id, "🗑 Seus alertas foram removidos.")
+        await _apagar_dados_do_chat(chat_id)
+        await _send(client, chat_id, "🗑 Pronto: seus alertas e suas configurações foram apagados.")
     else:
         await _send(client, chat_id,
             "Não conheço esse comando. /help lista todos.")
+
+
+async def _apagar_dados_do_chat(chat_id: int) -> None:
+    """/apagar_tudo: tudo o que o bot guarda deste chat (assinaturas e
+    configuração). É o que a política de privacidade promete (/sobre §5.5)."""
+    async with SessionLocal() as sess:
+        await sess.execute(delete(TelegramSubscription).where(TelegramSubscription.chat_id == chat_id))
+        await sess.execute(delete(TelegramChatConfig).where(TelegramChatConfig.chat_id == chat_id))
+        await sess.commit()
 
 
 async def _processar_update(client, upd: dict) -> None:
