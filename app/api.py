@@ -559,6 +559,8 @@ async def apuracao_projecao(
             "n_estratos": len(lista_agora),
             "fracao_apurada": round(proj.fracao_apurada * 100, 2),
             "exibir_probabilidade": proj.exibir_probabilidade,
+            "probabilidade_previa": proj.probabilidade_previa,
+            "disputa_indefinida": proj.disputa_indefinida,
             "candidatos": [
                 {"sq_candidato": sq_a, "pct": round(proj.pct_a, 2),
                  "ic95": [round(proj.ic95_a[0], 2), round(proj.ic95_a[1], 2)],

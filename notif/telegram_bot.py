@@ -490,10 +490,13 @@ async def _texto_estimativa(sess, cargo: int, uf: str) -> str | None:
     for c in sorted(pj["candidatos"], key=lambda c: -c["pct"]):
         nome, _ = await _nome_partido(sess, c["sq_candidato"])
         m = (c["ic95"][1] - c["ic95"][0]) / 2
-        ch = f" · {round(c['p_vitoria'] * 100)}% de chance" if c.get("p_vitoria") is not None else ""
+        previa = " (prévia)" if pj.get("probabilidade_previa") else ""
+        ch = f" · {round(c['p_vitoria'] * 100)}% de chance{previa}" if c.get("p_vitoria") is not None else ""
         linhas.append(f"{nome}: ≈{_fmt_pct(c['pct'], 1)} ±{str(round(m, 1)).replace('.', ',')}{ch}")
-    if pj.get("exibir_probabilidade") is False:
-        linhas.append("_Chance a partir de 50% apurado._")
+    if pj.get("disputa_indefinida"):
+        linhas.append("_Chance: disputa indefinida (antes de 50% apurado, só aparece com um favorito claro)._")
+    elif pj.get("exibir_probabilidade") is False:
+        linhas.append("_Chance a partir de 30% apurado._")
     return "\n".join(linhas)
 
 

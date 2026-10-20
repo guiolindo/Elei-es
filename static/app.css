@@ -3533,3 +3533,11 @@ body.tv-quadro .hero .hero-bg { display: none; }
 /* Horário previsto para 99% apurado (math_engine/ritmo.py) */
 .proj-horario { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
 .tvq-est-hora { margin: calc(8 * var(--u)) 0 0; font: 600 calc(19 * var(--u)) var(--tvq-cond); letter-spacing: .02em; color: #9fb0cc; }
+
+/* Chance em prévia (30–50% apurado): cinza, com selo. Não usa vermelho:
+   é a cor de um dos partidos e soaria como alerta. */
+.tv2t-proj-previa { color: var(--muted); }
+.selo-previa { font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; opacity: .85; }
+.tvq-previa { color: #9fb0cc; }
+.tvq-indef { font-size: calc(22 * var(--u)); }

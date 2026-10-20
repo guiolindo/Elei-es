@@ -2400,7 +2400,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
         return `<div class="tv2t-proj-linha tv2t-proj-pendente" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
           <span class="tv2t-proj-nome">${c.nome_urna}</span>
           <span class="tv2t-proj-pct" aria-label="Estimativa ainda não disponível">≈ —</span>
-          <span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 50%</span>
+          <span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 30%</span>
         </div>`;
       }).join("") + `<p class="proj-horario">${textoHorario99()}</p>`;
     aviso.textContent = "";
@@ -2416,10 +2416,14 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
       chance = `<span class="tv2t-proj-eleito">Eleito</span>`;
     } else if (c.p_vitoria != null) {
       const w = Math.round(c.p_vitoria * 100);
-      chance = `<span class="tv2t-proj-barra" aria-hidden="true"><span style="width:${w}%;background:${cor}"></span></span>`
-        + `<span class="tv2t-proj-chance">${textoChance(c.p_vitoria).replace(" de vencer", "")}</span>`;
+      // 30–50% apurado: prévia, em cinza (só aparece com favorito ≥70%).
+      const previa = pj.probabilidade_previa;
+      chance = `<span class="tv2t-proj-barra${previa ? " previa" : ""}" aria-hidden="true"><span style="width:${w}%;background:${previa ? "var(--muted)" : cor}"></span></span>`
+        + `<span class="tv2t-proj-chance${previa ? " tv2t-proj-previa" : ""}">${textoChance(c.p_vitoria).replace(" de vencer", "")}${previa ? ` <em class="selo-previa">prévia</em>` : ""}</span>`;
+    } else if (pj.disputa_indefinida) {
+      chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">disputa indefinida</span>`;
     } else {
-      chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 50%</span>`;
+      chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 30%</span>`;
     }
     return `<div class="tv2t-proj-linha" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
       <span class="tv2t-proj-nome">${nome}</span>
@@ -3298,7 +3302,7 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
   };
   if (!pj?.disponivel) {
     box.innerHTML = tit + `<p class="tvq-est-espera">Começa com 10% apurado${pct > 0 ? ` · agora ${dec(pct, 1)}%` : ""}</p>`
-      + ativos.map(c => linha(c, `<span class="tvq-est-p tvq-mudo">≈ —</span>`, `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 50%</span></span>`)).join("")
+      + ativos.map(c => linha(c, `<span class="tvq-est-p tvq-mudo">≈ —</span>`, `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 30%</span></span>`)).join("")
       + `<p class="tvq-est-hora">${textoHorario99()}</p>`;
     return;
   }
@@ -3308,8 +3312,12 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
     if (!e) return "";
     const m = (e.ic95[1] - e.ic95[0]) / 2;
     const chance = e.p_vitoria != null
-      ? `<span class="tvq-est-c">${Math.round(e.p_vitoria * 100)}%<span>chance</span></span>`
-      : `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 50%</span></span>`;
+      ? (pj.probabilidade_previa
+        ? `<span class="tvq-est-c tvq-previa">${Math.round(e.p_vitoria * 100)}%<span>chance · prévia</span></span>`
+        : `<span class="tvq-est-c">${Math.round(e.p_vitoria * 100)}%<span>chance</span></span>`)
+      : pj.disputa_indefinida
+        ? `<span class="tvq-est-c tvq-mudo tvq-indef">indefinida<span>chance</span></span>`
+        : `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 30%</span></span>`;
     return linha(c, `<span class="tvq-est-p">≈${dec(e.pct, 1)}<small>± ${dec(m, 1)}</small></span>`, chance);
   }).join("") + (textoHorario99() ? `<p class="tvq-est-hora">${textoHorario99()}</p>` : "");
 }

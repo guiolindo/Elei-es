@@ -43,9 +43,13 @@ def test_corrige_vies_de_ordem_regional_estilo_2022():
 
 
 def test_probabilidade_so_exibida_a_partir_de_50pct():
-    assert projetar_2t([e(1_000_000, 0.35, 0.55, 0.55)]).exibir_probabilidade is False
-    assert projetar_2t([e(1_000_000, 0.49, 0.55, 0.55)]).exibir_probabilidade is False
-    assert projetar_2t([e(1_000_000, 0.55, 0.55, 0.55)]).exibir_probabilidade is True
+    # Antes de 50% a chance só aparece como prévia (favorito forte); a
+    # chance "normal" (sem selo) começa em 50%.
+    for frac in (0.35, 0.49):
+        p = projetar_2t([e(1_000_000, frac, 0.55, 0.55)])
+        assert p.exibir_probabilidade is p.probabilidade_previa
+    p = projetar_2t([e(1_000_000, 0.55, 0.55, 0.55)])
+    assert p.exibir_probabilidade is True and p.probabilidade_previa is False
 
 
 def test_estrato_unico_usa_o_1t_sem_contar_o_parcial_duas_vezes():
@@ -101,3 +105,25 @@ def test_deriva_observada_so_alarga_a_banda():
     antes = [Estrato(10_000_000, 3_600_000, 2_880_000, int(2_880_000 * 0.56), 10_000, 3_600, 0.52),
              Estrato(8_000_000, 2_400_000, 1_920_000, int(1_920_000 * 0.43), 10_000, 3_000, 0.47)]
     assert projetar_2t(agora, antes).sd_pp >= projetar_2t(agora).sd_pp
+
+
+def test_previa_entre_30_e_50_so_com_favorito_forte():
+    import math_engine.projecao as PM
+    # 40% apurado, A com 62% dos válidos: favorito claro -> prévia
+    forte = projetar_2t([e(1_000_000, 0.40, 0.62, 0.62)])
+    assert forte.probabilidade_previa and forte.exibir_probabilidade
+    assert not forte.disputa_indefinida
+    assert max(forte.p_vitoria_a, forte.p_vitoria_b) >= PM.LIMIAR_PREVIA
+    # 40% apurado, empate: sem número, "disputa indefinida"
+    empate = projetar_2t([e(1_000_000, 0.40, 0.501, 0.50)])
+    assert empate.disputa_indefinida and not empate.exibir_probabilidade
+    assert not empate.probabilidade_previa
+
+
+def test_previa_nao_vale_fora_da_faixa():
+    # abaixo de 30%: nada, mesmo com favorito forte
+    cedo = projetar_2t([e(1_000_000, 0.25, 0.65, 0.65)])
+    assert not cedo.exibir_probabilidade and not cedo.probabilidade_previa and not cedo.disputa_indefinida
+    # a partir de 50%: chance normal, sem selo de prévia
+    tarde = projetar_2t([e(1_000_000, 0.55, 0.501, 0.50)])
+    assert tarde.exibir_probabilidade and not tarde.probabilidade_previa and not tarde.disputa_indefinida

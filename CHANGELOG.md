@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Chance em prévia a partir de 30% (20/10)
+- Entre 30% e 50% apurado, a chance aparece em cinza com o selo "prévia" quando o favorito tem 70% ou mais; se não, "disputa indefinida". A partir de 50%, como antes. Site (computador, celular, TV) e `/estimativa` do bot. `/api/apuracao/projecao` ganha `probabilidade_previa` e `disputa_indefinida`. Validação em `docs/metodologia.md` §8.4.
+
 ### Horário previsto para 99% apurado (19/10)
 - A caixa da estimativa (computador, celular e TV) mostra "≈ 99% apurado por volta das 20h05" a partir de 90% apurado, pelo ritmo dos últimos 15 minutos (`math_engine/ritmo.py`, campo `previsao_99` em `/api/apuracao/projecao`). Validado com o horário real de recebimento das urnas em 2022: erro médio de 10 min. Antes de 90% a caixa avisa quando o horário aparece.
 

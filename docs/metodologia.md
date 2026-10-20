@@ -491,6 +491,10 @@ Chance com dados reais: 26 disputas de Governador + 2 de Presidente; nenhuma pre
 
 A fração de seções que falta, R(t), é tratada como R0·e^(−k·t); k sai dos últimos ~15 minutos de dados do TSE (horário de geração do arquivo). Mostrado só entre 90% e 99% apurado. Validado com o horário de recebimento de cada boletim em 2022 (`scripts/validacao_2t`): no 2º turno de Presidente, erro de −8 min com 90% e −4 min com 95%; nos 12 de Governador, erro médio de 10 min com 90% (pior +20) e 4 min com 95%. Com 80% o erro médio era 27 min (pior +49), por isso o corte em 90%. Ritmo constante (linear) errava sempre para cedo, 25 a 95 min. No 1º turno de 2022 (mais cargos por urna) o erro a 90% foi −58 min: o 2º turno é o caso validado. Alvo 99% e não 100%: em 2022 o 2º turno chegou a 99% às 20h00 e a 100% à 0h17.
 
+#### Chance em prévia, de 30% a 50% apurado (20/10/2026)
+
+Entre 30% e 50% apurado a chance só aparece se o favorito tem pelo menos 70% (`FRACAO_MIN_PREVIA`, `LIMIAR_PREVIA`), em cinza e marcada como "prévia"; abaixo disso o site mostra "disputa indefinida". A conta da chance não mudou. Calibração nos pontos de 30% e 40% (semente 2610, 2.000 eleições por cenário, IC por bootstrap de eleições): faixa 50–70% → base 59,9% × 69,0% real (cautelosa); hard 60,1% × 55,9% (52–60); **adverso 60,1% × 46,9% (44–51); adverso_regional 60,5% × 52,3% (49–56)**. Faixa 70–90%: base 80,6% × 95,0%; hard 81,0% × 86,6%; adverso 80,7% × 79,7%; adverso_regional 80,1% × 77,4% (75–80). Boletins reais (26 governadores de 2018 e 2022, pontos de 30% a 45%): 104 previsões, nenhum favorito errado; Presidente 2022 teria mostrado 49–51% (disputa indefinida).
+
 #### Limitações conhecidas (abertas até a validação com dados reais)
 
 Decisão de 18/10/2026: a versão em produção fica como está até a validação retrospectiva. Estas limitações valem para o dia 25/10:

@@ -56,6 +56,13 @@ FRACAO_MIN_PROJECAO = 0.10   # abaixo disso não projeta
 # 50%: com viés forte capital × interior a chance ficava confiante demais
 # na faixa 60–90% (validação 17/10, docs/metodologia.md §8.4).
 FRACAO_MIN_PROBABILIDADE = 0.50
+# Prévia (30–50% apurado): a chance só aparece quando o favorito tem pelo
+# menos 70%. Validação 20/10 (scripts/validacao_2t): nessa faixa, chances
+# de 50–70% eram confiantes demais nos cenários difíceis (diziam 60%,
+# acontecia 47–56%); a partir de 70% ficavam corretas ou cautelosas, e nos
+# boletins reais de 2018/2022 (26 governadores) acertaram 97 de 97.
+FRACAO_MIN_PREVIA = 0.30
+LIMIAR_PREVIA = 0.70
 P_MAX_EXIBIDA = 0.99
 # Alarga só a incerteza usada na CHANCE (o IC95 já cobre >95%). Com 1,0 a
 # chance ficava confiante demais na faixa 70–90% com viés capital×interior
@@ -88,6 +95,10 @@ class Projecao:
     votos_b: int
     fracao_apurada: float
     exibir_probabilidade: bool
+    # 30–50% apurado: chance mostrada como "prévia" (só se o favorito tem
+    # LIMIAR_PREVIA ou mais); abaixo disso, "disputa indefinida".
+    probabilidade_previa: bool = False
+    disputa_indefinida: bool = False
 
 
 def _phi(x: float) -> float:
@@ -215,6 +226,8 @@ def projetar_2t(estratos: list[Estrato], antes: list[Estrato] | None = None) -> 
     else:
         pa = 1.0 if S > 0.5 else (0.0 if S < 0.5 else 0.5)
     lo, hi = max(0.0, S - 1.96 * sd), min(1.0, S + 1.96 * sd)
+    na_previa = FRACAO_MIN_PREVIA <= fracao < FRACAO_MIN_PROBABILIDADE
+    previa_forte = na_previa and max(pa, 1 - pa) >= LIMIAR_PREVIA
     return Projecao(
         pct_a=100 * S, pct_b=100 * (1 - S),
         ic95_a=(100 * lo, 100 * hi), ic95_b=(100 * (1 - hi), 100 * (1 - lo)),
@@ -222,5 +235,7 @@ def projetar_2t(estratos: list[Estrato], antes: list[Estrato] | None = None) -> 
         p_vitoria_a=pa, p_vitoria_b=1 - pa,
         votos_a=int(round(proj_a)), votos_b=int(round(proj_v - proj_a)),
         fracao_apurada=fracao,
-        exibir_probabilidade=fracao >= FRACAO_MIN_PROBABILIDADE,
+        exibir_probabilidade=fracao >= FRACAO_MIN_PROBABILIDADE or previa_forte,
+        probabilidade_previa=previa_forte,
+        disputa_indefinida=na_previa and not previa_forte,
     )
