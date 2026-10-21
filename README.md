@@ -31,7 +31,7 @@ O sistema tem cinco módulos independentes que se comunicam pelo banco:
 
 1. **`poller/`** — coleta a cada 20s os JSONs oficiais do TSE, deduplica por SHA-256, persiste um snapshot por (cargo, abrangência), marca snapshots suspeitos (regressão de seções totalizadas), avalia o motor matemático e emite eventos.
 2. **`math_engine/`** — módulo puro. Decide "eleito no 1º turno", "2º turno definido", "eleito majoritário (1 ou 2 vagas)", "matematicamente eliminado", "virada iminente", e o cálculo proporcional completo (QE + Fase 1 QP + Fase 2 sobras 80/20 + Fase 3 residual STF). Todas as regras usam desigualdade estrita.
-3. **`app/`** — API FastAPI (REST + WebSocket + páginas HTML servidas do `static/`). Rate limit via slowapi, admin token nos endpoints administrativos, CORS configurável.
+3. **`app/`** — API FastAPI (REST + WebSocket + páginas HTML servidas do `static/`). Admin token nos endpoints administrativos, CORS configurável.
 4. **`notif/telegram_bot.py`** — bot do Telegram com 13 comandos de consulta ao vivo (`/placar`, `/lider`, `/vs`, `/mapa`, `/candidato`, `/eventos`, `/status`, ...) + assinatura de alertas (`/assinar`, `/minhas`, `/pausar`, `/silencio`).
 5. **`static/`** — frontend zero-framework. Design responsivo com dois chromes (desktop com top-nav + hero grande + big-number Apurado; mobile com bottom-nav de 5 abas, chips clicáveis, bottom sheet, FAB de comparar). Icon set SVG unificado, logo próprio, motion tokens que respeitam `prefers-reduced-motion`.
 

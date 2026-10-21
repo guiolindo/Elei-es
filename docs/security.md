@@ -19,7 +19,7 @@ Todos os endpoints `/api/admin/*` exigem header `X-Admin-Token: <valor>`. Sem ma
 **Se o token estiver vazio (dev), libera.** Sempre setar em produção. Rotacionar se vazar.
 
 ### Rate limit
-slowapi com `100/min` por IP global. Endpoints admin poderiam ter limite menor, mas o token já os protege.
+Configurado com slowapi (600/min por IP, IP do visitante pelo `X-Forwarded-For` do Railway), mas **inativo**: o `SlowAPIMiddleware` não encontra as rotas incluídas como `_IncludedRouter` pela versão atual do FastAPI e trata todas como isentas (verificado em 21/10/2026 com 640 requisições do mesmo IP, todas 200). Não foi ativado antes do 2º turno de propósito. A carga é contida pelos caches do servidor (estimativa 15 s, resumo 10 s, municípios 45 s) e pelo `Cache-Control` das respostas. Endpoints admin são protegidos pelo token.
 
 ### CORS
 `CORS_ORIGINS` env var define hosts permitidos. Setar pra URL pública do Railway.

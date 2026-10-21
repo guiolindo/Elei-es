@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Contagem de visitantes e limite de requisições (21/10)
+- Visitantes passam a ser identificados pelo IP real (`X-Forwarded-For` do Railway, depois `X-Real-IP`, depois a conexão). Antes usava o IP da conexão, que atrás do proxy do Railway pode ser o do próprio proxy.
+- Descoberto que o limite de requisições do slowapi nunca foi aplicado às rotas `/api` (a versão do FastAPI inclui as rotas de um jeito que o middleware não reconhece). Mantido inativo até depois do 2º turno, com o valor já ajustado para 600/min (medido: ~21-25 requisições/min por visitante na apuração). Documentação corrigida.
+
 ### Modo TV: outras disputas no letreiro (21/10)
 - Durante a apuração, o letreiro "ÚLTIMAS" mostra também as disputas que não estão na tela (presidente e cada governador com 2º turno): % apurado e placar, ou o eleito com o percentual. Antes da apuração: resultado dos dois finalistas no 1º turno e os estados com 2º turno de governador.
 - Novo `GET /api/apuracao/resumo-2t`: todas as disputas do 2º turno numa chamada (cache de 10 s); o letreiro consulta no máximo a cada 30 s e só no modo TV.

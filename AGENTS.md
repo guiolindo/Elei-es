@@ -74,7 +74,7 @@ Este documento é otimizado pra IAs e desenvolvedores novos que precisam entrar 
 
 **Admin**: qualquer rota sob `/admin/*` recebe o dependency `_exigir_admin` automaticamente. Novos endpoints admin herdam a proteção.
 
-**Rate limit**: global 100/min por IP via slowapi (`app.main`). Se precisar mais restrito, decorar com `@limiter.limit("10/minute")`.
+**Rate limit**: configurado em `app.main` (600/min por IP, IP real via `ip_do_visitante`), mas **não está sendo aplicado**: o SlowAPIMiddleware não reconhece as rotas incluídas (`_IncludedRouter` do FastAPI) e libera tudo. Ver o comentário em `app/main.py` antes de ativar.
 
 ### ...ajustar schema do banco
 
@@ -98,7 +98,7 @@ Este documento é otimizado pra IAs e desenvolvedores novos que precisam entrar 
 
 **Superfícies de risco**:
 - Endpoints `/api/admin/*` — todos protegidos por token.
-- Rate limit global slowapi 100/min.
+- Rate limit: configurado, mas inativo (ver seção "adicionar endpoint HTTP").
 - CORS configurável.
 - Nada de PII coletado no site (só `chat_id` no bot; sem nome, email, telefone).
 

@@ -29,7 +29,32 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 log = logging.getLogger("app")
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+def ip_do_visitante(request: Request) -> str:
+    """IP de quem acessa. Atrás do proxy do Railway, `request.client.host`
+    é o IP do proxy (todos os visitantes pareceriam um só). O Railway
+    preenche X-Forwarded-For com o IP do visitante (o 1º da lista); se
+    faltar, tenta X-Real-IP e por último a conexão."""
+    xff = request.headers.get("x-forwarded-for", "")
+    primeiro = xff.split(",")[0].strip()
+    if primeiro:
+        return primeiro
+    real = request.headers.get("x-real-ip", "").strip()
+    if real:
+        return real
+    return get_remote_address(request)
+
+
+# ATENÇÃO (21/10/2026): este limite NÃO está sendo aplicado. A versão do
+# FastAPI em uso guarda as rotas incluídas como `_IncludedRouter`, e o
+# SlowAPIMiddleware não encontra o handler (`_find_route_handler` → None),
+# então trata toda rota /api como isenta. Foi assim também no 1º turno.
+# Decisão: não ativar antes do 2º turno (risco de bloquear visitantes se o
+# IP do Railway vier errado). Para ativar depois: aplicar o limite por
+# rota (@limiter.limit) ou um middleware próprio, e testar com o IP real.
+# O valor já está dimensionado: cada visitante faz ~21-25 requisições/min
+# na apuração (medido em 21/10), então 600/min comporta ~25 pessoas atrás
+# do mesmo IP (Wi-Fi de casa, operadora de celular com IP compartilhado).
+limiter = Limiter(key_func=ip_do_visitante, default_limits=["600/minute"])
 
 async def _descobrir_cod_loop():
     """A cada 5 min tenta descobrir os códigos reais da Eleição Geral 2026
@@ -213,7 +238,7 @@ def create_app() -> FastAPI:
         from app.visitas import deve_logar, registrar
         if (request.method == "GET" and resp.status_code == 200
                 and deve_logar(request.url.path)):
-            ip = request.client.host if request.client else "unknown"
+            ip = ip_do_visitante(request)
             # fire-and-forget: não bloqueia a resposta
             asyncio.create_task(registrar(
                 path=request.url.path,
