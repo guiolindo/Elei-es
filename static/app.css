@@ -3556,3 +3556,4 @@ body.tv-quadro .hero .hero-bg { display: none; }
 .tvq-est-virada { margin: calc(4 * var(--u)) 0 calc(6 * var(--u)); font: 600 calc(19 * var(--u)) var(--tvq-cond);
   color: #9fb0cc; letter-spacing: .02em; }
 .tvq-est-virada b { color: #22c55e; font-weight: 800; }
+.tvq-est-virada.tvq-leve b { color: #f0b429; }
