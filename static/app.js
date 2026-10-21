@@ -2391,10 +2391,12 @@ function empateTecnico(pj) {
   return !!c && c.ic95[0] <= 50 && 50 <= c.ic95[1];
 }
 
-// Quando a estimativa discorda do placar: quem está atrás no placar tem a
-// maior chance de terminar na frente. Só com a chance já liberada (≥50%
-// apurado, ou prévia com ≥70%), para não piscar quando a estimativa fica
-// em cima dos 50%. Em 2022 teria aparecido às 18h30, 13 min antes da virada.
+// Quando a estimativa discorda do placar: quem está atrás no placar tem
+// 70% ou mais de chance de terminar na frente. Abaixo disso a disputa é
+// cara ou coroa e o site não aponta ninguém (fica o "empate técnico · o
+// placar ainda pode virar"). 70% é o nível em que a chance se mostrou
+// confiável nos testes (prévia, metodologia §8.4). Em 2022 o aviso não
+// teria saído antes da virada do placar (chance de Lula 64-68% às 18h43).
 function avisoViradaEstimativa(pj) {
   if (!pj?.disponivel) return null;
   const snap = state.ultimoSnapshot?.candidatos || [];
@@ -2402,7 +2404,7 @@ function avisoViradaEstimativa(pj) {
   const placar = [...snap].sort((x, y) => y.votos - x.votos);
   if (placar[0].votos === placar[1].votos) return null;
   const est = [...pj.candidatos].sort((x, y) => y.pct - x.pct)[0];
-  if (est.sq_candidato === placar[0].sq_candidato || est.p_vitoria == null) return null;
+  if (est.sq_candidato === placar[0].sq_candidato || est.p_vitoria == null || est.p_vitoria < 0.70) return null;
   const nome = state.ficha[est.sq_candidato]?.nome_urna || "";
   return { nome, chance: Math.round(est.p_vitoria * 100), previa: !!pj.probabilidade_previa };
 }
@@ -2437,7 +2439,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
   const ordenados = [...pj.candidatos].sort((x, y) => y.pct - x.pct);
   const vir = avisoViradaEstimativa(pj);
   const empate = vir
-    ? `<p class="proj-empate proj-virada"><b>A estimativa indica virada:</b> ${vir.nome} deve terminar na frente (${vir.chance}% de chance${vir.previa ? ", prévia" : ""})</p>`
+    ? `<p class="proj-empate proj-virada"><b>A estimativa indica virada:</b> ${vir.nome} tem ${vir.chance}% de chance de terminar na frente${vir.previa ? " (prévia)" : ""}</p>`
     : empateTecnico(pj) && !ordenados.some(c => state.eleitos.has(c.sq_candidato))
       ? `<p class="proj-empate"><b>Empate técnico</b> · o placar ainda pode virar</p>` : "";
   linhas.innerHTML = empate + ordenados.map(c => {
@@ -3346,7 +3348,7 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
   const porSq = new Map(pj.candidatos.map(c => [c.sq_candidato, c]));
   const vir = avisoViradaEstimativa(pj);
   const linhaVirada = vir
-    ? `<p class="tvq-est-virada">A estimativa indica virada: <b>${vir.nome}</b> deve terminar na frente</p>` : "";
+    ? `<p class="tvq-est-virada">A estimativa indica virada: <b>${vir.nome}</b> tem ${vir.chance}% de chance de terminar na frente</p>` : "";
   box.innerHTML = tit + linhaVirada + ativos.map(c => {
     const e = porSq.get(c.sq_candidato);
     if (!e) return "";
@@ -3422,7 +3424,7 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
     `${r.t ? `<time>${new Date(r.t).toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" })}</time>` : ""}${r.txt}`);
   if (comecou && !eleito) {
     const vir = avisoViradaEstimativa(state.projecao);
-    if (vir) itens.unshift(`<b>A estimativa indica virada:</b> ${vir.nome} deve terminar na frente (${vir.chance}% de chance${vir.previa ? ", prévia" : ""}, não oficial)`);
+    if (vir) itens.unshift(`<b>A estimativa indica virada:</b> ${vir.nome} tem ${vir.chance}% de chance de terminar na frente (${vir.previa ? "prévia, " : ""}não oficial)`);
     else if (empateTecnico(state.projecao)) itens.unshift("Estimativa em empate técnico: o placar ainda pode virar (não oficial)");
   }
   if (comecou) {
