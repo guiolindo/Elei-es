@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### /sobre: metodologia completa e e-mail de contato (21/10)
+- Seção 3 reescrita em camadas: explicação simples primeiro, depois as fórmulas e os valores exatos do motor (aviso de eleito, os 8 passos da estimativa, margem, chance, horário dos 99%, deputados), quanto a estimativa acerta (2018/2022 reais e simulação) e as limitações conhecidas.
+- Contato por e-mail.
+
 ### /sobre reescrito para leigos (21/10)
 - Sem referências ao repositório ou a arquivos de código (o repositório vai ficar privado). Termos técnicos trocados por explicações simples: "impressão digital" do arquivo no lugar de SHA-256, "código embaralhado" no lugar de hash, "memória do navegador" no lugar de localStorage, sem fórmulas. Seções renomeadas ("Como o site faz as contas", "Privacidade", "Uso de dados, fotos e logos"); âncoras mantidas.
 - Contato: por enquanto só o /apagar_tudo do bot; e-mail de contato será incluído.

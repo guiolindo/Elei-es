@@ -16,6 +16,7 @@
   padding-top: 20px; border-top: 1px solid rgba(255,255,255,.08); }
 .pagina-legal h3 { font-size: 16px; margin-top: 24px; margin-bottom: 6px; color: var(--gold, #f0b429); }
 .pagina-legal p, .pagina-legal li { line-height: 1.65; font-size: 15px; }
+.pagina-legal > p { margin: 0 0 14px; }
 .pagina-legal ul, .pagina-legal ol { margin-left: 22px; margin-bottom: 12px; }
 .pagina-legal a { color: var(--gold, #f0b429); text-decoration: underline; }
 .pagina-legal .aviso { background: rgba(240,180,41,.1); border-left: 3px solid #f0b429;
@@ -33,6 +34,11 @@
 .faq-item summary:hover { color: var(--gold, #f0b429); }
 .faq-item[open] summary { color: var(--gold, #f0b429); }
 .faq-item p { padding: 12px 0; }
+.pagina-legal .formula { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px; padding: 10px 16px; margin: 8px 0 16px; overflow-x: auto; }
+.pagina-legal .formula p { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 13.5px;
+  line-height: 1.7; margin: 4px 0; white-space: normal; }
+.pagina-legal .formula b { font-family: Inter, system-ui, sans-serif; }
 </style>
 </head>
 <body>
@@ -105,7 +111,7 @@
 
   <details class="faq-item">
     <summary>O que é a estimativa para 100% apurado?</summary>
-    <p>É um cálculo do site, sem valor oficial, que tenta prever o resultado final enquanto a contagem ainda está no meio. A explicação completa está no item 3.</p>
+    <p>É um cálculo do site, sem valor oficial, que tenta prever o resultado final enquanto a contagem ainda está no meio. A explicação completa, com as fórmulas, está no item 3.</p>
   </details>
 
   <details class="faq-item">
@@ -134,27 +140,100 @@
 
   <!-- ===================== METODOLOGIA ===================== -->
   <h2 id="metodologia">3. Como o site faz as contas</h2>
+  <p>Esta seção explica de verdade como funcionam o aviso de eleito, a estimativa do resultado final e o horário previsto. Cada parte começa com a explicação em palavras simples. Logo abaixo vêm as fórmulas e os números exatos usados, para quem quiser conferir.</p>
 
   <h3>3.1. Aviso de eleito</h3>
+  <p><strong>Em palavras simples:</strong> o site só declara alguém eleito quando não existe mais nenhuma forma de o resultado mudar. Ele imagina o pior cenário possível para o líder: todos os eleitores das urnas que faltam votando no segundo colocado. Se mesmo assim o líder continua na frente, está eleito.</p>
+  <p>Na prática esse pior cenário nunca acontece, porque cerca de 20% dos eleitores não comparecem e parte dos votos é branco ou nulo. Por isso o aviso pode sair alguns minutos depois do necessário, mas nunca antes.</p>
+  <div class="formula">
+    <p><b>Votos que ainda podem entrar:</b> R = eleitores aptos das urnas que ainda não foram apuradas</p>
+    <p><b>2º turno:</b> eleito quando votos do 2º colocado + R &lt; votos do 1º colocado</p>
+    <p><b>Presidente e governador no 1º turno:</b> eleito quando 2 × votos do líder &gt; votos válidos já contados + R (maioria absoluta mesmo no pior caso, art. 77 da Constituição)</p>
+    <p><b>Senador (2 vagas em 2026):</b> os dois primeiros estão eleitos quando votos do 2º colocado &gt; votos do 3º colocado + R</p>
+  </div>
   <ul>
-    <li>Os votos que ainda podem entrar são contados como se todos os eleitores das urnas que faltam tivessem votado. Na prática, cerca de 20% deles não comparecem e parte dos votos é branco ou nulo, então a conta sempre sobra. Por isso o aviso pode atrasar um pouco, mas não sai antes da hora.</li>
-    <li>Nenhum aviso sai antes de 20% das urnas apuradas.</li>
-    <li>Empate não elege ninguém. Se a contagem terminar empatada, a lei (art. 110 do Código Eleitoral) dá a vitória ao candidato mais velho.</li>
-    <li>Se o TSE corrigir um arquivo e a quantidade de urnas apuradas diminuir, aquela atualização é marcada e não gera aviso.</li>
-    <li>No 1º turno, as vagas de deputado foram calculadas pelas regras do Código Eleitoral (quociente eleitoral, votação mínima e distribuição das sobras), considerando as federações de partidos.</li>
+    <li>Todas as comparações são "maior que", nunca "maior ou igual": empate não elege ninguém. Se a contagem terminar empatada, a lei (art. 110 do Código Eleitoral) dá a vitória ao candidato mais velho.</li>
+    <li>Votos em candidatos com registro cassado, indeferido ou que renunciaram são nulos por lei e não entram em nenhuma conta.</li>
+    <li>Nenhum aviso sai antes de 20% das urnas apuradas. Se o TSE corrigir um arquivo e a quantidade de urnas apuradas diminuir, aquela atualização é ignorada.</li>
   </ul>
 
   <h3>3.2. Estimativa para 100% apurado</h3>
-  <p>No 2º turno, para presidente e governador, o site mostra uma previsão do resultado final enquanto a contagem ainda não terminou. Ela aparece sempre abaixo dos números do TSE e marcada como "não oficial".</p>
-  <p>A ideia: os votos que faltam vêm de lugares que já votaram no 1º turno. Para presidente, o site olha cada estado separadamente. Aos votos já contados num estado, soma uma previsão dos que faltam ali, baseada em como aquele estado votou no 1º turno e corrigida pela mudança que já aparece na contagem do país. Para governador, faz a mesma conta dentro do estado.</p>
+  <p><strong>Em palavras simples:</strong> a contagem não chega igual de todo o país. Alguns estados contam mais rápido que outros, e eles votam de forma diferente. Por isso o placar parcial pode enganar: com 30% apurado, quem está na frente pode estar só à frente nos lugares que contaram primeiro.</p>
+  <p>A estimativa corrige isso. Para cada estado, ela pega os votos já contados ali e estima os que faltam usando duas pistas: como aquele estado votou no 1º turno e quanto o voto já mudou do 1º para o 2º turno nas urnas contadas. Depois soma todos os estados. É como completar um quebra-cabeça: as peças que faltam são estimadas a partir das que já estão na mesa e da foto da caixa (o 1º turno).</p>
+  <p>A estimativa não usa pesquisas eleitorais nem eleições anteriores. Usa só a contagem oficial em andamento e o resultado do 1º turno de 2026.</p>
+
+  <p><strong>Passo a passo, com as fórmulas.</strong> Para presidente, cada estado e o exterior são calculados separadamente (28 partes). Para governador, o estado é uma parte só. Em cada parte u:</p>
+
+  <p><b>1. O que já foi contado.</b> A participação do candidato A entre os votos dos dois finalistas já contados ali:</p>
+  <div class="formula"><p>q<sub>u</sub> = votos de A ÷ (votos de A + votos de B)</p></div>
+
+  <p><b>2. A referência do 1º turno.</b> A mesma participação, mas no 1º turno, considerando só os votos que os dois finalistas tiveram:</p>
+  <div class="formula"><p>p<sub>u</sub> = votos de A no 1º turno ÷ (votos de A + votos de B no 1º turno)</p></div>
+
+  <p><b>3. A mudança do 1º para o 2º turno.</b> Quanto, em média, o candidato A ganhou ou perdeu em relação ao 1º turno nas partes que já têm votos contados. Partes com mais votos pesam mais:</p>
+  <div class="formula"><p>δ = Σ v<sub>u</sub> × (q<sub>u</sub> − p<sub>u</sub>) ÷ Σ v<sub>u</sub> &nbsp;&nbsp;(v<sub>u</sub> = votos válidos já contados na parte u)</p></div>
+
+  <p><b>4. A previsão para os votos que faltam.</b> É uma média ponderada entre o que a contagem mostra (q<sub>u</sub>) e o que o 1º turno corrigido sugere (p<sub>u</sub> + δ). O peso de cada lado depende de quanta confiança cada um merece: quanto mais urnas contadas na parte, mais o site confia no que foi contado.</p>
+  <div class="formula">
+    <p>m<sub>u</sub> = w × q<sub>u</sub> + (1 − w) × (p<sub>u</sub> + δ)</p>
+    <p>w = σ<sub>p</sub>² ÷ (σ<sub>o</sub>² + σ<sub>p</sub>²)</p>
+    <p>σ<sub>o</sub>² = 0,028² + 0,37² ÷ urnas contadas + 0,12² ÷ urnas que faltam &nbsp;&nbsp;(incerteza do que foi contado)</p>
+    <p>σ<sub>p</sub> = 0,025 &nbsp;&nbsp;(incerteza do 1º turno como referência)</p>
+  </div>
+  <p>O primeiro termo de σ<sub>o</sub> (0,028) representa o fato de que as urnas que chegam por último costumam votar um pouco diferente das primeiras. Por causa dele, o site nunca confia 100% no placar parcial: o peso do que foi contado fica em no máximo cerca de 44%. Se a apuração mostrar uma diferença maior que essa entre urnas antigas e novas, o site passa a usar o valor medido.</p>
+
+  <p><b>5. Quantos votos ainda faltam.</b> Calculado pelo eleitorado das urnas que faltam, com o mesmo comparecimento já observado naquela parte:</p>
+  <div class="formula"><p>F<sub>u</sub> = (eleitores aptos que faltam) × (votos válidos contados ÷ eleitores aptos das urnas contadas)</p></div>
+
+  <p><b>6. O resultado final estimado.</b> Soma o que já foi contado com a previsão do que falta, em todas as partes:</p>
+  <div class="formula"><p>Estimativa de A = (Σ votos de A já contados + Σ F<sub>u</sub> × m<sub>u</sub>) ÷ (Σ votos válidos já contados + Σ F<sub>u</sub>)</p></div>
+
+  <p><b>7. A margem (o "±").</b> O site soma três fontes de incerteza: o erro de cada estado, um erro comum a todos (se o país inteiro mudar na mesma direção) e a incerteza da própria mudança δ. Com isso calcula o desvio-padrão σ da estimativa. No começo da apuração esse σ é multiplicado por um fator de segurança, porque com poucos votos contados os erros são maiores:</p>
+  <div class="formula">
+    <p>σ = √(Σ F<sub>u</sub>² × incerteza da parte u + (erro comum)²) ÷ total de votos estimado × fator</p>
+    <p>fator = 1,8 abaixo de 30% apurado · 1,4 de 30% a 50% · 1,15 de 50% a 80% · 1,0 acima de 80%</p>
+    <p>margem de 95% = estimativa ± 1,96 × σ</p>
+  </div>
+
+  <p><b>8. A chance de vencer.</b> É a probabilidade de o resultado final passar de 50%, calculada pela curva normal (a "curva do sino"). Para a chance, a margem é alargada mais 40%, porque os testes mostraram que sem isso ela ficava confiante demais em disputas difíceis:</p>
+  <div class="formula">
+    <p>chance de A = Φ( (estimativa de A − 50%) ÷ (1,4 × σ) ) &nbsp;&nbsp;(Φ = curva normal acumulada)</p>
+    <p>a chance mostrada fica sempre entre 1% e 99%; 100% só existe no resultado oficial</p>
+  </div>
+
+  <p><b>Quando cada informação aparece:</b></p>
   <ul>
-    <li><strong>O "±"</strong> mostra até onde o resultado final pode variar. Ele é calculado para acertar em 95 de cada 100 casos e fica menor conforme a contagem avança. Em testes com regiões votando de forma muito diferente, perto do fim da contagem ele acertou menos, cerca de 9 em cada 10.</li>
-    <li><strong>A estimativa</strong> aparece a partir de 10% das urnas apuradas.</li>
-    <li><strong>A chance de vencer</strong> aparece a partir de 50% apurado e fica sempre entre 1% e 99%. Entre 30% e 50%, ela aparece antes, em cinza e marcada como "prévia", mas só quando um candidato tem 70% de chance ou mais. Nessa fase, chances menores ainda erram muito, e o site mostra "disputa indefinida".</li>
-    <li><strong>O horário previsto para 99% apurado</strong> aparece a partir de 90%, calculado pela velocidade da contagem nos últimos 15 minutos. Testado com a apuração de 2022, errou em média 10 minutos. O site não prevê o horário de 100% porque as últimas urnas costumam atrasar sem padrão: em 2022, o 2º turno chegou a 99% às 20h e a 100% só depois da meia-noite.</li>
-    <li>Tudo isso some quando a contagem termina ou quando alguém é eleito.</li>
+    <li><strong>Estimativa e margem:</strong> a partir de 10% do eleitorado apurado.</li>
+    <li><strong>Chance de vencer:</strong> a partir de 50% apurado. Entre 30% e 50%, aparece antes, em cinza e marcada como "prévia", só quando um candidato tem 70% de chance ou mais. Nos testes, nessa fase, chances menores que 70% erravam muito, e o site mostra "disputa indefinida".</li>
+    <li>Tudo some quando a contagem termina ou quando alguém é matematicamente eleito.</li>
   </ul>
-  <p>A estimativa pode errar, por exemplo se as urnas que faltam forem de lugares onde o voto mudou muito mais do que nas já contadas. Ela também supõe que, em cada estado, o comparecimento nas urnas que faltam é parecido com o das já contadas. Não substitui o resultado do TSE.</p>
+
+  <p><b>Governador:</b> como o estado é uma parte só, não há outros estados para medir a mudança δ. Então a referência é o 1º turno sem correção, com uma incerteza maior (σ<sub>p</sub> = √(0,025² + 0,04²) ≈ 4,7 pontos).</p>
+
+  <h3>3.3. Quanto a estimativa acerta</h3>
+  <p>O método foi testado de duas formas, sempre usando em cada momento só o que já estaria contado naquele instante, sem "espiar" o resultado final:</p>
+  <ul>
+    <li><strong>Com a apuração real de 2022 e 2018</strong>, refeita urna por urna a partir dos boletins de urna publicados pelo TSE. No 2º turno de presidente de 2022, a estimativa errou o resultado final por 0,8 ponto com metade das urnas apuradas e por 0,2 ponto com 90%. A margem de 95% conteve o resultado real em todos os momentos.</li>
+    <li><strong>Com 2.000 eleições simuladas</strong> em vários cenários, inclusive com estados e regiões mudando de voto de forma bem diferente uns dos outros.</li>
+  </ul>
+  <p><strong>Limitações conhecidas:</strong></p>
+  <ul>
+    <li><strong>Governador:</strong> nos 2ºs turnos de 2018 e 2022, o líder do 1º turno perdeu em média de 4 a 6 pontos no 2º turno. O método não prevê essa queda e tende a favorecer o líder do 1º turno em cerca de 1,5 ponto com metade das urnas apuradas. A margem cobriu o resultado real em quase todos os testes.</li>
+    <li><strong>Presidente:</strong> as primeiras urnas de cada estado podem mudar de voto mais que as últimas. Em 2022 isso fez a estimativa ficar 0,8 ponto abaixo do resultado do vencedor por boa parte da contagem.</li>
+    <li><strong>Perto do fim:</strong> nos cenários mais difíceis das simulações, com 90% apurado, a margem de 95% conteve o resultado em cerca de 9 de cada 10 casos, um pouco menos do que promete.</li>
+  </ul>
+
+  <h3>3.4. Horário previsto para 99% apurado</h3>
+  <p><strong>Em palavras simples:</strong> a apuração começa rápida e vai ficando mais lenta no fim, porque as últimas urnas costumam vir de lugares mais distantes. O site mede a velocidade dos últimos 15 minutos, supõe que ela continua caindo no mesmo ritmo e calcula quando a contagem chega a 99%.</p>
+  <div class="formula">
+    <p>fração que falta: F(t) = F<sub>0</sub> × e<sup>−k·t</sup> &nbsp;&nbsp;(cai sempre na mesma proporção por minuto)</p>
+    <p>k = ln(F há 15 min ÷ F agora) ÷ 15</p>
+    <p>minutos até 99% = ln(F agora ÷ 0,01) ÷ k</p>
+  </div>
+  <p>O horário aparece a partir de 90% apurado, arredondado de 5 em 5 minutos. Testado com a apuração real de 2022, errou em média 10 minutos. O site não prevê o horário de 100% porque as últimas urnas atrasam sem padrão: em 2022, o 2º turno chegou a 99% às 20h e a 100% só depois da meia-noite.</p>
+
+  <h3>3.5. Deputados (1º turno)</h3>
+  <p>No 1º turno, as vagas de deputado foram calculadas pelas regras do Código Eleitoral: quociente eleitoral (votos válidos ÷ vagas, art. 106), quociente partidário (art. 107), votação mínima de 10% do quociente para cada eleito (art. 108) e distribuição das vagas que sobram pelas maiores médias (art. 109), tratando as federações de partidos como um partido só (Lei 14.208/2021).</p>
 
   <!-- ===================== TERMOS ===================== -->
   <h2 id="termos">4. Termos de uso</h2>
@@ -208,7 +287,7 @@
   <ul>
     <li><strong>Ver o que está guardado:</strong> envie /minhas ao bot.</li>
     <li><strong>Apagar tudo:</strong> envie /apagar_tudo ao bot. Seus avisos e configurações são apagados na hora.</li>
-    <li><strong>Outros pedidos:</strong> pelo contato do item 8. No site não há como ligar os registros de acesso a uma pessoa, porque o endereço de internet fica guardado só na forma embaralhada.</li>
+    <li><strong>Outros pedidos:</strong> pelo e-mail do item 8. No site não há como ligar os registros de acesso a uma pessoa, porque o endereço de internet fica guardado só na forma embaralhada.</li>
   </ul>
 
   <!-- ===================== LEGAL ===================== -->
@@ -244,7 +323,8 @@
 
   <!-- ===================== CONTATO ===================== -->
   <h2 id="contato">8. Contato</h2>
-  <p>Para apagar os seus dados do bot, não é preciso falar com ninguém: envie /apagar_tudo ao bot.</p>
+  <p>Para tirar dúvidas, avisar de algum erro ou fazer pedidos sobre seus dados, escreva para <a href="mailto:gui3423862@gmail.com">gui3423862@gmail.com</a>.</p>
+  <p>Para apagar os seus dados do bot, não é preciso escrever: envie /apagar_tudo ao bot.</p>
   <p><small>Última atualização: 21 de outubro de 2026.</small></p>
 </main>
 
