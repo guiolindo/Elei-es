@@ -36,6 +36,9 @@ _PATHS_CONTAM = re.compile(r"^/(sobre|urna|verificacao|cola)?$")
 # User-agent → família simplificada. Ordem importa (bots primeiro).
 _UA_PATTERNS = [
     (re.compile(r"(bot|crawler|spider|slurp|facebookexternalhit|preview)", re.I), "bot", True),
+    # Ferramentas, não navegadores (conferências de deploy, scripts, testes
+    # automatizados): não são visitantes.
+    (re.compile(r"(curl|wget|python|httpx|aiohttp|go-http|java/|okhttp|libwww|headless|uptime|monitor)", re.I), "ferramenta", True),
     (re.compile(r"Edg/", re.I),       "Edge",    False),
     (re.compile(r"OPR/|Opera", re.I), "Opera",   False),
     (re.compile(r"Firefox/", re.I),   "Firefox", False),
@@ -46,7 +49,7 @@ _UA_PATTERNS = [
 
 def _classificar_ua(ua: str) -> tuple[str, bool]:
     if not ua:
-        return ("outro", False)
+        return ("ferramenta", True)  # navegador de verdade sempre manda user-agent
     for pat, nome, is_bot in _UA_PATTERNS:
         if pat.search(ua):
             return (nome, is_bot)
