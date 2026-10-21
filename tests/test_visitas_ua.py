@@ -11,5 +11,12 @@ def test_navegadores_contam_como_visita():
 def test_ferramentas_e_robos_nao_contam():
     for ua in ("curl/8.5.0", "python-httpx/0.27", "Python-urllib/3.11",
                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 HeadlessChrome/130.0 Safari/537.36",
-               "Googlebot/2.1", ""):
+               "Googlebot/2.1", "WhatsApp/2.24.21.79 A", "TelegramBot (like TwitterBot)", ""):
         assert _classificar_ua(ua)[1] is True, ua
+
+
+def test_navegador_dentro_de_app_continua_contando():
+    # Navegador embutido do Instagram/Facebook é gente de verdade.
+    ig = ("Mozilla/5.0 (Linux; Android 14; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) "
+          "Version/4.0 Chrome/130.0 Mobile Safari/537.36 Instagram 350.0")
+    assert _classificar_ua(ig)[1] is False

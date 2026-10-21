@@ -39,6 +39,11 @@ _UA_PATTERNS = [
     # Ferramentas, não navegadores (conferências de deploy, scripts, testes
     # automatizados): não são visitantes.
     (re.compile(r"(curl|wget|python|httpx|aiohttp|go-http|java/|okhttp|libwww|headless|uptime|monitor)", re.I), "ferramenta", True),
+    # Pré-visualização de link (WhatsApp, Skype, Iframely etc.): o app abre a
+    # página para montar título e imagem quando alguém compartilha o link.
+    # O WhatsApp manda só "WhatsApp/2.x"; o navegador embutido de outros apps
+    # traz "Mozilla/..." e continua contando como visita.
+    (re.compile(r"^WhatsApp/|SkypeUriPreview|Iframely|Embedly|vkShare|redditbot|Snapchat|Pinterest", re.I), "previa-link", True),
     (re.compile(r"Edg/", re.I),       "Edge",    False),
     (re.compile(r"OPR/|Opera", re.I), "Opera",   False),
     (re.compile(r"Firefox/", re.I),   "Firefox", False),

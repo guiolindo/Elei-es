@@ -6,6 +6,7 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ### Visitas: ferramentas não contam como visitante (21/10)
 - Acessos de curl, scripts (Python, httpx etc.), navegadores automatizados e sem user-agent passam a contar como robô, fora de "Visitas" e "Únicos". Antes as conferências de deploy entravam como "outro".
+- Pré-visualização de link (WhatsApp e afins) também conta como robô: quando alguém compartilha o link, o app abre a página para montar a prévia. Navegador embutido de apps (Instagram, Facebook) continua contando como visita.
 
 ### Chance sempre como "chance de vencer" (21/10)
 - Todos os lugares que mostram a chance dizem "N% de chance de vencer" (caixa da estimativa, TV, letreiro, avisos e bot), para não confundir com porcentagem de votos. Na TV a estimativa ganhou o "%" ("≈50,2%"), e "chance a partir de 30%" virou "a partir de 30% apurado".
