@@ -1,5 +1,45 @@
 # Apuração 2026
 
+### 👉 [elei-es-production.up.railway.app](https://elei-es-production.up.railway.app)
+
+**A apuração das eleições de 2026 em tempo real, com os números do TSE, no celular, no computador e na TV.**
+
+Domingo, 25 de outubro de 2026, a partir das 17h (horário de Brasília): 2º turno para presidente e para governador no Acre, Amazonas, Distrito Federal, Espírito Santo, Rio Grande do Norte e Tocantins.
+
+| Modo TV | Celular |
+|---|---|
+| <img src="docs/img/modo-tv.png" alt="Modo TV: placar, mapa por estado, estimativa e gráfico" width="560"> | <img src="docs/img/celular.png" alt="Placar e estimativa no celular" width="220"> |
+
+<sub>Imagens com dados de teste.</sub>
+
+### O que o site mostra
+
+- **Placar ao vivo** com os números oficiais do TSE, atualizados a cada 20 segundos.
+- **Aviso de eleito** só quando não há mais como o resultado mudar, e um troféu na tela, até para quem estava com o celular bloqueado.
+- **Estimativa do resultado final** (não oficial): calculada estado por estado a partir do 1º turno, com margem de erro, chance de vencer, aviso de empate técnico e de possível virada.
+- **Mapa** de quem lidera em cada estado e em cada município, e o gráfico da evolução da contagem.
+- **Modo TV**: tela cheia no formato de telejornal, com letreiro de últimas notícias da apuração (viradas, governadores, comparecimento).
+- **Conferir minha seção**: o boletim da urna onde você votou.
+
+Não é o TSE nem de nenhum partido. O resultado oficial é sempre o de [resultados.tse.jus.br](https://resultados.tse.jus.br). Como o site faz as contas está explicado, com as fórmulas, em [/sobre#metodologia](https://elei-es-production.up.railway.app/sobre#metodologia).
+
+### Avisos no Telegram
+
+O bot **[@avisoeleicao_bot](https://t.me/avisoeleicao_bot)** avisa quando alguém for eleito, quando houver virada e em boletins durante a apuração (25%, 50%, 75%, 90%). Também responde ao placar e à estimativa a qualquer momento: `/placar`, `/estimativa`, `/mapa`.
+
+### Para compartilhar
+
+> 🗳️ Apuração do 2º turno ao vivo, direto dos números do TSE: placar, mapa por estado, estimativa do resultado final e modo TV. Domingo, 25/10, a partir das 17h.
+> https://elei-es-production.up.railway.app
+>
+> Avisos no Telegram: https://t.me/avisoeleicao_bot
+
+Dica: na TV ou no computador, abra o site e toque em **📺 Modo TV** no rodapé.
+
+---
+
+## Para desenvolvedores
+
 Painel web independente pra acompanhar a apuração das Eleições Gerais 2026 do TSE em tempo real, com motor matemático que calcula quando um resultado está definido (1º turno, 2º turno, majoritário, senador multi-vaga, proporcional) e alertas via bot do Telegram.
 
 Não é o TSE. É um site de terceiro que consome os JSONs públicos que o próprio TSE publica em `resultados.tse.jus.br` e `divulgacandcontas.tse.jus.br`, e apresenta esses dados com regras matemáticas explícitas e verificáveis.
