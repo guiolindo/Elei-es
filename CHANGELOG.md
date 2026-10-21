@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### /sobre reescrito para leigos (21/10)
+- Sem referências ao repositório ou a arquivos de código (o repositório vai ficar privado). Termos técnicos trocados por explicações simples: "impressão digital" do arquivo no lugar de SHA-256, "código embaralhado" no lugar de hash, "memória do navegador" no lugar de localStorage, sem fórmulas. Seções renomeadas ("Como o site faz as contas", "Privacidade", "Uso de dados, fotos e logos"); âncoras mantidas.
+- Contato: por enquanto só o /apagar_tudo do bot; e-mail de contato será incluído.
+
 ### Contagem de visitantes e limite de requisições (21/10)
 - Visitantes passam a ser identificados pelo IP real (`X-Forwarded-For` do Railway, depois `X-Real-IP`, depois a conexão). Antes usava o IP da conexão, que atrás do proxy do Railway pode ser o do próprio proxy.
 - Descoberto que o limite de requisições do slowapi nunca foi aplicado às rotas `/api` (a versão do FastAPI inclui as rotas de um jeito que o middleware não reconhece). Mantido inativo até depois do 2º turno, com o valor já ajustado para 600/min (medido: ~21-25 requisições/min por visitante na apuração). Documentação corrigida.
