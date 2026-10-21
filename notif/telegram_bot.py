@@ -493,6 +493,9 @@ async def _texto_estimativa(sess, cargo: int, uf: str) -> str | None:
         previa = " (prévia)" if pj.get("probabilidade_previa") else ""
         ch = f" · {round(c['p_vitoria'] * 100)}% de chance{previa}" if c.get("p_vitoria") is not None else ""
         linhas.append(f"{nome}: ≈{_fmt_pct(c['pct'], 1)} ±{str(round(m, 1)).replace('.', ',')}{ch}")
+    c0 = pj["candidatos"][0]
+    if c0["ic95"][0] <= 50 <= c0["ic95"][1]:
+        linhas.append("_Empate técnico: a margem ainda inclui os 50%._")
     if pj.get("disputa_indefinida"):
         linhas.append("_Chance: disputa indefinida (antes de 50% apurado, só aparece com um favorito claro)._")
     elif pj.get("exibir_probabilidade") is False:

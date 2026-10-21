@@ -3545,3 +3545,8 @@ body.tv-quadro .hero .hero-bg { display: none; }
 /* Logo do partido no placar da TV, entre o número e a sigla */
 .tvq-logo { height: calc(34 * var(--u)); width: auto; max-width: calc(60 * var(--u)); object-fit: contain;
   background: #fff; border-radius: calc(4 * var(--u)); padding: calc(2 * var(--u)); }
+
+/* Empate técnico: margem da estimativa ainda inclui 50% */
+.proj-empate { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.proj-empate b { color: var(--gold, #f0b429); letter-spacing: .02em; }
+.tvq-selo.tvq-empate { color: #f0b429; border-color: #f0b429; }

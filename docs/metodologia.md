@@ -495,6 +495,10 @@ A fração de seções que falta, R(t), é tratada como R0·e^(−k·t); k sai d
 
 Entre 30% e 50% apurado a chance só aparece se o favorito tem pelo menos 70% (`FRACAO_MIN_PREVIA`, `LIMIAR_PREVIA`), em cinza e marcada como "prévia"; abaixo disso o site mostra "disputa indefinida". A conta da chance não mudou. Calibração nos pontos de 30% e 40% (semente 2610, 2.000 eleições por cenário, IC por bootstrap de eleições): faixa 50–70% → base 59,9% × 69,0% real (cautelosa); hard 60,1% × 55,9% (52–60); **adverso 60,1% × 46,9% (44–51); adverso_regional 60,5% × 52,3% (49–56)**. Faixa 70–90%: base 80,6% × 95,0%; hard 81,0% × 86,6%; adverso 80,7% × 79,7%; adverso_regional 80,1% × 77,4% (75–80). Boletins reais (26 governadores de 2018 e 2022, pontos de 30% a 45%): 104 previsões, nenhum favorito errado; Presidente 2022 teria mostrado 49–51% (disputa indefinida).
 
+#### Disputa decidida por décimos (21/10/2026)
+
+`scripts/validacao_2t/apertado.py`: apuração real do 2T de 2022 (ordem real de chegada), com uma fração fixa dos votos de um candidato passada ao outro em cada seção, até o final ficar em 50,05% × 49,95% (cerca de 119 mil votos), nos dois sentidos. Resultados: nenhum aviso de eleito antecipado (declarado só com 100% apurado, à 0h17, porque até lá o eleitorado das seções restantes ainda podia virar); uma única virada, quando o placar virou de fato (99,5% apurado); o IC95 conteve o resultado real em todos os pontos. No sentido em que o vencedor final passa a noite levemente atrás, a chance dele ficou em 19–29% até 95% apurado (o mesmo desvio de ordem dentro dos estados de 2022). Por isso o site mostra "empate técnico" enquanto o IC95 incluir 50% (só exibição; o cálculo não mudou).
+
 #### Limitações conhecidas (abertas até a validação com dados reais)
 
 Decisão de 18/10/2026: a versão em produção fica como está até a validação retrospectiva. Estas limitações valem para o dia 25/10:

@@ -2382,6 +2382,15 @@ function textoHorario99() {
   return pct >= 90 ? "Horário dos 99% apurado: medindo o ritmo" : "Horário dos 99% apurado: aparece com 90%";
 }
 
+// "Empate técnico": a margem de 95% da estimativa ainda inclui 50%. Mesma
+// leitura das pesquisas. Numa disputa de décimos a chance pode apontar
+// para um lado por boa parte da noite (teste com 2022 deslocado para
+// 50,05% × 49,95%); o selo deixa claro que o resultado ainda está aberto.
+function empateTecnico(pj) {
+  const c = pj?.disponivel && pj.candidatos?.[0];
+  return !!c && c.ic95[0] <= 50 && 50 <= c.ic95[1];
+}
+
 function renderBlocoProjecao(box, linhas, aviso, mostrar) {
   if (!mostrar) { box.hidden = true; return; }
   box.hidden = false;
@@ -2410,7 +2419,9 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
     return;
   }
   const ordenados = [...pj.candidatos].sort((x, y) => y.pct - x.pct);
-  linhas.innerHTML = ordenados.map(c => {
+  const empate = empateTecnico(pj) && !ordenados.some(c => state.eleitos.has(c.sq_candidato))
+    ? `<p class="proj-empate"><b>Empate técnico</b> · a margem ainda inclui os 50%</p>` : "";
+  linhas.innerHTML = empate + ordenados.map(c => {
     const nome = state.ficha[c.sq_candidato]?.nome_urna || "—";
     const cor = corDoCandidato(c.sq_candidato);
     const margem = (c.ic95[1] - c.ic95[0]) / 2;
@@ -3294,7 +3305,8 @@ function renderTVQuadro() {
 
 function renderEstimativaQuadro(ativos, pct, decidido) {
   const box = $("tvq-est");
-  const tit = `<div class="tvq-rot">Estimativa para 100% apurado <span class="tvq-selo">não oficial</span></div>`;
+  const tit = `<div class="tvq-rot">Estimativa para 100% apurado <span class="tvq-selo">não oficial</span>${
+    !decidido && empateTecnico(state.projecao) ? ` <span class="tvq-selo tvq-empate">empate técnico</span>` : ""}</div>`;
   if (decidido || pct >= 100) {
     box.innerHTML = tit + `<p class="tvq-est-msg">${decidido
       ? "Resultado decidido: os votos que faltam não mudam mais o vencedor."
