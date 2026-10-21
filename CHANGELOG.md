@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Chance sempre como "chance de vencer" (21/10)
+- Todos os lugares que mostram a chance dizem "N% de chance de vencer" (caixa da estimativa, TV, letreiro, avisos e bot), para não confundir com porcentagem de votos. Na TV a estimativa ganhou o "%" ("≈50,2%"), e "chance a partir de 30%" virou "a partir de 30% apurado".
+
 ### Aviso "a estimativa indica virada" (21/10)
 - Dois níveis (ajuste do mesmo dia): 55% a 70% de chance, "empate técnico · a estimativa vê leve vantagem de X no fim"; 70% ou mais, "A estimativa indica virada: X tem N% de chance de terminar na frente". Abaixo de 55%, só "empate técnico · o placar ainda pode virar". Em 2022: leve vantagem de Lula às 18h30, 13 min antes da virada do placar.
 - Quando quem está atrás no placar tem a maior chance de terminar na frente, a caixa da estimativa, o quadro da TV e o letreiro dizem "A estimativa indica virada: X deve terminar na frente". Em empate técnico o texto vira "o placar ainda pode virar". Na apuração real de 2022: empate técnico desde 17h41 e aviso de virada às 18h30; o placar virou às 18h43.

@@ -491,7 +491,7 @@ async def _texto_estimativa(sess, cargo: int, uf: str) -> str | None:
         nome, _ = await _nome_partido(sess, c["sq_candidato"])
         m = (c["ic95"][1] - c["ic95"][0]) / 2
         previa = " (prévia)" if pj.get("probabilidade_previa") else ""
-        ch = f" · {round(c['p_vitoria'] * 100)}% de chance{previa}" if c.get("p_vitoria") is not None else ""
+        ch = f" · {round(c['p_vitoria'] * 100)}% de chance de vencer{previa}" if c.get("p_vitoria") is not None else ""
         linhas.append(f"{nome}: ≈{_fmt_pct(c['pct'], 1)} ±{str(round(m, 1)).replace('.', ',')}{ch}")
     c0 = pj["candidatos"][0]
     if c0["ic95"][0] <= 50 <= c0["ic95"][1]:
