@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Aviso "a estimativa indica virada" (21/10)
+- Quando quem está atrás no placar tem a maior chance de terminar na frente (com a chance já liberada), a caixa da estimativa, o quadro da TV e o letreiro dizem "A estimativa indica virada: X deve terminar na frente". Em empate técnico o texto vira "o placar ainda pode virar". Na apuração real de 2022: empate técnico desde 17h41 e aviso de virada às 18h30; o placar virou às 18h43.
+
 ### Selo "empate técnico" na estimativa (21/10)
 - Site (computador, celular, TV) e `/estimativa` do bot mostram "empate técnico" enquanto a margem de 95% da estimativa incluir 50%. Teste com a apuração real de 2022 deslocada para 50,05% × 49,95% (`scripts/validacao_2t/apertado.py`): eleito só declarado com 100% apurado, uma única virada, margem sempre correta, mas a chance chegou a apontar 73% para quem perdeu.
 

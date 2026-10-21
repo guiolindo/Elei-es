@@ -2391,6 +2391,22 @@ function empateTecnico(pj) {
   return !!c && c.ic95[0] <= 50 && 50 <= c.ic95[1];
 }
 
+// Quando a estimativa discorda do placar: quem está atrás no placar tem a
+// maior chance de terminar na frente. Só com a chance já liberada (≥50%
+// apurado, ou prévia com ≥70%), para não piscar quando a estimativa fica
+// em cima dos 50%. Em 2022 teria aparecido às 18h30, 13 min antes da virada.
+function avisoViradaEstimativa(pj) {
+  if (!pj?.disponivel) return null;
+  const snap = state.ultimoSnapshot?.candidatos || [];
+  if (snap.length < 2 || [...state.eleitos].some(sq => pj.candidatos.some(c => c.sq_candidato === sq))) return null;
+  const placar = [...snap].sort((x, y) => y.votos - x.votos);
+  if (placar[0].votos === placar[1].votos) return null;
+  const est = [...pj.candidatos].sort((x, y) => y.pct - x.pct)[0];
+  if (est.sq_candidato === placar[0].sq_candidato || est.p_vitoria == null) return null;
+  const nome = state.ficha[est.sq_candidato]?.nome_urna || "";
+  return { nome, chance: Math.round(est.p_vitoria * 100), previa: !!pj.probabilidade_previa };
+}
+
 function renderBlocoProjecao(box, linhas, aviso, mostrar) {
   if (!mostrar) { box.hidden = true; return; }
   box.hidden = false;
@@ -2419,8 +2435,11 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
     return;
   }
   const ordenados = [...pj.candidatos].sort((x, y) => y.pct - x.pct);
-  const empate = empateTecnico(pj) && !ordenados.some(c => state.eleitos.has(c.sq_candidato))
-    ? `<p class="proj-empate"><b>Empate técnico</b> · a margem ainda inclui os 50%</p>` : "";
+  const vir = avisoViradaEstimativa(pj);
+  const empate = vir
+    ? `<p class="proj-empate proj-virada"><b>A estimativa indica virada:</b> ${vir.nome} deve terminar na frente (${vir.chance}% de chance${vir.previa ? ", prévia" : ""})</p>`
+    : empateTecnico(pj) && !ordenados.some(c => state.eleitos.has(c.sq_candidato))
+      ? `<p class="proj-empate"><b>Empate técnico</b> · o placar ainda pode virar</p>` : "";
   linhas.innerHTML = empate + ordenados.map(c => {
     const nome = state.ficha[c.sq_candidato]?.nome_urna || "—";
     const cor = corDoCandidato(c.sq_candidato);
@@ -3325,7 +3344,10 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
     return;
   }
   const porSq = new Map(pj.candidatos.map(c => [c.sq_candidato, c]));
-  box.innerHTML = tit + ativos.map(c => {
+  const vir = avisoViradaEstimativa(pj);
+  const linhaVirada = vir
+    ? `<p class="tvq-est-virada">A estimativa indica virada: <b>${vir.nome}</b> deve terminar na frente</p>` : "";
+  box.innerHTML = tit + linhaVirada + ativos.map(c => {
     const e = porSq.get(c.sq_candidato);
     if (!e) return "";
     const m = (e.ic95[1] - e.ic95[0]) / 2;
@@ -3398,6 +3420,11 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
   recentes.sort((a, b) => b.t - a.t);
   const itens = recentes.slice(0, 6).map(r =>
     `${r.t ? `<time>${new Date(r.t).toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" })}</time>` : ""}${r.txt}`);
+  if (comecou && !eleito) {
+    const vir = avisoViradaEstimativa(state.projecao);
+    if (vir) itens.unshift(`<b>A estimativa indica virada:</b> ${vir.nome} deve terminar na frente (${vir.chance}% de chance${vir.previa ? ", prévia" : ""}, não oficial)`);
+    else if (empateTecnico(state.projecao)) itens.unshift("Estimativa em empate técnico: o placar ainda pode virar (não oficial)");
+  }
   if (comecou) {
     const i = v[0].votos >= v[1].votos ? 0 : 1;
     if (v[0].votos !== v[1].votos && !eleito) itens.push(`${ativos[i].nome_urna} à frente por ${fmtNum(Math.abs(v[0].votos - v[1].votos))} votos`);
