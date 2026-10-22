@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Regiões desde antes da apuração; linha solta no mapa da TV (22/10)
+- O quadro "Por região" aparece desde antes das 17h, com as seis linhas em "aguardando", e cada região ganha número com o primeiro boletim dela.
+- TV: quando o quadro de regiões estava escondido, o `display: flex` do CSS anulava o `hidden` e sobrava só a borda dele, uma linha vertical no meio do mapa.
+
 ### Vitória em tela cheia também no computador e no celular (22/10)
 - O pop-up do troféu deu lugar à mesma tela cheia da TV: foto do eleito, nome grande, partido, % e votos. No celular (tela em pé) a foto fica em cima, sumindo para baixo, e o texto embaixo. No computador e no celular fica 15 s e tem o botão "Continuar acompanhando"; na TV, 30 s.
 - A foto é recortada em elipse em volta do rosto, com as bordas sumindo no escuro: a foto do TSE tem fundo claro e, em retângulo, formava um quadro luminoso.

@@ -3473,10 +3473,16 @@ async function atualizarRegioes() {
 }
 function renderRegioes() {
   const secao = $("regioes-secao"), tv = $("tvq-regioes");
-  const regs = (state.regioes?.regioes || []).filter(r => r.candidatos.length >= 2);
+  // As seis linhas aparecem desde antes das 17h ("aguardando"), e cada uma
+  // ganha número quando chega o primeiro boletim da região.
+  const daApi = Object.fromEntries((state.regioes?.regioes || []).map(r => [r.regiao, r]));
+  const regs = ["Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul", "Exterior"].map(nome => {
+    const r = daApi[nome];
+    return r && r.candidatos.length >= 2 ? r : { regiao: nome, pct_apurado: 0, candidatos: [] };
+  });
   const fin = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo")
     .sort((x, y) => (x.numero || 0) - (y.numero || 0));
-  const ok = regioesAplicavel() && regs.length && fin.length === 2;
+  const ok = regioesAplicavel() && fin.length === 2;
   if (secao) secao.hidden = !ok;
   if (tv) { tv.hidden = !ok; tv.parentElement?.classList.toggle("com-regioes", !!ok); }
   if (!ok) return;
@@ -3484,7 +3490,7 @@ function renderRegioes() {
   const cor = c => corPartido(c.partido);
   const pctDe = (r, c) => r.candidatos.find(x => x.sq_candidato === c.sq_candidato)?.pct || 0;
   const linha = (r, compacto) => {
-    const pa = pctDe(r, a), pb = pctDe(r, b), vazio = r.pct_apurado <= 0;
+    const pa = pctDe(r, a), pb = pctDe(r, b), vazio = r.pct_apurado <= 0 || !r.candidatos.length;
     const lider = pa === pb ? null : (pa > pb ? a : b);
     return `<div class="reg-linha${vazio ? " reg-vazia" : ""}">
       <span class="reg-nome">${r.regiao}<small>${vazio ? "aguardando" : `${dec(r.pct_apurado, compacto ? 0 : 1)}% apurado`}</small></span>

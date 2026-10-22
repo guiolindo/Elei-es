@@ -3591,6 +3591,7 @@ body.tv-quadro .hero .hero-bg { display: none; }
   width: calc(400 * var(--u)); display: flex; flex-direction: column; justify-content: center;
   border-left: calc(1 * var(--u)) solid var(--tvq-linha); padding-left: calc(18 * var(--u)); }
 /* Com o quadro por região, o mapa fica à esquerda e a legenda vai para o canto vazio (sudoeste). */
+.tvq-regioes[hidden], .regioes-secao[hidden] { display: none !important; }
 .tvq-mapa.com-regioes .tvq-slot { right: calc(424 * var(--u)); }
 body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda { right: auto; left: calc(10 * var(--u)); bottom: calc(6 * var(--u)); padding: calc(8 * var(--u)) calc(12 * var(--u)); }
 body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-item { font-size: calc(19 * var(--u)); }
