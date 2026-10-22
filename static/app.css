@@ -3029,6 +3029,7 @@ body.pre-apuracao .hero .stats, body.pre-apuracao #countdown { display: none !im
 .duelo-sub { margin: 0; font-size: 13px; color: var(--muted); }
 @media (max-width: 768px) {
   main.page.m-tab-placar > .duelo:not([hidden]) { display: flex; }
+  main.page.m-tab-placar > .regioes-secao:not([hidden]) { display: block; }
   body.pre-apuracao .m-stats { display: none !important; }
   .duelo { margin: 6px 0 18px; padding: 20px 12px 18px; gap: 14px; }
   .duelo-foto { width: 76px; height: 76px; font-size: 24px; border-width: 3px; }
@@ -3557,3 +3558,97 @@ body.tv-quadro .hero .hero-bg { display: none; }
   color: #9fb0cc; letter-spacing: .02em; }
 .tvq-est-virada b { color: #22c55e; font-weight: 800; }
 .tvq-est-virada.tvq-leve b { color: #f0b429; }
+
+/* ---------- Placar por região ---------- */
+.regioes-secao { margin: 8px 0 28px; }
+.regioes-lista { background: var(--panel, #161b26); border: 1px solid rgba(255,255,255,.07); border-radius: 14px; padding: 14px 18px; }
+.reg-cab, .reg-linha { display: grid; grid-template-columns: minmax(96px, 1.1fr) 62px minmax(80px, 2fr) 62px; align-items: center; gap: 12px; }
+.reg-cab { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.reg-cab span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.reg-cab span:nth-child(2) { grid-column: 2 / 4; grid-row: 1; justify-self: start; max-width: 100%; }
+.reg-cab span:nth-child(3) { display: none; }
+.reg-cab span:nth-child(4) { grid-column: 3 / 5; grid-row: 1; justify-self: end; max-width: 100%; text-align: right; }
+.reg-linha { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.reg-linha:last-child { border-bottom: 0; }
+.reg-nome { font-weight: 700; display: flex; flex-direction: column; line-height: 1.2; }
+.reg-nome small { font-weight: 500; color: var(--muted); font-size: 12px; }
+.reg-pct { font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; opacity: .75; }
+.reg-pct[data-lider] { opacity: 1; }
+.reg-linha .reg-pct:last-child { text-align: right; }
+.reg-barra { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.06); gap: 2px; }
+.reg-barra i { display: block; height: 100%; }
+.reg-vazia .reg-barra i { opacity: .25; }
+@media (max-width: 560px) {
+  .regioes-lista { padding: 12px 12px; }
+  .reg-cab, .reg-linha { grid-template-columns: minmax(92px, 1fr) 52px minmax(56px, 1.4fr) 52px; gap: 8px; }
+  .reg-cab { font-size: 11px; }
+  .reg-cab span:nth-child(2) { grid-column: 1 / 3; }
+  .reg-nome small { font-size: 11px; white-space: nowrap; }
+  .reg-pct { font-size: 14px; }
+}
+/* TV: coluna à direita do mapa */
+.tvq-regioes { position: absolute; top: calc(44 * var(--u)); right: calc(14 * var(--u)); bottom: calc(14 * var(--u)); z-index: 2;
+  width: calc(400 * var(--u)); display: flex; flex-direction: column; justify-content: center;
+  border-left: calc(1 * var(--u)) solid var(--tvq-linha); padding-left: calc(18 * var(--u)); }
+/* Com o quadro por região, o mapa fica à esquerda e a legenda vai para o canto vazio (sudoeste). */
+.tvq-mapa.com-regioes .tvq-slot { right: calc(424 * var(--u)); }
+body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda { right: auto; left: calc(10 * var(--u)); bottom: calc(6 * var(--u)); padding: calc(8 * var(--u)) calc(12 * var(--u)); }
+body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-item { font-size: calc(19 * var(--u)); }
+body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-n { font-size: calc(24 * var(--u)); padding-left: calc(10 * var(--u)); }
+.tvq-regioes .tvq-rot { position: static; margin-bottom: calc(10 * var(--u)); }
+.tvq-regioes .reg-cab, .tvq-regioes .reg-linha { grid-template-columns: calc(118 * var(--u)) calc(64 * var(--u)) 1fr calc(64 * var(--u)); gap: calc(10 * var(--u)); }
+.tvq-regioes .reg-cab { font: 700 calc(15 * var(--u)) var(--tvq-cond); padding-bottom: calc(6 * var(--u)); border-bottom-width: calc(1 * var(--u)); }
+.tvq-regioes .reg-linha { padding: calc(9 * var(--u)) 0; }
+.tvq-regioes .reg-nome { font: 700 calc(21 * var(--u))/1.05 var(--tvq-cond); color: var(--tvq-txt); text-transform: uppercase; letter-spacing: .02em; }
+.tvq-regioes .reg-nome small { font: 600 calc(14 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); text-transform: none; }
+.tvq-regioes .reg-pct { font: 800 calc(24 * var(--u)) var(--tvq-cond); }
+.tvq-regioes .reg-barra { height: calc(10 * var(--u)); gap: calc(2 * var(--u)); }
+
+/* ---------- Vitória em tela cheia no modo TV ---------- */
+.modal-vitoria.mv-tv {
+  --u: min(calc(100vw / 1920), calc(100vh / 1080));
+  --cond: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  display: grid; grid-template-columns: 50% 50%; align-items: stretch; justify-content: stretch;
+  background: #05080f; overflow: hidden; animation: mv-fade-in .6s ease-out both;
+}
+.mvt-fundo { position: absolute; inset: 0; overflow: hidden;
+  background: radial-gradient(ellipse at 28% 50%, color-mix(in srgb, var(--cor-vencedor) 45%, transparent), transparent 62%), #05080f; }
+.mvt-borrao { position: absolute; left: 0; top: 0; width: 60%; height: 100%; object-fit: cover; filter: blur(40px) saturate(1.2) brightness(.38);
+  transform: scale(1.15); opacity: .9;
+  -webkit-mask-image: linear-gradient(to right, #000 30%, transparent 100%); mask-image: linear-gradient(to right, #000 30%, transparent 100%); }
+.mvt-foto { position: relative; grid-column: 1; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+.mvt-img { height: 92%; width: auto; max-width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: 50% 18%;
+  filter: brightness(.92) contrast(1.04);
+  /* Bordas somem em todos os lados (a foto do TSE tem fundo claro e viraria um "quadro"), bem mais devagar para a direita. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 48%, transparent 96%), linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 48%, transparent 96%), linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
+  mask-composite: intersect; animation: mvt-zoom 14s ease-out both; }
+.mvt-img.cand-foto-fallback { display: grid; place-items: center; height: 78%; margin-bottom: 11%; border-radius: calc(12 * var(--u));
+  font: 800 calc(300 * var(--u)) var(--cond); color: rgba(255,255,255,.92); border: 0; box-shadow: none; outline: 0; }
+.mvt-texto { position: relative; grid-column: 2; align-self: center; margin-left: calc(-90 * var(--u)); padding-right: calc(110 * var(--u)); }
+.mvt-texto > * { animation: mvt-sobe .7s ease-out both; }
+.mvt-texto > :nth-child(2) { animation-delay: .1s; } .mvt-texto > :nth-child(3) { animation-delay: .2s; }
+.mvt-texto > :nth-child(4) { animation-delay: .3s; } .mvt-texto > :nth-child(5) { animation-delay: .45s; }
+.mvt-texto > :nth-child(6) { animation-delay: .55s; } .mvt-texto > :nth-child(7) { animation-delay: .65s; }
+.mvt-selo { display: inline-flex; align-items: center; gap: calc(12 * var(--u)); background: #22c55e; color: #04210f;
+  font: 800 calc(30 * var(--u)) var(--cond); letter-spacing: .12em; text-transform: uppercase;
+  padding: calc(8 * var(--u)) calc(20 * var(--u)); border-radius: calc(6 * var(--u)); }
+.mvt-selo svg { width: calc(34 * var(--u)); height: calc(34 * var(--u)); }
+.mvt-cargo { margin-top: calc(30 * var(--u)); font: 700 calc(34 * var(--u)) var(--cond); color: #9fb0cc; letter-spacing: .14em; text-transform: uppercase; }
+.mvt-nome { margin-top: calc(8 * var(--u)); font: 800 calc(124 * var(--u))/.92 var(--cond); color: #fff; text-transform: uppercase; text-wrap: balance; }
+.mvt-part { margin-top: calc(18 * var(--u)); display: flex; align-items: center; gap: calc(14 * var(--u));
+  font: 700 calc(34 * var(--u)) var(--cond); color: #c7d0e0; letter-spacing: .06em; }
+.mvt-num { background: #1a2440; color: #fff; padding: calc(2 * var(--u)) calc(14 * var(--u)); border-radius: calc(4 * var(--u)); }
+.mvt-pct { margin-top: calc(26 * var(--u)); font: 800 calc(200 * var(--u))/.9 var(--cond); color: var(--cor-vencedor-txt); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.mvt-pct small { font-size: .42em; margin-left: calc(6 * var(--u)); }
+.mvt-votos { margin-top: calc(10 * var(--u)); font: 600 calc(32 * var(--u)) var(--cond); color: #9fb0cc; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.mvt-sub { margin-top: calc(26 * var(--u)); font: 600 calc(28 * var(--u)) var(--cond); color: #c7d0e0; }
+.mvt-fechar { top: calc(28 * var(--u)); right: calc(28 * var(--u)); width: calc(56 * var(--u)); height: calc(56 * var(--u)); font-size: calc(24 * var(--u)); }
+.mvt-tempo { height: calc(6 * var(--u)); }
+.mvt-tempo > span { background: var(--cor-vencedor); }
+@keyframes mvt-zoom { from { transform: scale(1.06); } to { transform: scale(1); } }
+@keyframes mvt-sobe { from { opacity: 0; transform: translateY(calc(24 * var(--u))); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .modal-vitoria.mv-tv, .mvt-img, .mvt-texto > * { animation: none !important; }
+}

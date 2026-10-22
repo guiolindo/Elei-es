@@ -4,6 +4,11 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Painel por região e vitória em tela cheia na TV (22/10)
+- Novo `GET /api/apuracao/regioes?cargo=1&turno=2`: soma os votos de cada candidato por região (Norte, Nordeste, Centro-Oeste, Sudeste, Sul e Exterior) a partir do último boletim de cada UF, só candidatos ativos, cache de 10 s.
+- Site (computador e celular, aba Placar) ganhou a seção "Por região" com o % de cada candidato e quanto já foi apurado em cada região. Na TV o quadro do mapa divide: mapa à esquerda, regiões à direita.
+- Vitória no modo TV: em vez do pop-up, a tela inteira mostra a foto do eleito à esquerda, sumindo para a direita, com nome, partido, % e votos em letras grandes. Fica 30 s e volta ao quadro (ou Esc, Enter, ✕). Sem foto, entram as iniciais na cor do partido.
+
 ### README com galeria neutra; logo de partido que falta (22/10)
 - README: galeria com modo TV (antes, durante, troféu, eleito), computador (placar, mapa, gráfico) e celular (antes, durante, troféu), com candidatos e partidos fictícios (Alfa 98, Beta 99) e cores fora da polarização. As imagens antigas (13 × 22) saíram.
 - Logo de partido que não carrega: o `onerror` no HTML era bloqueado pela CSP (`script-src` sem `'unsafe-inline'`) e aparecia o ícone de imagem quebrada. Agora um ouvinte em `partidos.js` troca pela pílula com a sigla.

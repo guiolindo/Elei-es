@@ -433,6 +433,74 @@ async def _previsao_99(sess: AsyncSession, cargo: int, abr: str, turno: int) -> 
     return eta.isoformat() if eta else None
 
 
+REGIOES_UF = {
+    "Norte": ("AC", "AM", "AP", "PA", "RO", "RR", "TO"),
+    "Nordeste": ("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"),
+    "Centro-Oeste": ("DF", "GO", "MS", "MT"),
+    "Sudeste": ("ES", "MG", "RJ", "SP"),
+    "Sul": ("PR", "RS", "SC"),
+    "Exterior": ("ZZ",),
+}
+_CACHE_REGIOES: dict[tuple, tuple[float, dict]] = {}
+
+
+@router.get("/apuracao/regioes")
+async def apuracao_regioes(
+    cargo: int = Query(1),
+    turno: int = Query(2, ge=1, le=2),
+    sess: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Votos de cada candidato somados por região, a partir do último
+    snapshot de cada UF (os mesmos 28 arquivos já coletados, nenhuma
+    consulta a mais ao TSE). Só candidatos ativos; % entre eles."""
+    from time import monotonic
+    from sqlalchemy import func
+    chave = (cargo, turno)
+    hit = _CACHE_REGIOES.get(chave)
+    if hit and monotonic() - hit[0] < 10.0:
+        return hit[1]
+    base_where = [Snapshot.cod_cargo == cargo, Snapshot.turno == turno,
+                  Snapshot.suspeito.is_(False), Snapshot.abrangencia != "BR"]
+    subq = (select(Snapshot.abrangencia.label("abr"), func.max(Snapshot.coletado_em).label("ts"))
+            .where(and_(*base_where)).group_by(Snapshot.abrangencia).subquery())
+    ult = (await sess.execute(
+        select(Snapshot.id, Snapshot.abrangencia, SnapshotTotais.qt_secoes_totalizadas,
+               SnapshotTotais.qt_secoes_total)
+        .join(SnapshotTotais, SnapshotTotais.snapshot_id == Snapshot.id)
+        .join(subq, and_(subq.c.abr == Snapshot.abrangencia, subq.c.ts == Snapshot.coletado_em))
+        .where(Snapshot.cod_cargo == cargo, Snapshot.turno == turno)
+    )).all()
+    uf_de = {s.id: s.abrangencia for s in ult}
+    votos: dict[str, dict[str, int]] = {}
+    if uf_de:
+        for sid, sq, v in (await sess.execute(
+            select(SnapshotCandidato.snapshot_id, SnapshotCandidato.sq_candidato, SnapshotCandidato.votos)
+            .join(Candidato, Candidato.sq_candidato == SnapshotCandidato.sq_candidato)
+            .where(SnapshotCandidato.snapshot_id.in_(list(uf_de)), Candidato.situacao == "ativo")
+        )).all():
+            votos.setdefault(uf_de[sid], {})
+            votos[uf_de[sid]][sq] = votos[uf_de[sid]].get(sq, 0) + (v or 0)
+    secoes = {s.abrangencia: (s.qt_secoes_totalizadas or 0, s.qt_secoes_total or 0) for s in ult}
+    regioes = []
+    for nome, ufs in REGIOES_UF.items():
+        tot: dict[str, int] = {}
+        a = t = 0
+        for uf in ufs:
+            for sq, v in votos.get(uf, {}).items():
+                tot[sq] = tot.get(sq, 0) + v
+            a += secoes.get(uf, (0, 0))[0]; t += secoes.get(uf, (0, 0))[1]
+        soma = sum(tot.values())
+        regioes.append({
+            "regiao": nome, "ufs": list(ufs),
+            "pct_apurado": (a / t * 100) if t else 0,
+            "candidatos": [{"sq_candidato": sq, "votos": v, "pct": (v / soma * 100) if soma else 0}
+                           for sq, v in sorted(tot.items(), key=lambda x: -x[1])],
+        })
+    out = {"regioes": regioes}
+    _CACHE_REGIOES[chave] = (monotonic(), out)
+    return out
+
+
 _CACHE_RESUMO_2T: dict[str, tuple[float, dict]] = {}
 _CACHE_RESUMO_2T_TTL = 10.0
 

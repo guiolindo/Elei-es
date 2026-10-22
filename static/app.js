@@ -2333,6 +2333,8 @@ async function refreshApuracao() {
   try { renderProjecaoTV(); } catch(e) {}
   try { renderProjecaoPainel(); } catch(e) {}
   try { renderDuelo(); } catch(e) {}
+  await atualizarRegioes();
+  try { renderRegioes(); } catch(e) { console.error(e); }
   if (quadroTVAtivo()) await atualizarResumo2T();
   try { aplicarQuadroTV(); } catch(e) { console.error(e); }
 }
@@ -2990,7 +2992,66 @@ function renderFaixaVencedor(eventos) {
 // candidato, cargo + abrangência e % final. Fica até o usuário fechar
 // ou 10s. Dispara apenas pra ELEITO_* no cargo/abrangência que a pessoa
 // está acompanhando (WS já é canal-based, então garantido).
+// Vitória no modo TV: tela cheia, com a foto do eleito à esquerda sumindo
+// para a direita e o nome grande. A foto do TSE é pequena (3x4): entra como
+// retrato alto, com uma cópia desfocada dela mesma preenchendo o fundo, para
+// não esticar até pixelar. Fica 30 s (TV ninguém fecha) e volta ao quadro,
+// que segue com ELEITO no placar e no letreiro.
+function abrirVitoriaTV(sq_candidato, cor) {
+  const ficha = state.ficha[sq_candidato] || {};
+  const nome = ficha.nome_urna || "Vencedor(a)";
+  const snap = state.ultimoSnapshot;
+  const c = (snap?.candidatos || []).find(x => x.sq_candidato === sq_candidato);
+  const pctApur = snap?.totais?.pct_apurado || 0;
+  const cargoNome = { 1: "Presidente da República", 3: "Governador(a)" }[state.cargo] || "";
+  const onde = state.abrangencia === "BR" ? "" : ` · ${NOMES_UF_EXT[state.abrangencia] || state.abrangencia}`;
+  const selo = state.turno === 2 ? "Eleito no 2º turno" : "Eleito";
+  document.querySelectorAll(".modal-vitoria").forEach(el => el.remove());
+  const el = document.createElement("div");
+  el.className = "modal-vitoria mv-tv";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "true");
+  el.setAttribute("aria-label", `${nome}, ${selo.toLowerCase()}, ${cargoNome}`);
+  el.style.setProperty("--cor-vencedor", cor);
+  el.style.setProperty("--cor-vencedor-txt", corLegivel(cor, "#05080f"));
+  el.innerHTML = `
+    <div class="mvt-fundo" aria-hidden="true">${ficha.foto ? `<img class="mvt-borrao" src="${ficha.foto}" alt="">` : ""}</div>
+    <div class="mvt-foto">${ficha.foto
+      ? `<img class="mvt-img" src="${ficha.foto}" alt="">`
+      : `<div class="mvt-img cand-foto-fallback" style="background:${cor}">${iniciais(nome)}</div>`}</div>
+    <div class="mvt-texto">
+      <div class="mvt-selo"><svg aria-hidden="true"><use href="#i-trophy"/></svg>${selo}</div>
+      <div class="mvt-cargo">${cargoNome}${onde}</div>
+      <div class="mvt-nome">${nome}</div>
+      <div class="mvt-part"><span class="mvt-num">${ficha.numero || ""}</span>${siglaDoPartido(+ficha.partido) || ""}</div>
+      ${c ? `<div class="mvt-pct">${dec(c.pct_validos, 2)}<small>%</small></div>
+      <div class="mvt-votos">${fmtNum(c.votos)} votos · ${dec(pctApur, 1)}% apurado</div>` : ""}
+      <p class="mvt-sub">Os votos que faltam não mudam mais o resultado.</p>
+    </div>
+    <button class="mv-fechar mvt-fechar" aria-label="Voltar ao placar">✕</button>
+    <div class="mv-tempo mvt-tempo" aria-hidden="true"><span style="animation-duration:30s"></span></div>`;
+  document.body.appendChild(el);
+  const conf = document.querySelector("body > .confete");
+  if (conf) el.insertBefore(conf, el.querySelector(".mvt-texto"));
+  const img = el.querySelector(".mvt-img");
+  if (img?.tagName === "IMG") anexarFotoComRetry(img, nome, ficha.partido);
+  el.querySelector(".mvt-borrao")?.addEventListener("error", e => e.target.remove(), { once: true });
+  let fechado = false;
+  const fechar = () => {
+    if (fechado) return;
+    fechado = true;
+    document.removeEventListener("keydown", onKey);
+    el.classList.add("saindo");
+    setTimeout(() => el.remove(), 400);
+  };
+  const onKey = (e) => { if (e.key === "Escape" || e.key === "Enter") fechar(); };
+  el.querySelector(".mvt-fechar").onclick = fechar;
+  document.addEventListener("keydown", onKey);
+  setTimeout(fechar, 30000);
+}
+
 function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
+  if (quadroTVAtivo()) return abrirVitoriaTV(sq_candidato, cor);
   const ficha = state.ficha[sq_candidato] || {};
   const nome = ficha.nome_urna || "Vencedor(a)";
   const foto = ficha.foto;
@@ -3457,6 +3518,48 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
   if (!fita.firstElementChild) trocarFitaTicker(); else _ticker.pendente = html;
   if (!_ticker.raf) _ticker.raf = requestAnimationFrame(passoTicker);
 }
+// Placar por região (presidente, 2º turno, Brasil): soma dos estados no
+// servidor (/api/apuracao/regioes). Some antes de haver voto apurado.
+state.regioes = null;
+function regioesAplicavel() {
+  return state.turno === 2 && state.cargo === 1 && state.abrangencia === "BR";
+}
+async function atualizarRegioes() {
+  if (!regioesAplicavel() || !(state.ultimoSnapshot?.totais?.pct_apurado > 0)) { state.regioes = null; return; }
+  try { state.regioes = await get("/api/apuracao/regioes?cargo=1&turno=2"); } catch (e) { /* mantém o anterior */ }
+}
+function renderRegioes() {
+  const secao = $("regioes-secao"), tv = $("tvq-regioes");
+  const regs = (state.regioes?.regioes || []).filter(r => r.candidatos.length >= 2);
+  const fin = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo")
+    .sort((x, y) => (x.numero || 0) - (y.numero || 0));
+  const ok = regioesAplicavel() && regs.length && fin.length === 2;
+  if (secao) secao.hidden = !ok;
+  if (tv) { tv.hidden = !ok; tv.parentElement?.classList.toggle("com-regioes", !!ok); }
+  if (!ok) return;
+  const [a, b] = fin;
+  const cor = c => corPartido(c.partido);
+  const pctDe = (r, c) => r.candidatos.find(x => x.sq_candidato === c.sq_candidato)?.pct || 0;
+  const linha = (r, compacto) => {
+    const pa = pctDe(r, a), pb = pctDe(r, b), vazio = r.pct_apurado <= 0;
+    const lider = pa === pb ? null : (pa > pb ? a : b);
+    return `<div class="reg-linha${vazio ? " reg-vazia" : ""}">
+      <span class="reg-nome">${r.regiao}<small>${vazio ? "aguardando" : `${dec(r.pct_apurado, compacto ? 0 : 1)}% apurado`}</small></span>
+      <span class="reg-pct" style="color:${corLegivel(cor(a))}"${lider === a ? ' data-lider' : ""}>${vazio ? "—" : dec(pa, 1) + "%"}</span>
+      <span class="reg-barra" aria-hidden="true"><i style="width:${vazio ? 50 : pa}%;background:${cor(a)}"></i><i style="width:${vazio ? 50 : pb}%;background:${cor(b)}"></i></span>
+      <span class="reg-pct" style="color:${corLegivel(cor(b))}"${lider === b ? ' data-lider' : ""}>${vazio ? "—" : dec(pb, 1) + "%"}</span>
+    </div>`;
+  };
+  const cab = `<div class="reg-cab"><span></span><span style="color:${corLegivel(cor(a))}">${a.nome_urna}</span><span></span><span style="color:${corLegivel(cor(b))}">${b.nome_urna}</span></div>`;
+  const html = cab + regs.map(r => linha(r, false)).join("");
+  const lista = $("regioes-lista");
+  if (lista && lista.innerHTML !== html) lista.innerHTML = html;
+  if (tv) {
+    const htv = `<div class="tvq-rot">Por região</div>` + cab + regs.map(r => linha(r, true)).join("");
+    if (tv.innerHTML !== htv) tv.innerHTML = htv;
+  }
+}
+
 // Resumo de todas as disputas do 2º turno (/api/apuracao/resumo-2t), para
 // o letreiro mostrar as outras disputas da noite. No máximo a cada 30 s.
 state.resumo2T = null;
