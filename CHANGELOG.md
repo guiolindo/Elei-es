@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Vitória em tela cheia também no computador e no celular (22/10)
+- O pop-up do troféu deu lugar à mesma tela cheia da TV: foto do eleito, nome grande, partido, % e votos. No celular (tela em pé) a foto fica em cima, sumindo para baixo, e o texto embaixo. No computador e no celular fica 15 s e tem o botão "Continuar acompanhando"; na TV, 30 s.
+- A foto é recortada em elipse em volta do rosto, com as bordas sumindo no escuro: a foto do TSE tem fundo claro e, em retângulo, formava um quadro luminoso.
+
 ### Mapa sem cortes e sem partido embaixo da UF no 2º turno (22/10)
 - O mapa usava zoom 1,2 e cortava as pontas do país (AC/AM e, no computador, RR e RS). Agora o Brasil cabe inteiro em TV, computador e celular.
 - No 2º turno o rótulo de cada estado é só a sigla da UF: a cor já diz quem lidera, e a segunda linha com o partido embolava os estados do Nordeste. No 1º turno o partido continua (vários candidatos, cores parecidas).

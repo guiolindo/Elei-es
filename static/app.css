@@ -3604,7 +3604,7 @@ body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-n { font-size:
 .tvq-regioes .reg-pct { font: 800 calc(24 * var(--u)) var(--tvq-cond); }
 .tvq-regioes .reg-barra { height: calc(10 * var(--u)); gap: calc(2 * var(--u)); }
 
-/* ---------- Vitória em tela cheia no modo TV ---------- */
+/* ---------- Vitória em tela cheia (TV, computador e celular) ---------- */
 .modal-vitoria.mv-tv {
   --u: min(calc(100vw / 1920), calc(100vh / 1080));
   --cond: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
@@ -3613,16 +3613,16 @@ body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-n { font-size:
 }
 .mvt-fundo { position: absolute; inset: 0; overflow: hidden;
   background: radial-gradient(ellipse at 28% 50%, color-mix(in srgb, var(--cor-vencedor) 45%, transparent), transparent 62%), #05080f; }
-.mvt-borrao { position: absolute; left: 0; top: 0; width: 60%; height: 100%; object-fit: cover; filter: blur(40px) saturate(1.2) brightness(.38);
+.mvt-borrao { position: absolute; left: 0; top: 0; width: 60%; height: 100%; object-fit: cover; filter: blur(60px) saturate(1.3) brightness(.22);
   transform: scale(1.15); opacity: .9;
   -webkit-mask-image: linear-gradient(to right, #000 30%, transparent 100%); mask-image: linear-gradient(to right, #000 30%, transparent 100%); }
 .mvt-foto { position: relative; grid-column: 1; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
 .mvt-img { height: 92%; width: auto; max-width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: 50% 18%;
-  filter: brightness(.92) contrast(1.04);
-  /* Bordas somem em todos os lados (a foto do TSE tem fundo claro e viraria um "quadro"), bem mais devagar para a direita. */
-  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 48%, transparent 96%), linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
+  /* Recorte em elipse em volta do rosto e do tronco: a foto do TSE tem fundo claro e, recortada
+     em retângulo, viraria um "quadro" luminoso. Some bem mais devagar para a direita. */
+  -webkit-mask-image: radial-gradient(closest-side at 50% 46%, #000 58%, transparent 100%), linear-gradient(to right, #000 55%, transparent 98%);
   -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 48%, transparent 96%), linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
+  mask-image: radial-gradient(closest-side at 50% 46%, #000 58%, transparent 100%), linear-gradient(to right, #000 55%, transparent 98%);
   mask-composite: intersect; animation: mvt-zoom 14s ease-out both; }
 .mvt-img.cand-foto-fallback { display: grid; place-items: center; height: 78%; margin-bottom: 11%; border-radius: calc(12 * var(--u));
   font: 800 calc(300 * var(--u)) var(--cond); color: rgba(255,255,255,.92); border: 0; box-shadow: none; outline: 0; }
@@ -3647,6 +3647,32 @@ body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-n { font-size:
 .mvt-fechar { top: calc(28 * var(--u)); right: calc(28 * var(--u)); width: calc(56 * var(--u)); height: calc(56 * var(--u)); font-size: calc(24 * var(--u)); }
 .mvt-tempo { height: calc(6 * var(--u)); }
 .mvt-tempo > span { background: var(--cor-vencedor); }
+.mvt-ok { margin-top: calc(40 * var(--u)); width: auto; min-height: 48px; padding: calc(16 * var(--u)) calc(40 * var(--u));
+  font: 700 max(16px, calc(26 * var(--u))) var(--cond); letter-spacing: .04em; }
+/* Tela em pé (celular, tablet em retrato): foto em cima sumindo para baixo, texto embaixo. */
+@media (max-aspect-ratio: 1/1) {
+  .modal-vitoria.mv-tv { --u: calc(100vw / 860); display: flex; flex-direction: column; overflow-y: auto;
+    padding-bottom: env(safe-area-inset-bottom); }
+  .mvt-borrao { width: 100%; height: 60%;
+    -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent 100%); mask-image: linear-gradient(to bottom, #000 40%, transparent 100%); }
+  .mvt-fundo { background: radial-gradient(ellipse at 50% 26%, color-mix(in srgb, var(--cor-vencedor) 45%, transparent), transparent 60%), #05080f; }
+  .mvt-foto { flex: 0 0 auto; height: 50svh; min-height: 260px; align-items: flex-end; }
+  .mvt-img { height: 100%;
+    -webkit-mask-image: radial-gradient(closest-side at 50% 46%, #000 58%, transparent 100%), linear-gradient(to bottom, #000 55%, transparent 98%);
+    mask-image: radial-gradient(closest-side at 50% 46%, #000 58%, transparent 100%), linear-gradient(to bottom, #000 55%, transparent 98%); }
+  .mvt-img.cand-foto-fallback { height: 82%; margin-bottom: 8%; font-size: calc(260 * var(--u)); }
+  .mvt-texto { margin: calc(-70 * var(--u)) 0 0; padding: 0 20px 28px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+  .mvt-selo { font-size: calc(32 * var(--u)); }
+  .mvt-cargo { margin-top: calc(26 * var(--u)); font-size: calc(32 * var(--u)); }
+  .mvt-nome { font-size: calc(110 * var(--u)); }
+  .mvt-part { justify-content: center; }
+  .mvt-pct { font-size: calc(190 * var(--u)); }
+  .mvt-votos { font-size: calc(34 * var(--u)); }
+  .mvt-sub { font-size: calc(32 * var(--u)); }
+  .mvt-ok { margin-top: calc(34 * var(--u)); }
+  .mvt-fechar { width: 44px; height: 44px; font-size: 18px; top: 14px; right: 14px; }
+  .mvt-tempo { height: 4px; }
+}
 @keyframes mvt-zoom { from { transform: scale(1.06); } to { transform: scale(1); } }
 @keyframes mvt-sobe { from { opacity: 0; transform: translateY(calc(24 * var(--u))); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {

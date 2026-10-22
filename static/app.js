@@ -2993,20 +2993,24 @@ function renderFaixaVencedor(eventos) {
 // candidato, cargo + abrangência e % final. Fica até o usuário fechar
 // ou 10s. Dispara apenas pra ELEITO_* no cargo/abrangência que a pessoa
 // está acompanhando (WS já é canal-based, então garantido).
-// Vitória no modo TV: tela cheia, com a foto do eleito à esquerda sumindo
-// para a direita e o nome grande. A foto do TSE é pequena (3x4): entra como
-// retrato alto, com uma cópia desfocada dela mesma preenchendo o fundo, para
-// não esticar até pixelar. Fica 30 s (TV ninguém fecha) e volta ao quadro,
-// que segue com ELEITO no placar e no letreiro.
-function abrirVitoriaTV(sq_candidato, cor) {
+// Vitória em tela cheia (TV, computador e celular): foto do eleito sumindo
+// para a direita (no celular, para baixo) e o nome grande. A foto do TSE é
+// pequena (3x4): entra como retrato alto, com uma cópia desfocada dela
+// mesma preenchendo o fundo, para não esticar até pixelar. Na TV fica 30 s
+// (ninguém fecha); no computador e no celular 15 s, com botão para voltar.
+// Depois fica o selo ELEITO no placar e a faixa "Vencedor" no topo.
+function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
+  const naTV = document.body.classList.contains("is-tv");
   const ficha = state.ficha[sq_candidato] || {};
   const nome = ficha.nome_urna || "Vencedor(a)";
   const snap = state.ultimoSnapshot;
   const c = (snap?.candidatos || []).find(x => x.sq_candidato === sq_candidato);
   const pctApur = snap?.totais?.pct_apurado || 0;
-  const cargoNome = { 1: "Presidente da República", 3: "Governador(a)" }[state.cargo] || "";
+  const cargoNome = { 1: "Presidente da República", 3: "Governador(a)", 5: "Senador(a)",
+                      6: "Deputado(a) Federal", 7: "Deputado(a) Estadual" }[state.cargo] || "";
   const onde = state.abrangencia === "BR" ? "" : ` · ${NOMES_UF_EXT[state.abrangencia] || state.abrangencia}`;
   const selo = state.turno === 2 ? "Eleito no 2º turno" : "Eleito";
+  const duracao = naTV ? 30 : 15;
   document.querySelectorAll(".modal-vitoria").forEach(el => el.remove());
   const el = document.createElement("div");
   el.className = "modal-vitoria mv-tv";
@@ -3028,9 +3032,10 @@ function abrirVitoriaTV(sq_candidato, cor) {
       ${c ? `<div class="mvt-pct">${dec(c.pct_validos, 2)}<small>%</small></div>
       <div class="mvt-votos">${fmtNum(c.votos)} votos · ${dec(pctApur, 1)}% apurado</div>` : ""}
       <p class="mvt-sub">Os votos que faltam não mudam mais o resultado.</p>
+      ${naTV ? "" : `<button class="mv-ok mvt-ok">Continuar acompanhando</button>`}
     </div>
     <button class="mv-fechar mvt-fechar" aria-label="Voltar ao placar">✕</button>
-    <div class="mv-tempo mvt-tempo" aria-hidden="true"><span style="animation-duration:30s"></span></div>`;
+    <div class="mv-tempo mvt-tempo" aria-hidden="true"><span style="animation-duration:${duracao}s"></span></div>`;
   document.body.appendChild(el);
   const conf = document.querySelector("body > .confete");
   if (conf) el.insertBefore(conf, el.querySelector(".mvt-texto"));
@@ -3045,75 +3050,12 @@ function abrirVitoriaTV(sq_candidato, cor) {
     el.classList.add("saindo");
     setTimeout(() => el.remove(), 400);
   };
-  const onKey = (e) => { if (e.key === "Escape" || e.key === "Enter") fechar(); };
+  const onKey = (e) => { if (e.key === "Escape" || (naTV && e.key === "Enter")) fechar(); };
   el.querySelector(".mvt-fechar").onclick = fechar;
+  const ok = el.querySelector(".mvt-ok");
+  if (ok) { ok.onclick = fechar; ok.focus({ preventScroll: true }); }
   document.addEventListener("keydown", onKey);
-  setTimeout(fechar, 30000);
-}
-
-function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
-  if (quadroTVAtivo()) return abrirVitoriaTV(sq_candidato, cor);
-  const ficha = state.ficha[sq_candidato] || {};
-  const nome = ficha.nome_urna || "Vencedor(a)";
-  const foto = ficha.foto;
-  const snap = state.ultimoSnapshot;
-  const lider = (snap?.candidatos || []).find(c => c.sq_candidato === sq_candidato);
-  const pctApur = snap?.totais?.pct_apurado || 0;
-  const cargoNome = { 1: "Presidente da República", 3: "Governador(a)", 5: "Senador(a)",
-                      6: "Deputado(a) Federal", 7: "Deputado(a) Estadual" }[state.cargo] || "";
-  const onde = state.abrangencia === "BR" ? "" : ` · ${state.abrangencia}`;
-  const selo = state.turno === 2 ? "Eleito no 2º turno" : "Eleito";
-
-  document.querySelectorAll(".modal-vitoria").forEach(el => el.remove());
-  const modal = document.createElement("div");
-  modal.className = "modal-vitoria";
-  modal.setAttribute("role", "dialog");
-  modal.setAttribute("aria-modal", "true");
-  modal.setAttribute("aria-label", `${nome}, ${selo.toLowerCase()}, ${cargoNome}`);
-  modal.style.setProperty("--cor-vencedor", cor);
-  modal.style.setProperty("--cor-vencedor-txt", corLegivel(cor, "#121722"));
-  modal.innerHTML = `
-    <div class="mv-back"></div>
-    <div class="mv-card">
-      <button class="mv-fechar" aria-label="Fechar">✕</button>
-      <div class="mv-trofeu" aria-hidden="true"><svg><use href="#i-trophy"/></svg></div>
-      <div class="mv-selo">${selo}</div>
-      <div class="mv-quem">
-        ${foto ? `<img class="mv-foto" src="${foto}" alt="">` : ""}
-        <div class="mv-nome">${nome}</div>
-      </div>
-      <div class="mv-meta"><span class="cand-numero-tag">${ficha.numero || ""}</span>${ficha.partido ? badgePartidoHtml(ficha.partido) : ""}<span>${cargoNome}${onde}</span></div>
-      ${lider ? `<div class="mv-pct"><span class="mv-pct-num">${dec(lider.pct_validos, 2)}%</span>
-        <span class="mv-pct-lab">dos votos válidos, com ${dec(pctApur, 1)}% apurado</span></div>` : ""}
-      <p class="mv-sub">Os votos que faltam não mudam mais o resultado.</p>
-      <button class="mv-ok">Continuar acompanhando</button>
-      <div class="mv-tempo" aria-hidden="true"><span></span></div>
-    </div>`;
-  document.body.appendChild(modal);
-  // Confete entre o fundo escuro e o cartão: em tela pequena ele caía por
-  // cima do texto.
-  const conf = document.querySelector("body > .confete");
-  if (conf) modal.insertBefore(conf, modal.querySelector(".mv-card"));
-  const img = modal.querySelector(".mv-foto");
-  if (img) anexarFotoComRetry(img, nome, ficha.partido);
-
-  let fechado = false;
-  const fechar = () => {
-    if (fechado) return;
-    fechado = true;
-    document.removeEventListener("keydown", onKey);
-    modal.classList.add("saindo");
-    setTimeout(() => modal.remove(), 400);
-  };
-  const onKey = (e) => { if (e.key === "Escape") fechar(); };
-  modal.querySelector(".mv-fechar").onclick = fechar;
-  modal.querySelector(".mv-ok").onclick = fechar;
-  modal.querySelector(".mv-back").onclick = fechar;
-  document.addEventListener("keydown", onKey);
-  modal.querySelector(".mv-ok").focus({ preventScroll: true });
-  // Fecha sozinho em 10s; a barrinha no pé do cartão mostra o tempo. Depois
-  // fica o selo ELEITO no placar e a faixa "Vencedor" no topo.
-  setTimeout(fechar, 10000);
+  setTimeout(fechar, duracao * 1000);
 }
 
 // Troféu uma vez por vitória por aparelho. Chamado tanto pelo aviso ao
