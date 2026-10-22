@@ -581,7 +581,10 @@ async function get(url, opts = {}) {
   let ultimoErro;
   for (let i = 0; i <= tentativas; i++) {
     try {
-      const r = await fetch(url);
+      // fresco: ignora o cache do navegador (as rotas /api/apuracao mandam
+      // max-age=3 + stale-while-revalidate=15). Usado quando o WS avisa que
+      // chegou boletim novo: sem isso a tela podia mostrar o anterior.
+      const r = await fetch(url, opts.fresco ? { cache: "no-store" } : undefined);
       if (!r.ok) throw new Error(`${r.status} ${await r.text().catch(() => "")}`);
       return await r.json();
     } catch (e) {
@@ -2261,9 +2264,9 @@ async function carregarEventos() {
 }
 
 // ============ ciclo ============
-async function refreshApuracao() {
+async function refreshApuracao(fresco = false) {
   try {
-    const novo = await get(`/api/apuracao/atual?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=${state.turno}`);
+    const novo = await get(`/api/apuracao/atual?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=${state.turno}`, { fresco });
     // Guarda snapshot anterior pra calcular tendência (só se realmente mudou)
     if (state.ultimoSnapshot?.disponivel &&
         state.ultimoSnapshot.coletado_em !== novo.coletado_em) {
@@ -2300,7 +2303,7 @@ async function refreshApuracao() {
   // Abaixo de 10% o backend não projeta: nem pergunta (o quadro mostra a espera).
   if (projecaoAplicavel() && (state.ultimoSnapshot?.totais?.pct_apurado || 0) >= 10) {
     try {
-      const pj = await get(`/api/apuracao/projecao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=2`);
+      const pj = await get(`/api/apuracao/projecao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=2`, { fresco });
       if (pj.disponivel) state.projecao = pj;
     } catch (e) { /* sem projeção — UI cai no estado "aguardando" */ }
   }
@@ -2334,7 +2337,7 @@ async function refreshApuracao() {
   try { renderProjecaoTV(); } catch(e) {}
   try { renderProjecaoPainel(); } catch(e) {}
   try { renderDuelo(); } catch(e) {}
-  await atualizarRegioes();
+  await atualizarRegioes(fresco);
   try { renderRegioes(); } catch(e) { console.error(e); }
   if (quadroTVAtivo()) await atualizarResumo2T();
   try { aplicarQuadroTV(); } catch(e) { console.error(e); }
@@ -2663,7 +2666,21 @@ function conectarWS() {
     state.ultimaMsgWs = Date.now();
     const msg = JSON.parse(m.data);
     if (msg.type === "snapshot") {
-      await refreshApuracao();
+      // Vitória: tela do eleito antes de tudo. Busca só o placar novo (os
+      // números que a tela mostra) e abre; o resto da página (estimativa,
+      // regiões, mapa, gráficos) atualiza logo depois, por trás dela.
+      const eleitos = (msg.eventos || []).filter(ev => TIPOS_ELEITO.has(ev.tipo));
+      if (eleitos.length) {
+        try {
+          const novo = await get(`/api/apuracao/atual?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=${state.turno}`, { fresco: true, retries: 0 });
+          if (state.ultimoSnapshot?.disponivel && state.ultimoSnapshot.coletado_em !== novo.coletado_em) {
+            state.snapshotAnterior = state.ultimoSnapshot;
+          }
+          state.ultimoSnapshot = novo;
+        } catch (e) { /* abre com o placar que já tem */ }
+        for (const ev of eleitos) { _absorverEventoNoState(ev); celebrarSeNovo(ev); }
+      }
+      await refreshApuracao(true);
       atualizarMapa();  // sem await — não bloqueia os toasts de evento
       atualizarGrafHome();
       if (state.selecionados.length >= 2) await inicializarGraficos();
@@ -3107,7 +3124,7 @@ setInterval(() => {
   if (pct <= 0 || pct >= 100) return;
   if (Date.now() - (state.ultimaMsgWs || 0) < 90_000) return;
   state.ultimaMsgWs = Date.now();
-  refreshApuracao().then(carregarEventos).catch(() => {});
+  refreshApuracao(true).then(carregarEventos).catch(() => {});
 }, 30_000);
 
 function comemorar(nome, cor = "#f0b429") {
@@ -3467,9 +3484,9 @@ state.regioes = null;
 function regioesAplicavel() {
   return state.turno === 2 && state.cargo === 1 && state.abrangencia === "BR";
 }
-async function atualizarRegioes() {
+async function atualizarRegioes(fresco = false) {
   if (!regioesAplicavel() || !(state.ultimoSnapshot?.totais?.pct_apurado > 0)) { state.regioes = null; return; }
-  try { state.regioes = await get("/api/apuracao/regioes?cargo=1&turno=2"); } catch (e) { /* mantém o anterior */ }
+  try { state.regioes = await get("/api/apuracao/regioes?cargo=1&turno=2", { fresco }); } catch (e) { /* mantém o anterior */ }
 }
 function renderRegioes() {
   const secao = $("regioes-secao"), tv = $("tvq-regioes");

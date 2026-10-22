@@ -4,6 +4,12 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Tela do eleito no mesmo instante do aviso (22/10)
+- Quando o aviso ao vivo traz um eleito, o site busca só o placar novo e abre a tela do eleito na hora; estimativa, regiões, mapa e gráficos atualizam depois, por trás dela. Antes esperava 3 ou 4 buscas em sequência. Medido localmente: 0,07 a 0,26 s do aviso até a tela (antes 0,2 a 0,5 s; em produção a diferença cresce com a latência de cada busca).
+- As buscas disparadas pelo aviso ao vivo ignoram o cache do navegador (as rotas de apuração mandam `max-age=3` + `stale-while-revalidate=15`): sem isso o placar podia ficar até ~18 s com o boletim anterior.
+- Teste de propriedade do aviso de eleito no 2º turno: 20 mil cenários aleatórios, metade colada na fronteira "2º + restantes = 1º", todos batendo com a definição.
+- /sobre: o aviso de eleito é descrito como a mesma conta do "matematicamente eleito", na versão que não depende de suposição de comparecimento.
+
 ### Regiões desde antes da apuração; linha solta no mapa da TV (22/10)
 - O quadro "Por região" aparece desde antes das 17h, com as seis linhas em "aguardando", e cada região ganha número com o primeiro boletim dela.
 - TV: quando o quadro de regiões estava escondido, o `display: flex` do CSS anulava o `hidden` e sobrava só a borda dele, uma linha vertical no meio do mapa.
