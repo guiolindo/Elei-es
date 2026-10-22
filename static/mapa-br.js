@@ -57,26 +57,28 @@ async function init(container, abrangencia) {
     container.style.height = Math.min(640, Math.max(340, w * aspect)) + "px";
   }
   _chart = echarts.init(container, null, { renderer: "canvas" });
+  // Altura acompanha a largura real. Com a aba escondida o container mede 0
+  // no boot (cai no fallback de 800 px) e ficava 640 px de altura num
+  // celular de 366 px de largura: o mapa sobrava espremido no meio.
+  const ajustarAltura = () => {
+    if (document.body.classList.contains("is-tv")) { container.style.removeProperty("height"); return; }
+    const w2 = container.clientWidth;
+    if (!w2) return;
+    const asp2 = abrangencia === "BR" ? (w2 < 500 ? 1.0 : 0.88) : 1.0;
+    const h2 = Math.min(640, Math.max(340, w2 * asp2)) + "px";
+    if (container.style.height !== h2) container.style.height = h2;
+  };
+  init._ajustar = ajustarAltura;
   if (!init._resize) {
     window.addEventListener("resize", () => {
-      if (_chart) {
-        const w2 = container.clientWidth || 800;
-        const isMob2 = w2 < 500;
-        const asp2 = abrangencia === "BR" ? (isMob2 ? 1.0 : 0.88) : 1.0;
-        if (document.body.classList.contains("is-tv")) {
-          container.style.removeProperty("height");
-        } else {
-          container.style.height = Math.min(640, Math.max(340, w2 * asp2)) + "px";
-        }
-        _chart.resize();
-      }
+      if (_chart) { init._ajustar(); _chart.resize(); }
     });
     init._resize = true;
   }
   // ResizeObserver dedicado pro container: pega mudanças de layout
   // (toggle TV, troca de aba, etc.) sem depender de window resize.
   if (!init._obs && window.ResizeObserver) {
-    init._obs = new ResizeObserver(() => { if (_chart) _chart.resize(); });
+    init._obs = new ResizeObserver(() => { if (_chart) { init._ajustar(); _chart.resize(); } });
     init._obs.observe(container);
   }
   return _chart;
@@ -86,7 +88,7 @@ async function init(container, abrangencia) {
  * @param {HTMLElement} container
  * @param {string} abrangencia "BR" para país, "SP"/"RJ"/... para estado
  * @param {Object} dadosPorArea { "SP" ou nome do município: { valor, cor, nome_lider, votos } }
- * @param {Object} opts { onClickArea?: (name) => void }
+ * @param {Object} opts { onClickArea?: (name) => void, rotuloPartido?: false = só a sigla da UF }
  */
 export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts = {}) {
   if (typeof echarts === "undefined") {
@@ -104,12 +106,14 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
     // dois UFs ganhos por partidos diferentes com cores parecidas (PT ×
     // PDT, PL × PSDB, etc.) ficam distinguíveis a olho nu, sem precisar
     // só do tooltip.
+    // No 2º turno são só dois candidatos e a cor já diz quem lidera: só a
+    // sigla da UF, que também não embola no Nordeste.
     labelFormatter = (p) => {
-      const sig = p.data?._extra?.partido_sigla;
+      const sig = opts.rotuloPartido === false ? "" : p.data?._extra?.partido_sigla;
       return sig ? `${p.name}\n${sig}` : p.name;
     };
     roam = false;
-    zoom = 1.2;
+    zoom = 1;   // 1.2 cortava AC/AM, RR e RS quando o espaço é estreito
   } else {
     mapKey = `uf-${abrangencia.toLowerCase()}`;
     url = `/static/municipios/${abrangencia.toLowerCase()}.geojson`;
@@ -167,7 +171,7 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
       // fazia o Brasil parecer "esticado" pra cima).
       aspectScale: 1,
       layoutCenter: ["50%", "52%"],
-      layoutSize: "94%",
+      layoutSize: "97%",
       label: {
         show: abrangencia === "BR",
         color: "#ffffff", fontSize: 11, fontWeight: 700,

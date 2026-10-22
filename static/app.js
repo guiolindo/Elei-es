@@ -1,4 +1,4 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261017p";
+import { renderMapa } from "/static/mapa-br.js?v=20261022c";
 import { corDoPartido, siglaDoPartido, badgePartidoHtml, urlLogoPartido } from "/static/partidos.js?v=20261022a";
 
 // Dados ao vivo nunca vêm do cache do navegador. A API manda
@@ -1919,6 +1919,7 @@ async function atualizarMapa() {
       }
     } catch (e) {}
     await renderMapa(container, "BR", dadosPorUF, {
+      rotuloPartido: state.turno !== 2,
       onClickArea: (sigla) => {
         state.abrangencia = sigla;
         $("sel-uf").value = sigla;

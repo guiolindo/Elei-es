@@ -4,6 +4,11 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Mapa sem cortes e sem partido embaixo da UF no 2º turno (22/10)
+- O mapa usava zoom 1,2 e cortava as pontas do país (AC/AM e, no computador, RR e RS). Agora o Brasil cabe inteiro em TV, computador e celular.
+- No 2º turno o rótulo de cada estado é só a sigla da UF: a cor já diz quem lidera, e a segunda linha com o partido embolava os estados do Nordeste. No 1º turno o partido continua (vários candidatos, cores parecidas).
+- Celular: o mapa nascia com 640 px de altura quando a aba Mapa estava escondida no carregamento, e o Brasil ficava espremido no meio. A altura agora acompanha a largura real.
+
 ### Painel por região e vitória em tela cheia na TV (22/10)
 - Novo `GET /api/apuracao/regioes?cargo=1&turno=2`: soma os votos de cada candidato por região (Norte, Nordeste, Centro-Oeste, Sudeste, Sul e Exterior) a partir do último boletim de cada UF, só candidatos ativos, cache de 10 s.
 - Site (computador e celular, aba Placar) ganhou a seção "Por região" com o % de cada candidato e quanto já foi apurado em cada região. Na TV o quadro do mapa divide: mapa à esquerda, regiões à direita.
