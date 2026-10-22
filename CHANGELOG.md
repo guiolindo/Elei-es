@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### README com galeria neutra; logo de partido que falta (22/10)
+- README: galeria com modo TV (antes, durante, troféu, eleito), computador (placar, mapa, gráfico) e celular (antes, durante, troféu), com candidatos e partidos fictícios (Alfa 98, Beta 99) e cores fora da polarização. As imagens antigas (13 × 22) saíram.
+- Logo de partido que não carrega: o `onerror` no HTML era bloqueado pela CSP (`script-src` sem `'unsafe-inline'`) e aparecia o ícone de imagem quebrada. Agora um ouvinte em `partidos.js` troca pela pílula com a sigla.
+
 ### Visitas: ferramentas não contam como visitante (21/10)
 - Acessos de curl, scripts (Python, httpx etc.), navegadores automatizados e sem user-agent passam a contar como robô, fora de "Visitas" e "Únicos". Antes as conferências de deploy entravam como "outro".
 - Pré-visualização de link (WhatsApp e afins) também conta como robô: quando alguém compartilha o link, o app abre a página para montar a prévia. Navegador embutido de apps (Instagram, Facebook) continua contando como visita.

@@ -73,6 +73,20 @@ export function urlLogoPartido(numero) {
   return `/static/partidos/${numero}.${EXT_LOGO[numero] || "svg"}`;
 }
 
+// Logo que não carrega: esconde a imagem e mostra a pílula com a sigla.
+// Ouvinte único em captura (evento de erro de <img> não borbulha). Não dá
+// para usar onerror="..." no HTML: a CSP (script-src sem 'unsafe-inline')
+// bloqueia, e aparecia o ícone de imagem quebrada.
+if (typeof document !== "undefined") {
+  document.addEventListener("error", (ev) => {
+    const img = ev.target;
+    if (!(img instanceof HTMLImageElement) || !img.classList.contains("badge-part-logo")) return;
+    img.classList.add("erro");
+    const pill = img.nextElementSibling;
+    if (pill) pill.style.display = "inline-block";
+  }, true);
+}
+
 // Retorna HTML de badge do partido: tenta logo local, cai na pill colorida.
 // Estrutura: <img> primeiro (some se falhar) + <span pill> escondido que
 // aparece via onerror. Loading lazy pra não sobrecarregar a listagem.
@@ -82,8 +96,7 @@ export function badgePartidoHtml(numero) {
   const ext = EXT_LOGO[numero] || "svg";
   return `<span class="badge-part-wrap">
     <img class="badge-part-logo" src="/static/partidos/${numero}.${ext}" alt="${sig}"
-         loading="lazy" decoding="async"
-         onerror="this.classList.add('erro');this.nextElementSibling.style.display='inline-block'">
+         loading="lazy" decoding="async">
     <span class="pill-part" style="background:${cor};display:none">${sig}</span>
   </span>`;
 }

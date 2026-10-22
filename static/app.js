@@ -1,5 +1,5 @@
 import { renderMapa } from "/static/mapa-br.js?v=20261017p";
-import { corDoPartido, siglaDoPartido, badgePartidoHtml, urlLogoPartido } from "/static/partidos.js?v=20261021a";
+import { corDoPartido, siglaDoPartido, badgePartidoHtml, urlLogoPartido } from "/static/partidos.js?v=20261022a";
 
 // Dados ao vivo nunca vêm do cache do navegador. A API manda
 // "max-age=3, stale-while-revalidate=15" (bom pra proxies), e com isso o

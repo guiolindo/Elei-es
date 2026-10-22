@@ -6,11 +6,9 @@
 
 Domingo, 25 de outubro de 2026, a partir das 17h (horário de Brasília): 2º turno para presidente e para governador no Acre, Amazonas, Distrito Federal, Espírito Santo, Rio Grande do Norte e Tocantins.
 
-| Modo TV | Celular |
-|---|---|
-| <img src="docs/img/modo-tv.png" alt="Modo TV: placar, mapa por estado, estimativa e gráfico" width="560"> | <img src="docs/img/celular.png" alt="Placar e estimativa no celular" width="220"> |
+<img src="docs/img/tv-apuracao.png" alt="Modo TV durante a apuração: placar, mapa por estado, estimativa e gráfico" width="100%">
 
-<sub>Imagens com dados de teste.</sub>
+<sub>As imagens usam candidatos e partidos fictícios (Alfa, número 98, e Beta, número 99) e números de teste.</sub>
 
 ### O que o site mostra
 
@@ -22,6 +20,33 @@ Domingo, 25 de outubro de 2026, a partir das 17h (horário de Brasília): 2º tu
 - **Conferir minha seção**: o boletim da urna onde você votou.
 
 Não é o TSE nem de nenhum partido. O resultado oficial é sempre o de [resultados.tse.jus.br](https://resultados.tse.jus.br). Como o site faz as contas está explicado, com as fórmulas, em [/sobre#metodologia](https://elei-es-production.up.railway.app/sobre#metodologia).
+
+### Galeria
+
+**Modo TV** (tela cheia, para deixar ligado na TV ou no computador)
+
+| Antes da apuração | Vitória definida |
+|---|---|
+| <img src="docs/img/tv-antes.png" alt="Modo TV antes da apuração, com contagem regressiva" width="420"> | <img src="docs/img/tv-trofeu.png" alt="Troféu de vitória no modo TV" width="420"> |
+| Contagem regressiva, mapa e letreiro esperando as 17h. | O troféu aparece quando os votos que faltam não mudam mais o resultado. |
+
+<img src="docs/img/tv-eleito.png" alt="Modo TV depois da vitória: eleito marcado no placar e no letreiro" width="100%">
+
+<sub>Depois do troféu, o placar e o letreiro continuam mostrando o eleito.</sub>
+
+**Computador**
+
+<img src="docs/img/computador-placar.png" alt="Placar e estimativa no computador" width="100%">
+
+| Mapa por estado | Evolução da apuração |
+|---|---|
+| <img src="docs/img/computador-mapa.png" alt="Mapa com quem lidera em cada estado" width="420"> | <img src="docs/img/computador-grafico.png" alt="Gráfico da evolução dos votos válidos" width="420"> |
+
+**Celular**
+
+| Antes da apuração | Durante | Vitória |
+|---|---|---|
+| <img src="docs/img/celular-antes.png" alt="Celular antes da apuração" width="250"> | <img src="docs/img/celular-placar.png" alt="Celular durante a apuração" width="250"> | <img src="docs/img/celular-trofeu.png" alt="Troféu no celular" width="250"> |
 
 ### Avisos no Telegram
 
