@@ -84,6 +84,14 @@ async function init(container, abrangencia) {
   return _chart;
 }
 
+// Siglas dos estados: 11 px no site; no quadro da TV acompanham a escala
+// da tela (15 px a 1920 de largura), senão somem numa TV 4K.
+function tamanhoRotulo() {
+  if (!document.body.classList.contains("tv-quadro")) return 11;
+  const larg = document.getElementById("tv-quadro")?.firstElementChild?.offsetWidth || 1920;
+  return Math.max(10, Math.round(15 * larg / 1920));
+}
+
 /**
  * @param {HTMLElement} container
  * @param {string} abrangencia "BR" para país, "SP"/"RJ"/... para estado
@@ -172,9 +180,12 @@ export async function renderMapa(container, abrangencia, dadosPorArea = {}, opts
       aspectScale: 1,
       layoutCenter: ["50%", "52%"],
       layoutSize: "97%",
+      // Quadro da TV: siglas que se encostam (DF/GO, RN/PB/PE/AL/SE) somem
+      // em vez de virar "GODF"; a cor do estado continua dizendo quem lidera.
+      labelLayout: document.body.classList.contains("tv-quadro") ? { hideOverlap: true } : undefined,
       label: {
         show: abrangencia === "BR",
-        color: "#ffffff", fontSize: 11, fontWeight: 700,
+        color: "#ffffff", fontSize: tamanhoRotulo(), fontWeight: 700,
         lineHeight: 13,
         formatter: labelFormatter,
         textShadowColor: "#000",           // legibilidade em cima de qualquer cor

@@ -4,6 +4,15 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Correções da revisão do modo TV (23/10)
+- Falha momentânea da API (deploy, banco ocupado) não zera mais a tela: o placar e a estimativa anteriores ficam, e o selo do alto diz "Reconectando…". Antes a TV voltava para "0,00% · a apuração começa às 17h".
+- Selo do alto: "AO VIVO" só com dado chegando. Sem boletim novo há 5 min ou mais vira "Sem dado novo do TSE há N min", em âmbar e legível de longe.
+- Letreiro: quando muda a notícia principal (eleito, troca de líder, início da apuração) a faixa troca na hora com fade; antes esperava a volta terminar (até ~75 s mostrando "X à frente" ao lado de "Eleito Y").
+- Entre 17h e o 1º boletim: "Urnas fechadas · aguardando o 1º boletim do TSE" no placar e no letreiro, com "AO VIVO" aceso (antes repetia "a apuração começa às 17h").
+- Letras maiores no que importa a 3 metros: selo "empate técnico" (fundo âmbar), "não oficial", "chance de vencer", "Dado TSE", % apurado das regiões, fonte; siglas do mapa acompanham a escala da tela (somem quando se sobrepõem).
+- Regiões: nomes longos no cabeçalho não se sobrepõem; região sem voto mostra barra cinza (antes parecia 50% × 50%).
+- Título do governador com o nome do estado ("Governador · Espírito Santo").
+
 ### Correções da revisão de computador e celular (23/10)
 - Comparar: "o 2º ainda pode passar o 1º?" lia um campo com nome errado e usava o eleitorado inteiro como votos que faltam (156 mi em vez de ~47 mi a 70%); com 100% apurado nunca dizia "apuração encerrada".
 - Comparecimento e abstenção em % sobre os eleitores das seções já apuradas, como na TV (a 70% apurado mostrava "57% dos aptos"). "Brancos e nulos" diz qual número é qual.

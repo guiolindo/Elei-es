@@ -1,4 +1,4 @@
-import { renderMapa } from "/static/mapa-br.js?v=20261022c";
+import { renderMapa } from "/static/mapa-br.js?v=20261023e";
 import { corDoPartido, siglaDoPartido, badgePartidoHtml, urlLogoPartido } from "/static/partidos.js?v=20261022a";
 
 // Dados ao vivo nunca vêm do cache do navegador. A API manda
@@ -472,6 +472,20 @@ function tickUltimoRelativo() {
     q.innerHTML = `<span>Dado TSE</span><strong>${fmtHora(iso)}</strong>`
       + (andando && txt ? `<em>${txt}</em>` : "");
     q.className = "tvq-tse " + (andando ? classeStaleness(iso) : "stale-sem");
+    // Selo do alto: "AO VIVO" só quando está mesmo chegando dado. Parado
+    // há 5 min ou mais, ou sem conexão com o site, vira aviso âmbar legível
+    // de longe (o "há 12 min" pequeno ao lado não se via a 3 metros).
+    const vivo = document.getElementById("tvq-vivo");
+    if (vivo) {
+      const minParado = (agora() - new Date(iso).getTime()) / 60000;
+      const semConexao = (state.ws && state.ws.readyState !== 1)
+        || (state.erroApiEm && Date.now() - state.erroApiEm < 60_000);
+      let txt = "AO VIVO";
+      if (andando && minParado >= 5) txt = `Sem dado novo do TSE há ${Math.floor(minParado)} min`;
+      else if (semConexao) txt = "Reconectando…";
+      if (vivo.textContent !== txt) vivo.textContent = txt;
+      vivo.classList.toggle("parado", txt !== "AO VIVO");
+    }
   }
 }
 
@@ -740,6 +754,7 @@ async function trocarTurno(novoTurno) {
   state.ultimoSnapshot = null;
   state.snapshotAnterior = null;
   state.proporcional = null;
+  state.projecao = null;
   state.eliminados.clear();
   state.eleitos.clear();
   state.segundoTurno.clear();
@@ -2324,7 +2339,11 @@ async function refreshApuracao(fresco = false) {
       } catch (e) { /* se falhar, seguimos com a ficha que tem */ }
     }
   } catch (e) {
-    state.ultimoSnapshot = { disponivel: false };
+    // Falha momentânea da API (deploy, banco ocupado): mantém o último placar
+    // em vez de zerar a tela (a TV voltava para "a apuração começa às 17h").
+    // Trocar de cargo/turno já limpa o placar antes de chamar aqui.
+    if (!state.ultimoSnapshot?.disponivel) state.ultimoSnapshot = { disponivel: false };
+    state.erroApiEm = Date.now();
   }
   // Se for cargo proporcional (Deputado Fed/Est) e temos UF, busca cálculo
   state.proporcional = null;
@@ -2337,13 +2356,16 @@ async function refreshApuracao(fresco = false) {
   // Projeção estatística do 2T (estratificada por UF, com IC95 e
   // probabilidade). Só Presidente-BR e Governador; antes de 10% apurado
   // ou com 100% o backend devolve disponivel=false.
-  state.projecao = null;
   // Abaixo de 10% o backend não projeta: nem pergunta (o quadro mostra a espera).
+  // Se a busca falhar, fica a estimativa anterior (só some quando o backend
+  // disser que não há).
   if (projecaoAplicavel() && (state.ultimoSnapshot?.totais?.pct_apurado || 0) >= 10) {
     try {
       const pj = await get(`/api/apuracao/projecao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=2`, { fresco });
-      if (pj.disponivel) state.projecao = pj;
-    } catch (e) { /* sem projeção — UI cai no estado "aguardando" */ }
+      state.projecao = pj.disponivel ? pj : null;
+    } catch (e) { /* mantém a anterior */ }
+  } else {
+    state.projecao = null;
   }
   // ORDEM IMPORTA: renderLista() faz `el.innerHTML = ""` e reconstrói
   // os cards a partir do template (que vem com "0 votos" placeholder).
@@ -2760,6 +2782,7 @@ async function onFiltroChange() {
   state.ultimoSnapshot = null;
   state.snapshotAnterior = null;
   state.proporcional = null;
+  state.projecao = null;
   state.wsRetry = 0;
   atualizarPainelTotais();
   await carregarCandidatos();
@@ -3324,12 +3347,14 @@ function renderTVQuadro() {
   const t = snap.totais || {};
   const pct = t.pct_apurado || 0;
   const comecou = !!snap.disponivel && pct > 0;
-  $("tvq-vivo").hidden = !(comecou && pct < 100);
-  $("tvq-titulo").innerHTML = `<b>2º turno</b> · ${state.cargo === 1 ? "Presidente da República" : `Governador · ${state.abrangencia}`}`;
+  // Entre 17h e o 1º boletim: urnas fechadas, ainda sem número.
+  const fechou = agora() >= DIA_D_2T.getTime();
+  $("tvq-vivo").hidden = !((comecou || fechou) && pct < 100);
+  $("tvq-titulo").innerHTML = `<b>2º turno</b> · ${state.cargo === 1 ? "Presidente da República" : `Governador · ${NOMES_UF_EXT[state.abrangencia] || state.abrangencia}`}`;
   $("tvq-pct").textContent = `${dec(pct, 2)}%`;
   $("tvq-barra").style.transform = `scaleX(${Math.min(1, pct / 100)})`;
   $("tvq-mapa-rot").textContent = state.abrangencia === "BR" ? "Quem lidera em cada estado" : "Quem lidera em cada município";
-  $("tvq-graf-rot").textContent = comecou ? "Evolução dos válidos (%)" : "Contagem regressiva";
+  $("tvq-graf-rot").textContent = comecou || fechou ? "Evolução dos válidos (%)" : "Contagem regressiva";
 
   // ---- placar (estrutura refeita só quando a dupla muda; números sempre)
   const ativos = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo")
@@ -3373,12 +3398,14 @@ function renderTVQuadro() {
   $("tvq-split-a").style.cssText = `flex-basis:${wA}%;background:${comecou ? corPartido(ativos[0].partido) : "#1a2440"}`;
   $("tvq-split-b").style.cssText = `flex-basis:${100 - wA}%;background:${comecou ? corPartido(ativos[1].partido) : "#1a2440"}`;
   const eleito = ativos.find(c => state.eleitos.has(c.sq_candidato));
-  $("tvq-dif-rot").textContent = eleito ? "Eleito" : (comecou ? "Diferença" : "A apuração começa");
+  $("tvq-dif-rot").textContent = eleito ? "Eleito" : (comecou ? "Diferença" : fechou ? "Urnas fechadas" : "A apuração começa");
   $("tvq-dif").innerHTML = eleito
     ? `${(state.ficha[eleito.sq_candidato]?.nome_urna || eleito.nome_urna)}`
     : comecou
       ? `${fmtNum(Math.abs(v[0].votos - v[1].votos))} <small>votos · ${dec(Math.abs(v[0].pct_validos - v[1].pct_validos), 2)} ponto${Math.abs(v[0].pct_validos - v[1].pct_validos) >= 2 ? "s" : ""}</small>`
-      : `${DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" })} <small>às 17h (Brasília)</small>`;
+      : fechou
+        ? `Aguardando <small>o 1º boletim do TSE</small>`
+        : `${DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" })} <small>às 17h (Brasília)</small>`;
 
   renderEstimativaQuadro(ativos, pct, !!eleito);
   renderTickerQuadro(ativos, v, comecou, pct, t);
@@ -3502,7 +3529,9 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
     }
     itens.push(...itensOutrasDisputas());
   } else {
-    itens.push(`A apuração do 2º turno começa domingo, ${DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" })}, às 17h (Brasília)`);
+    itens.push(agora() >= DIA_D_2T.getTime()
+      ? "Urnas fechadas às 17h: aguardando o 1º boletim do TSE"
+      : `A apuração do 2º turno começa domingo, ${DIA_D_2T.toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" })}, às 17h (Brasília)`);
     itens.push(`${ativos[0].nome_urna} (${ativos[0].numero}) × ${ativos[1].nome_urna} (${ativos[1].numero})`);
     itens.push(...itensAntesDaApuracao());
   }
@@ -3510,7 +3539,24 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
   const html = itens.map(x => `<span class="tvq-item">${x}</span><span class="tvq-sep" aria-hidden="true">◆</span>`).join("");
   if (html === _ticker.html) return;
   _ticker.html = html;
-  if (!fita.firstElementChild) trocarFitaTicker(); else _ticker.pendente = html;
+  // Mudou a notícia principal (eleito, troca de líder, início da apuração):
+  // troca a faixa na hora, com fade. Esperar a volta terminar deixava até
+  // ~75 s de "X à frente" ao lado do "Eleito Y".
+  const iLider = comecou && v[0].votos !== v[1].votos ? (v[0].votos > v[1].votos ? 0 : 1) : -1;
+  const chave = `${eleito?.sq_candidato || ""}|${iLider}|${comecou}`;
+  const mudouPrincipal = _ticker.chave !== undefined && _ticker.chave !== chave;
+  _ticker.chave = chave;
+  if (!fita.firstElementChild) trocarFitaTicker();
+  else if (mudouPrincipal) {
+    _ticker.pendente = html;
+    fita.style.transition = "opacity .35s";
+    fita.style.opacity = "0";
+    setTimeout(() => {
+      _ticker.x = 0;
+      trocarFitaTicker();
+      fita.style.opacity = "1";
+    }, 360);
+  } else _ticker.pendente = html;
   if (!_ticker.raf) _ticker.raf = requestAnimationFrame(passoTicker);
 }
 // Placar por região (presidente, 2º turno, Brasil): soma dos estados no
@@ -3547,7 +3593,9 @@ function renderRegioes() {
     return `<div class="reg-linha${vazio ? " reg-vazia" : ""}">
       <span class="reg-nome">${r.regiao}<small>${vazio ? "aguardando" : `${dec(r.pct_apurado, compacto ? 0 : 1)}% apurado`}</small></span>
       <span class="reg-pct" style="color:${corLegivel(cor(a))}"${lider === a ? ' data-lider' : ""}>${vazio ? "—" : dec(pa, 1) + "%"}</span>
-      <span class="reg-barra" aria-hidden="true"><i style="width:${vazio ? 50 : pa}%;background:${cor(a)}"></i><i style="width:${vazio ? 50 : pb}%;background:${cor(b)}"></i></span>
+      <span class="reg-barra" aria-hidden="true">${vazio
+        ? `<i style="width:100%;background:rgba(255,255,255,.08)"></i>`
+        : `<i style="width:${pa}%;background:${cor(a)}"></i><i style="width:${pb}%;background:${cor(b)}"></i>`}</span>
       <span class="reg-pct" style="color:${corLegivel(cor(b))}"${lider === b ? ' data-lider' : ""}>${vazio ? "—" : dec(pb, 1) + "%"}</span>
     </div>`;
   };

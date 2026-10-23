@@ -3341,6 +3341,8 @@ body.tv-quadro .tvq[hidden] { display: none; }
   display: flex; align-items: center; gap: calc(8 * var(--u));
 }
 .tvq-vivo[hidden] { display: none; }
+.tvq-vivo.parado { background: #b45309; text-transform: uppercase; }
+.tvq-vivo.parado::before { animation: none; opacity: .8; }
 .tvq-vivo::before {
   content: ""; width: calc(10 * var(--u)); height: calc(10 * var(--u)); border-radius: 50%; background: #fff;
   animation: tvq-pisca 1.4s infinite;
@@ -3400,7 +3402,7 @@ body.tv-quadro .tvq[hidden] { display: none; }
 .tvq-pct small { font-size: .5em; margin-left: calc(2 * var(--u)); }
 .tvq-votos { font: 600 calc(22 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); letter-spacing: .04em; margin-top: calc(6 * var(--u)); font-variant-numeric: tabular-nums; }
 .tvq-centro { display: flex; flex-direction: column; align-items: center; gap: calc(10 * var(--u)); padding: 0 calc(20 * var(--u)); min-width: 0; }
-.tvq-meio { font: 600 calc(18 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); letter-spacing: .12em; text-transform: uppercase; }
+.tvq-meio { font: 600 calc(20 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); letter-spacing: .12em; text-transform: uppercase; }
 .tvq-dif { font: 800 calc(34 * var(--u)) var(--tvq-cond); white-space: nowrap; font-variant-numeric: tabular-nums; text-transform: uppercase; }
 .tvq-dif small { font-size: calc(20 * var(--u)); color: var(--tvq-sub); font-weight: 600; margin-left: calc(8 * var(--u)); text-transform: none; }
 .tvq-split { position: relative; width: 100%; height: calc(34 * var(--u)); display: flex; border-radius: calc(4 * var(--u)); overflow: hidden; background: #1a2440; }
@@ -3453,7 +3455,7 @@ body.tv-quadro .tvq-slot .home-graf-msg { font: 600 calc(22 * var(--u)) var(--tv
 .tvq-est > .tvq-rot { margin-bottom: calc(6 * var(--u)); }
 .tvq-selo {
   display: inline-block; margin-left: calc(10 * var(--u)); padding: calc(1 * var(--u)) calc(8 * var(--u));
-  border: calc(1 * var(--u)) solid #3a4866; border-radius: calc(3 * var(--u)); font-size: calc(14 * var(--u)); letter-spacing: .08em;
+  border: calc(1 * var(--u)) solid #3a4866; border-radius: calc(3 * var(--u)); font-size: calc(18 * var(--u)); letter-spacing: .08em;
 }
 .tvq-est-l {
   display: grid; grid-template-columns: minmax(0, 1fr) auto calc(170 * var(--u)); align-items: center; gap: calc(16 * var(--u));
@@ -3467,7 +3469,7 @@ body.tv-quadro .tvq-slot .home-graf-msg { font: 600 calc(22 * var(--u)) var(--tv
 .tvq-est-p { font: 800 calc(40 * var(--u)) var(--tvq-cond); font-variant-numeric: tabular-nums; }
 .tvq-est-p small { font-size: calc(20 * var(--u)); color: var(--tvq-sub); font-weight: 600; margin-left: calc(6 * var(--u)); }
 .tvq-est-c { text-align: right; font: 700 calc(30 * var(--u)) var(--tvq-cond); font-variant-numeric: tabular-nums; }
-.tvq-est-c span { display: block; font-size: calc(15 * var(--u)); color: var(--tvq-sub); letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+.tvq-est-c span { display: block; font-size: calc(18 * var(--u)); color: var(--tvq-sub); letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
 .tvq-mudo { color: var(--tvq-sub); }
 .tvq-est-espera, .tvq-est-msg { font: 600 calc(20 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); letter-spacing: .03em; margin: calc(4 * var(--u)) 0; }
 .tvq-est-msg { color: var(--tvq-txt); font-size: calc(26 * var(--u)); }
@@ -3497,7 +3499,7 @@ body.tv-quadro .tvq-slot .home-graf-msg { font: 600 calc(22 * var(--u)) var(--tv
 @keyframes tvq-rolar { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .tvq-fonte {
   position: absolute; right: calc(36 * var(--u)); bottom: calc(70 * var(--u));
-  font: 600 calc(13 * var(--u)) Inter, sans-serif; color: #56627a; pointer-events: none;
+  font: 600 calc(16 * var(--u)) Inter, sans-serif; color: #6b7891; pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .tvq-vivo::before { animation: none; }
@@ -3525,7 +3527,7 @@ body.tv-quadro .hero .hero-bg { display: none; }
 .tvq-tse {
   display: flex; align-items: baseline; gap: calc(10 * var(--u)); white-space: nowrap;
   padding-left: calc(24 * var(--u)); border-left: calc(2 * var(--u)) solid var(--tvq-linha);
-  font: 600 calc(18 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); letter-spacing: .06em; text-transform: uppercase;
+  font: 600 calc(22 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); letter-spacing: .06em; text-transform: uppercase;
 }
 .tvq-tse:empty { display: none; }
 .tvq-tse strong { font: 700 calc(30 * var(--u)) var(--tvq-cond); color: var(--tvq-txt); letter-spacing: 0; font-variant-numeric: tabular-nums; }
@@ -3554,7 +3556,7 @@ body.tv-quadro .hero .hero-bg { display: none; }
 /* Empate técnico: margem da estimativa ainda inclui 50% */
 .proj-empate { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
 .proj-empate b { color: var(--gold, #f0b429); letter-spacing: .02em; }
-.tvq-selo.tvq-empate { color: #f0b429; border-color: #f0b429; }
+.tvq-selo.tvq-empate { color: #1a1204; background: #f0b429; border-color: #f0b429; font-size: calc(21 * var(--u)); font-weight: 800; }
 
 /* Estimativa discorda do placar */
 .proj-virada b { color: #22c55e; }
@@ -3605,7 +3607,7 @@ body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-n { font-size:
 .tvq-regioes .reg-cab { font: 700 calc(15 * var(--u)) var(--tvq-cond); padding-bottom: calc(6 * var(--u)); border-bottom-width: calc(1 * var(--u)); }
 .tvq-regioes .reg-linha { padding: calc(9 * var(--u)) 0; }
 .tvq-regioes .reg-nome { font: 700 calc(21 * var(--u))/1.05 var(--tvq-cond); color: var(--tvq-txt); text-transform: uppercase; letter-spacing: .02em; }
-.tvq-regioes .reg-nome small { font: 600 calc(14 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); text-transform: none; }
+.tvq-regioes .reg-nome small { font: 600 calc(17 * var(--u)) var(--tvq-cond); color: var(--tvq-sub); text-transform: none; }
 .tvq-regioes .reg-pct { font: 800 calc(24 * var(--u)) var(--tvq-cond); }
 .tvq-regioes .reg-barra { height: calc(10 * var(--u)); gap: calc(2 * var(--u)); }
 
@@ -3694,3 +3696,7 @@ body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-n { font-size:
   .m-top .m-brand { gap: 5px; }
   .m-top .m-title { font-size: 13px; }
 }
+/* TV: cabeçalho das regiões com nomes longos lado a lado, sem sobrepor. */
+.tvq-regioes .reg-cab { display: flex; justify-content: space-between; gap: calc(12 * var(--u)); }
+.tvq-regioes .reg-cab span:first-child, .tvq-regioes .reg-cab span:nth-child(3) { display: none; }
+.tvq-regioes .reg-cab span { max-width: 49%; }
