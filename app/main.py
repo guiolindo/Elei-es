@@ -205,6 +205,10 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Apuração 2026", lifespan=lifespan)
     app.state.limiter = limiter
     app.add_middleware(SlowAPIMiddleware)
+    # Compressão: echarts, mapa, app.js e app.css caem de ~2,3 MB para ~580 KB
+    # (pesa no 4G na noite de pico). Só HTTP; o WebSocket passa direto.
+    from starlette.middleware.gzip import GZipMiddleware
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],

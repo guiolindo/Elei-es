@@ -1299,7 +1299,8 @@ body.is-tv .timeline .ev-texto { font-size: 12px; white-space: nowrap; }
 
 /* ============ Modal ============ */
 .modal {
-  position: fixed; inset: 0; z-index: 100;
+  /* Acima da barra de abas do celular (.m-nav, 100), abaixo da folha de escolha e dos avisos (200). */
+  position: fixed; inset: 0; z-index: 150;
   display: grid; place-items: center;
 }
 .modal.oculto { display: none; }
@@ -1949,14 +1950,17 @@ svg.ico, .m-nav-ico, .m-chip-arrow, .cd-icone, .m-fab svg, .btn-topo svg,
   .m-title b { color: var(--gold, #f0b429); }
   .m-icon-btn { width: 40px; height: 40px; border-radius: 50%; border: none;
     background: rgba(255,255,255,.08); color: #fff; font-size: 18px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; }
+    display: flex; align-items: center; justify-content: center; text-decoration: none; }
+  /* "Alertas" já leva ao bot no celular: o botão próprio do Telegram só
+     espremia o nome do site no topo. */
+  #m-btn-telegram { display: none !important; }
 
   /* Pills com legenda — SOBRESCREVE .m-icon-btn redondo acima. Precisa estar
      DENTRO do media query pra ganhar a cascata. */
   .m-icon-btn.m-labeled {
     flex-direction: column; gap: 2px;
     width: auto; height: auto;
-    min-width: 50px; padding: 5px 8px;
+    min-width: 50px; min-height: 44px; padding: 5px 8px;
     border-radius: 10px;
   }
   .m-icon-lab { font-size: 11px; font-weight: 700; letter-spacing: 0.2px;
@@ -3678,4 +3682,15 @@ body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-n { font-size:
 @keyframes mvt-sobe { from { opacity: 0; transform: translateY(calc(24 * var(--u))); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .modal-vitoria.mv-tv, .mvt-img, .mvt-texto > * { animation: none !important; }
+}
+
+/* Âncoras do menu do topo: o título da seção para abaixo do cabeçalho fixo. */
+@media (min-width: 769px) {
+  main.page > section[id] { scroll-margin-top: 210px; }
+}
+@media (max-width: 400px) {
+  .m-top .m-icon-btn.m-labeled { min-width: 44px; padding: 5px 5px; }
+  .m-top .m-icon-lab { font-size: 10px; }
+  .m-top .m-brand { gap: 5px; }
+  .m-top .m-title { font-size: 13px; }
 }

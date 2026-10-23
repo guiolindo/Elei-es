@@ -4,6 +4,15 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Correções da revisão de computador e celular (23/10)
+- Comparar: "o 2º ainda pode passar o 1º?" lia um campo com nome errado e usava o eleitorado inteiro como votos que faltam (156 mi em vez de ~47 mi a 70%); com 100% apurado nunca dizia "apuração encerrada".
+- Comparecimento e abstenção em % sobre os eleitores das seções já apuradas, como na TV (a 70% apurado mostrava "57% dos aptos"). "Brancos e nulos" diz qual número é qual.
+- Celular: nome do site inteiro no topo (o botão do Telegram sai, "Alertas" já leva ao bot; botões mais compactos abaixo de 400 px), "Seção" e "Cola" sem sublinhado, botões com 44 px de altura; a ficha do candidato fica acima da barra de abas.
+- Computador: "Placar" no menu volta ao topo no 2º turno (a lista fica escondida e o clique não fazia nada); títulos das seções não ficam mais embaixo do cabeçalho fixo.
+- /cola no celular: a prévia do cartão cabe na tela (cortava ~30 px em 360).
+- Compressão gzip: app.js 195→62 KB, echarts 1,03 MB→334 KB, mapa 896→150 KB.
+- Conferido em produção: as 6 UFs com 2º turno para governador e os finalistas estão cadastrados.
+
 ### Coletor não trava mais esperando um arquivo lento do TSE (23/10)
 - Dados reais do 1º turno: por volta das 19h17–19h30 vários estados ficaram 12 min sem dado novo (SP 22 min, AP 30 min). Cada arquivo tinha até 4 tentativas de 15 s com espera crescente (~67 s no pior caso), e o ciclo esperava o mais lento antes de começar o próximo. O aviso de governador eleito saiu no mesmo boletim em que a conta fechou (0 s de processamento), mas esse boletim chegou atrasado.
 - Agora: 2 tentativas de 8 s por arquivo e teto de 20 s por alvo; o que passar disso fica para o ciclo seguinte e os outros seguem. Testado com um alvo travado: os demais processados em 0 s, ciclo encerrado em 20 s.

@@ -1492,7 +1492,7 @@ async function atualizarComparacao() {
     const dif = ordenados[0].votos - ordenados[1].votos;
     animarNumero($("dif-abs"), dif);
     $("dif-pct").textContent = dec((ordenados[0].pct_validos - ordenados[1].pct_validos), 2) + " pp";
-    const restantes = Math.max(0, (dados.totais.eleitorado_apto || 0) - (dados.totais.eleitorado_apto_totalizadas || 0));
+    const restantes = Math.max(0, (dados.totais.eleitorado_apto || 0) - (dados.totais.eleitorado_apto_totalizado || 0));
     // Pergunta aritmética simples entre os dois mais votados da seleção:
     // a diferença cabe nos votos que ainda faltam? (teto: eleitores aptos
     // das seções não totalizadas — conservador, mesmo critério do motor).
@@ -1825,11 +1825,14 @@ async function atualizarPainelTotais() {
   $("secoes-sub").textContent = `de ${fmtNum(t.secoes_total)}`;
   animarNumero($("comparecimento"), t.comparecimento);
   animarNumero($("abstencoes"), t.abstencoes);
-  const totalAptos = t.eleitorado_apto || 1;
+  // Comparecimento e abstenção do TSE contam só as seções já apuradas: a
+  // porcentagem é sobre os eleitores dessas seções (como na TV), não sobre
+  // o eleitorado inteiro (com 70% apurado dava "57% de comparecimento").
+  const totalAptos = t.eleitorado_apto_totalizado || t.eleitorado_apto || 1;
   const pctCompar = dec((t.comparecimento / totalAptos * 100), 1);
   const pctAbst = dec((t.abstencoes / totalAptos * 100), 1);
-  $("pct-comparecimento").textContent = `${pctCompar}% dos aptos`;
-  $("pct-abstencoes").textContent = `${pctAbst}% dos aptos`;
+  $("pct-comparecimento").textContent = `${pctCompar}% dos aptos já apurados`;
+  $("pct-abstencoes").textContent = `${pctAbst}% dos aptos já apurados`;
   $("brancos-nulos").textContent = `${fmtNum(t.votos_brancos)} · ${fmtNum(t.votos_nulos)}`;
   // "Último dado" mostra a hora em que o TSE GEROU o arquivo (fonte da
   // verdade pro cross-check), caindo pra "coletado_em" (quando a gente
@@ -4027,6 +4030,11 @@ async function boot() {
   };
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
+  // "Placar" aponta para a lista, que no 2º turno fica escondida (o duelo
+  // faz o papel dela): aí o link só volta ao topo.
+  document.querySelector('.d-topnav-link[data-anchor="lista"]')?.addEventListener("click", (e) => {
+    if (!secoes.lista?.offsetParent) { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  });
   btnTopo.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 
   // filtros da lista
