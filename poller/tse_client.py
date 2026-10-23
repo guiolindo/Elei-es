@@ -88,6 +88,7 @@ async def buscar_json(
     url: str,
     *,
     max_retries: int = 4,
+    timeout: float = 15.0,
 ) -> tuple[dict[str, Any], str] | str | None:
     """Baixa JSON com backoff exponencial.
     Retorna (payload, sha256) em sucesso, NAO_PUBLICADO em 404,
@@ -96,7 +97,7 @@ async def buscar_json(
     delay = 1.0
     for tentativa in range(1, max_retries + 1):
         try:
-            r = await client.get(url, timeout=15.0, headers=BROWSER_HEADERS)
+            r = await client.get(url, timeout=timeout, headers=BROWSER_HEADERS)
             if r.status_code == 404:
                 log.debug("json ainda não publicado (404): %s", url)
                 return NAO_PUBLICADO

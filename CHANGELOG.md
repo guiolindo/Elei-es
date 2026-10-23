@@ -4,6 +4,11 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Coletor não trava mais esperando um arquivo lento do TSE (23/10)
+- Dados reais do 1º turno: por volta das 19h17–19h30 vários estados ficaram 12 min sem dado novo (SP 22 min, AP 30 min). Cada arquivo tinha até 4 tentativas de 15 s com espera crescente (~67 s no pior caso), e o ciclo esperava o mais lento antes de começar o próximo. O aviso de governador eleito saiu no mesmo boletim em que a conta fechou (0 s de processamento), mas esse boletim chegou atrasado.
+- Agora: 2 tentativas de 8 s por arquivo e teto de 20 s por alvo; o que passar disso fica para o ciclo seguinte e os outros seguem. Testado com um alvo travado: os demais processados em 0 s, ciclo encerrado em 20 s.
+- No 2º turno são 56 arquivos pequenos (~3 KB); um ciclo completo medido daqui levou 1,8 s.
+
 ### Hora pelo servidor, igual em todos os aparelhos (23/10)
 - Relógio e contagens usavam o relógio do aparelho; TV e computador lado a lado mostravam ~10 s de diferença. Nova rota `GET /api/hora` (hora do servidor, sincronizado por NTP, em ms). O site mede a diferença (4 medidas, fica a de ida e volta mais curta) ao abrir e a cada 10 min, e usa essa hora no relógio, nas contagens regressivas, no "há X" do último dado, na troca automática de turno e na janela do troféu. Testado com aparelhos adiantados 12 s e atrasados 7,3 s: os três mostram o mesmo segundo.
 

@@ -206,7 +206,11 @@ async def processar_alvo(
     settings = get_settings()
     cod_eleicao = getattr(settings, alvo.cod_eleicao_key)
     url = resultado_url(settings.tse_cdn_base, cod_eleicao, alvo.cod_cargo, alvo.abrangencia)
-    res = await buscar_json(client, url)
+    # Poucas tentativas curtas: o próximo ciclo (20 s) já tenta de novo. Com
+    # 4 tentativas de 15 s, um TSE lento prendia cada alvo por até ~67 s e o
+    # ciclo inteiro esperava o mais lento: no 1º turno houve 12 a 22 min sem
+    # dado novo em vários estados por volta das 19h20.
+    res = await buscar_json(client, url, max_retries=2, timeout=8.0)
     if res is None:
         _stats_ciclo["falhas"] += 1
         return
@@ -540,7 +544,12 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
     async def _um(client, alvo):
         async with sem:
             try:
-                await processar_alvo(client, alvo, broadcaster)
+                # Teto por alvo: um arquivo travado (TSE ou banco lento) não
+                # segura o ciclo, e os outros estados seguem atualizando.
+                await asyncio.wait_for(processar_alvo(client, alvo, broadcaster), timeout=20)
+            except asyncio.TimeoutError:
+                _stats_ciclo["falhas"] += 1
+                log.warning("alvo %s passou de 20 s; fica para o próximo ciclo", alvo)
             except Exception:
                 log.exception("erro processando %s", alvo)
 
