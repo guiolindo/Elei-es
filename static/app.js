@@ -18,6 +18,29 @@ import { corDoPartido, siglaDoPartido, badgePartidoHtml, urlLogoPartido } from "
   };
 }
 
+// Hora certa. O relógio do aparelho pode estar segundos fora (TVs
+// principalmente), e duas telas lado a lado mostravam segundos diferentes.
+// Mede a diferença para o servidor, sincronizado por NTP, e usa agora() em
+// tudo que mostra hora ou conta tempo até um horário. Várias medidas, fica
+// a de ida e volta mais rápida (erro máximo = metade dela).
+let _desvioRelogio = 0;
+function agora() { return Date.now() + _desvioRelogio; }
+async function sincronizarHora() {
+  let melhor = null;
+  for (let i = 0; i < 4; i++) {
+    try {
+      const t0 = Date.now();
+      const r = await fetch("/api/hora", { cache: "no-store" });
+      const t1 = Date.now();
+      const { agora_ms } = await r.json();
+      if (!melhor || t1 - t0 < melhor.ida) melhor = { ida: t1 - t0, desvio: agora_ms - (t0 + t1) / 2 };
+    } catch (e) { /* segue com o relógio do aparelho */ }
+  }
+  if (melhor && melhor.ida < 3000) _desvioRelogio = Math.round(melhor.desvio);
+}
+sincronizarHora();
+setInterval(sincronizarHora, 10 * 60_000);
+
 // Resolve a cor "oficial" de um candidato = cor do seu partido.
 // Usada no mapa (pintar UF/município pelo líder) e no card (barra de
 // votos + accent da esquerda). Fallback pra paleta genérica quando o
@@ -58,7 +81,7 @@ const TITULO_BASE = "Apuração 2026 · Brasil";
 function _turnoPadrao() {
   // Depois de 05/10/2026 00h BRT (dia seguinte ao 1T), default = 2
   const CORTE = new Date("2026-10-05T00:00:00-03:00");
-  return Date.now() >= CORTE.getTime() ? 2 : 1;
+  return agora() >= CORTE.getTime() ? 2 : 1;
 }
 
 const state = {
@@ -247,7 +270,7 @@ const _porSegundo = [];
 function aCadaSegundo(fn) { _porSegundo.push(fn); }
 (function tique() {
   for (const fn of _porSegundo) { try { fn(); } catch (e) { console.error(e); } }
-  setTimeout(tique, 1000 - (Date.now() % 1000) + 5);
+  setTimeout(tique, 1000 - (agora() % 1000) + 5);
 })();
 // Tempo que falta em dias/horas/min/s, arredondando os segundos para cima:
 // às 16:59:50 faltam 10 s para as 17:00:00, não 9 (o relógio e a contagem
@@ -259,8 +282,8 @@ function partesAte(diff) {
 function tickRelogio() {
   const el = document.getElementById("relogio-brt");
   if (!el) return;
-  el.textContent = _fmtRelogio.format(new Date());
-  el.setAttribute("datetime", new Date().toISOString());
+  el.textContent = _fmtRelogio.format(new Date(agora()));
+  el.setAttribute("datetime", new Date(agora()).toISOString());
   const q = document.getElementById("tvq-relogio");
   if (q) q.innerHTML = `${el.textContent}<small>BRT</small>`;
 }
@@ -333,7 +356,7 @@ function tempoRelativo(tsIso) {
   if (!tsIso) return null;
   const d = new Date(tsIso);
   if (isNaN(d.getTime())) return null;
-  const diffS = Math.round((Date.now() - d.getTime()) / 1000);
+  const diffS = Math.round((agora() - d.getTime()) / 1000);
   if (diffS < 2) return "agora";
   if (diffS < 60) return `há ${diffS}s`;
   if (diffS < 3600) return `há ${Math.round(diffS / 60)} min`;
@@ -347,7 +370,7 @@ function tempoRelativo(tsIso) {
 // mais que isso = stale. Usado pra pintar o indicador do "último dado".
 function classeStaleness(tsIso) {
   if (!tsIso) return "stale-sem";
-  const diffS = (Date.now() - new Date(tsIso).getTime()) / 1000;
+  const diffS = (agora() - new Date(tsIso).getTime()) / 1000;
   if (diffS < 60) return "stale-fresh";
   if (diffS < 300) return "stale-warn";
   return "stale-stale";
@@ -381,7 +404,7 @@ async function renderPainelStatusColeta() {
   }
   const ultimoIso = s.ultimo_ciclo_em || null;
   const intervalo = s.intervalo_s || 20;
-  const diffUltimo = ultimoIso ? (Date.now() - new Date(ultimoIso).getTime()) / 1000 : null;
+  const diffUltimo = ultimoIso ? (agora() - new Date(ultimoIso).getTime()) / 1000 : null;
   const alvos = s.alvos_total || 0;
   const falhas = s.ultimo?.falhas || 0;
 
@@ -403,7 +426,7 @@ async function renderPainelStatusColeta() {
   }
   const diaD = state.turno === 2 ? DIA_D_2T : DIA_D;
   const nomeTurno = state.turno === 2 ? "do 2º turno" : "do 1º turno";
-  if (Date.now() < diaD.getTime()) {
+  if (agora() < diaD.getTime()) {
     const dataTxt = diaD.toLocaleDateString("pt-BR", { timeZone: TZ, weekday: "long", day: "2-digit", month: "2-digit" });
     const horaTxt = diaD.toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
     tit.textContent = `A apuração ${nomeTurno} começa ${dataTxt}, às ${horaTxt}`;
@@ -2752,7 +2775,7 @@ function atualizarContagemRegressiva() {
   const alvo = state.turno === 2 ? DIA_D_2T : DIA_D;
   const titulo = state.turno === 2 ? "2º turno começa em" : "Apuração começa em";
   const dataStr = state.turno === 2 ? "· 25/10 17h BRT" : "· 4/10 17h BRT";
-  const diff = alvo.getTime() - Date.now();
+  const diff = alvo.getTime() - agora();
   const apurando = (state.ultimoSnapshot?.totais?.pct_apurado || 0) > 0;
   if (diff <= 0 || apurando) { el.classList.add("oculto"); return; }
   const { d: dias, h: horas, m: min, s: seg } = partesAte(diff);
@@ -2774,7 +2797,7 @@ function atualizarContagemRegressiva() {
 // depois do fechamento das urnas do 2º turno — a última votação de 2026.
 // Chamado no boot e também pelo tick da contagem regressiva.
 function esconderColaSeFechado() {
-  if (Date.now() < DIA_D_2T.getTime()) return;
+  if (agora() < DIA_D_2T.getTime()) return;
   document.querySelectorAll(
     ".cta-brand, .m-icon-cta, .d-topnav-cta, #btn-cola-cta"
   ).forEach(el => el.classList.add("oculto"));
@@ -2878,7 +2901,7 @@ function tickContagemTV() {
   const box = $("status-coleta");
   if (!box || !document.body.classList.contains("is-tv")) return;
   const alvo = state.turno === 2 ? DIA_D_2T : DIA_D;
-  const diff = alvo.getTime() - Date.now();
+  const diff = alvo.getTime() - agora();
   if (diff <= 0 || !box.offsetParent) { box.querySelector(".tv-cd")?.remove(); return; }
   const { d, h, m, s: sg } = partesAte(diff);
   const p2 = n => String(n).padStart(2, "0");
@@ -2894,7 +2917,7 @@ function tickContagemTV() {
 function tickDuelo() {
   const el = $("duelo-cd");
   if (!el || $("duelo")?.hidden) return;
-  const diff = DIA_D_2T.getTime() - Date.now();
+  const diff = DIA_D_2T.getTime() - agora();
   if (diff <= 0) {
     $("duelo-quando-lab").textContent = "As urnas fecharam.";
     el.textContent = "Apuração começando…";
@@ -3094,8 +3117,8 @@ const _trofeusVistos = new Set();
 function celebrarSeNovo(ev) {
   if (!ev?.sq_candidato_a || document.hidden) return false;  // escondido: mostra ao voltar
   if (document.querySelector(".modal-vitoria")) return false;
-  const quando = ev.ocorrido_em ? Date.parse(ev.ocorrido_em) : Date.now();
-  if (Date.now() - quando > TROFEU_JANELA_MS) return false;
+  const quando = ev.ocorrido_em ? Date.parse(ev.ocorrido_em) : agora();
+  if (agora() - quando > TROFEU_JANELA_MS) return false;
   const chave = `trofeu:${state.turno}:${state.cargo}:${state.abrangencia}:${ev.sq_candidato_a}`;
   if (_trofeusVistos.has(chave)) return false;
   try { if (localStorage.getItem(chave)) return false; } catch (e) {}

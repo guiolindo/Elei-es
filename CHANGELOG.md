@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Hora pelo servidor, igual em todos os aparelhos (23/10)
+- Relógio e contagens usavam o relógio do aparelho; TV e computador lado a lado mostravam ~10 s de diferença. Nova rota `GET /api/hora` (hora do servidor, sincronizado por NTP, em ms). O site mede a diferença (4 medidas, fica a de ida e volta mais curta) ao abrir e a cada 10 min, e usa essa hora no relógio, nas contagens regressivas, no "há X" do último dado, na troca automática de turno e na janela do troféu. Testado com aparelhos adiantados 12 s e atrasados 7,3 s: os três mostram o mesmo segundo.
+
 ### Relógio e contagem regressiva mudam juntos (23/10)
 - Relógio, "há X" do último dado e as três contagens regressivas (faixa, placar e TV) usavam `setInterval` separados, iniciados em momentos diferentes: o segundo de um mudava até ~0,5 s depois do outro. Agora um tique só, realinhado à virada do segundo a cada vez. Medido: 0 ms de diferença entre relógio e contagem.
 - A contagem arredonda os segundos para cima: às 16:59:50 mostra 10 s, e a soma relógio + contagem dá exatamente 17:00:00.

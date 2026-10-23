@@ -47,6 +47,15 @@ def _url_foto(sq_candidato: str, uf: str | None) -> str:
     )
 
 
+@router.get("/hora")
+async def hora_servidor() -> dict[str, int]:
+    """Hora do servidor (sincronizado por NTP) em milissegundos. O site
+    mede a diferença para o relógio do aparelho, que em TVs costuma estar
+    segundos fora, e mostra relógio e contagens pela hora do servidor."""
+    import time
+    return {"agora_ms": int(time.time() * 1000)}
+
+
 @router.get("/config-publica")
 async def config_publica() -> dict[str, Any]:
     """Config pública (sem segredos). Expõe os códigos TSE que o
