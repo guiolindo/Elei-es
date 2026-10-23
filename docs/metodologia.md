@@ -544,3 +544,12 @@ Se bater, é prova criptográfica de que o site exibe exatamente o que o TSE pub
 | Sobras 80/20 (Fase 2) | CE art. 109 §2º (red. Lei 14.211/2021) |
 | Sobras residuais (Fase 3) | STF ADI 7228/7263/7325 (2024) |
 | Federações | Lei 14.208/2021 + EC 97/2017 |
+
+
+## Vitória projetada (23/10/2026)
+
+Selo "vitória projetada" na caixa da estimativa (site, celular, TV e letreiro), separado do aviso de eleito do motor. Condições: `p_vitoria >= 0,99` de um candidato, chance oficial (nunca a prévia de 30–50%), IC95 sem incluir 50% e ninguém eleito ainda. Texto: "se a tendência continuar, X será eleito (mais de 99% de chance, não oficial)".
+
+Verificação com os backtests reais (`backtest_2022_recebido.json`, ordem real de chegada; `backtest_2018_encerramento.json`, ordem aproximada): 28 disputas de 2º turno (presidente e governadores), 0 casos em que a chance ≥ 99% apontou o perdedor a partir de 50% apurado. Presidente 2022: primeiro ponto ≥ 99% com 90% apurado. Governadores: entre 50% e 95% apurado.
+
+Comparação descartada: "eleito com comparecimento estimado" (restantes × 85%), conta usada por parte da imprensa. No 1º turno de 2026 anteciparia o aviso em ~3 min (mediana; máximo 12), sem erro nos 21 eleitos nem nos 6 estados que foram ao 2º turno. Ganho pequeno para mexer na regra do motor; fica registrado.

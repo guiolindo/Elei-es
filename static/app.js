@@ -344,6 +344,10 @@ const dec = (x, n = 2) => Number(x).toFixed(n).replace(".", ",");
 const fmtPct1 = (x) => `${dec(x, 1)}%`;
 // Nunca "100%" de chance: o modelo é estatístico; certeza só vem da
 // decisão matemática (evento ELEITO), que a UI mostra à parte.
+// Só o número, para a TV: nunca "100%" nem "0%" (estimativa não é certeza).
+function chanceCurta(p) {
+  return p >= 0.99 ? ">99%" : p <= 0.01 ? "<1%" : `${Math.round(p * 100)}%`;
+}
 function textoChance(p) {
   if (p >= 0.99) return ">99% de chance de vencer";
   if (p <= 0.01) return "<1% de chance de vencer";
@@ -481,7 +485,7 @@ function tickUltimoRelativo() {
       const semConexao = (state.ws && state.ws.readyState !== 1)
         || (state.erroApiEm && Date.now() - state.erroApiEm < 60_000);
       let txt = "AO VIVO";
-      if (andando && minParado >= 5) txt = `Sem dado novo do TSE há ${Math.floor(minParado)} min`;
+      if (andando && minParado >= 5) txt = `Sem dado novo do TSE há ${minParado < 120 ? `${Math.floor(minParado)} min` : `${Math.floor(minParado / 60)} h`}`;
       else if (semConexao) txt = "Reconectando…";
       if (vivo.textContent !== txt) vivo.textContent = txt;
       vivo.classList.toggle("parado", txt !== "AO VIVO");
@@ -2477,6 +2481,19 @@ function avisoViradaEstimativa(pj) {
     forte: est.p_vitoria >= 0.70 };
 }
 
+// "Vitória projetada": se a tendência continuar, um candidato será eleito.
+// Exige a chance de vencer oficial (50% apurado ou mais, nunca a prévia)
+// acima de 99% e a margem de 95% já sem incluir 50%. Nos 28 segundos turnos
+// de 2018 e 2022 refeitos urna por urna, nunca apontou o vencedor errado;
+// para presidente em 2022 teria saído com 90% apurado. Não é o aviso de
+// eleito: esse continua só quando os votos que faltam não mudam mais nada.
+function vitoriaProjetada(pj) {
+  if (!pj?.disponivel || pj.probabilidade_previa || empateTecnico(pj)) return null;
+  if (pj.candidatos.some(c => state.eleitos.has(c.sq_candidato))) return null;
+  const c = pj.candidatos.find(x => (x.p_vitoria ?? 0) >= 0.99);
+  return c ? { sq: c.sq_candidato, nome: state.ficha[c.sq_candidato]?.nome_urna || "" } : null;
+}
+
 function renderBlocoProjecao(box, linhas, aviso, mostrar) {
   if (!mostrar) { box.hidden = true; return; }
   box.hidden = false;
@@ -2506,7 +2523,10 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
   }
   const ordenados = [...pj.candidatos].sort((x, y) => y.pct - x.pct);
   const vir = avisoViradaEstimativa(pj);
-  const empate = vir?.forte
+  const proj = vitoriaProjetada(pj);
+  const empate = proj
+    ? `<p class="proj-projetada"><b>Vitória projetada</b> · se a tendência continuar, <b>${proj.nome}</b> será eleito (mais de 99% de chance, não oficial). O aviso de eleito sai quando os votos que faltam não puderem mais mudar o resultado.</p>`
+    : vir?.forte
     ? `<p class="proj-empate proj-virada"><b>A estimativa indica virada:</b> ${vir.nome} tem ${vir.chance}% de chance de terminar na frente${vir.previa ? " (prévia)" : ""}</p>`
     : vir
       ? `<p class="proj-empate"><b>Empate técnico</b> · a estimativa vê leve vantagem de ${vir.nome} no fim (${vir.chance}% de chance de vencer)</p>`
@@ -3434,17 +3454,21 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
   }
   const porSq = new Map(pj.candidatos.map(c => [c.sq_candidato, c]));
   const vir = avisoViradaEstimativa(pj);
-  const linhaVirada = vir?.forte
+  const proj = vitoriaProjetada(pj);
+  const linhaVirada = proj
+    ? `<p class="tvq-est-virada tvq-projetada">Se a tendência continuar, <b>${proj.nome}</b> será eleito · mais de 99% de chance. O aviso oficial sai quando a conta fechar.</p>`
+    : vir?.forte
     ? `<p class="tvq-est-virada">A estimativa indica virada: <b>${vir.nome}</b> tem ${vir.chance}% de chance de terminar na frente</p>`
     : vir ? `<p class="tvq-est-virada tvq-leve">Leve vantagem de <b>${vir.nome}</b> no fim, segundo a estimativa (${vir.chance}% de chance de vencer)</p>` : "";
-  box.innerHTML = tit + linhaVirada + ativos.map(c => {
+  const titulo = proj ? tit.replace("</div>", ` <span class="tvq-selo tvq-selo-projetada">vitória projetada</span></div>`) : tit;
+  box.innerHTML = titulo + linhaVirada + ativos.map(c => {
     const e = porSq.get(c.sq_candidato);
     if (!e) return "";
     const m = (e.ic95[1] - e.ic95[0]) / 2;
     const chance = e.p_vitoria != null
       ? (pj.probabilidade_previa
-        ? `<span class="tvq-est-c tvq-previa">${Math.round(e.p_vitoria * 100)}%<span>chance de vencer · prévia</span></span>`
-        : `<span class="tvq-est-c">${Math.round(e.p_vitoria * 100)}%<span>chance de vencer</span></span>`)
+        ? `<span class="tvq-est-c tvq-previa">${chanceCurta(e.p_vitoria)}<span>chance de vencer · prévia</span></span>`
+        : `<span class="tvq-est-c">${chanceCurta(e.p_vitoria)}<span>chance de vencer</span></span>`)
       : pj.disputa_indefinida
         ? `<span class="tvq-est-c tvq-mudo tvq-indef">indefinida<span>chance de vencer</span></span>`
         : `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 30% apurado</span></span>`;
@@ -3510,9 +3534,11 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
   recentes.sort((a, b) => b.t - a.t);
   const itens = recentes.slice(0, 6).map(r =>
     `${r.t ? `<time>${new Date(r.t).toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" })}</time>` : ""}${r.txt}`);
+  const proj = comecou && !eleito ? vitoriaProjetada(state.projecao) : null;
   if (comecou && !eleito) {
     const vir = avisoViradaEstimativa(state.projecao);
-    if (vir?.forte) itens.unshift(`<b>A estimativa indica virada:</b> ${vir.nome} tem ${vir.chance}% de chance de terminar na frente (${vir.previa ? "prévia, " : ""}não oficial)`);
+    if (proj) itens.unshift(`<b>Vitória projetada:</b> se a tendência continuar, ${proj.nome} será eleito (mais de 99% de chance, não oficial)`);
+    else if (vir?.forte) itens.unshift(`<b>A estimativa indica virada:</b> ${vir.nome} tem ${vir.chance}% de chance de terminar na frente (${vir.previa ? "prévia, " : ""}não oficial)`);
     else if (vir) itens.unshift(`Empate técnico: a estimativa vê leve vantagem de ${vir.nome} no fim (${vir.chance}% de chance de vencer, não oficial)`);
     else if (empateTecnico(state.projecao)) itens.unshift("Estimativa em empate técnico: o placar ainda pode virar (não oficial)");
   }
@@ -3543,7 +3569,7 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
   // troca a faixa na hora, com fade. Esperar a volta terminar deixava até
   // ~75 s de "X à frente" ao lado do "Eleito Y".
   const iLider = comecou && v[0].votos !== v[1].votos ? (v[0].votos > v[1].votos ? 0 : 1) : -1;
-  const chave = `${eleito?.sq_candidato || ""}|${iLider}|${comecou}`;
+  const chave = `${eleito?.sq_candidato || ""}|${iLider}|${comecou}|${proj?.sq || ""}`;
   const mudouPrincipal = _ticker.chave !== undefined && _ticker.chave !== chave;
   _ticker.chave = chave;
   if (!fita.firstElementChild) trocarFitaTicker();

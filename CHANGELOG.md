@@ -4,6 +4,11 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### "Vitória projetada" na estimativa (23/10)
+- Quando a estimativa dá mais de 99% de chance a um candidato (com 50% apurado ou mais, fora da prévia) e a margem de 95% já não inclui 50%, a caixa da estimativa mostra o selo verde "vitória projetada": "se a tendência continuar, X será eleito (mais de 99% de chance, não oficial)". Aparece no site, no celular, na TV e no letreiro. O aviso de eleito do motor não muda: só quando a conta fecha.
+- Testado nos 28 segundos turnos de 2018 e 2022 refeitos urna por urna: nunca apontou o perdedor; presidente 2022 com 90% apurado.
+- TV: chance mostrada como ">99%"/"<1%", nunca "100%"/"0%". Aviso de dado parado em horas quando passa de 2 h.
+
 ### Correções da revisão do modo TV (23/10)
 - Falha momentânea da API (deploy, banco ocupado) não zera mais a tela: o placar e a estimativa anteriores ficam, e o selo do alto diz "Reconectando…". Antes a TV voltava para "0,00% · a apuração começa às 17h".
 - Selo do alto: "AO VIVO" só com dado chegando. Sem boletim novo há 5 min ou mais vira "Sem dado novo do TSE há N min", em âmbar e legível de longe.

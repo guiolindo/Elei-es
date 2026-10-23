@@ -3700,3 +3700,8 @@ body.tv-quadro .tvq-mapa.com-regioes .tvq-slot .mapa-legenda .leg-n { font-size:
 .tvq-regioes .reg-cab { display: flex; justify-content: space-between; gap: calc(12 * var(--u)); }
 .tvq-regioes .reg-cab span:first-child, .tvq-regioes .reg-cab span:nth-child(3) { display: none; }
 .tvq-regioes .reg-cab span { max-width: 49%; }
+/* Vitória projetada (estimativa > 99%, não oficial): verde, sem troféu. */
+.proj-projetada { margin: 0 0 10px; font-size: 13px; line-height: 1.45; color: var(--fg-2, #c7d0e0); }
+.proj-projetada b:first-child { color: #22c55e; letter-spacing: .02em; }
+.tvq-selo.tvq-selo-projetada { color: #04210f; background: #22c55e; border-color: #22c55e; font-size: calc(21 * var(--u)); font-weight: 800; }
+.tvq-est-virada.tvq-projetada b { color: #22c55e; }
