@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Relógio e contagem regressiva mudam juntos (23/10)
+- Relógio, "há X" do último dado e as três contagens regressivas (faixa, placar e TV) usavam `setInterval` separados, iniciados em momentos diferentes: o segundo de um mudava até ~0,5 s depois do outro. Agora um tique só, realinhado à virada do segundo a cada vez. Medido: 0 ms de diferença entre relógio e contagem.
+- A contagem arredonda os segundos para cima: às 16:59:50 mostra 10 s, e a soma relógio + contagem dá exatamente 17:00:00.
+
 ### /sobre: guia de uso; avisos do navegador passam a funcionar (23/10)
 - Nova seção 2 "Como usar o site": computador (filtros, comparação, mapa por município, atalhos), celular (abas, avisos pelo Telegram), TV (quadro, controles escondidos), o que cada parte da tela mostra e as outras páginas (cola, seção, verificação, bot). Seções seguintes renumeradas (3 a 9), referências "item N" ajustadas, âncoras mantidas.
 - A pergunta "Quando o site diz que alguém foi eleito?" segue o texto novo do item 4.1.

@@ -238,6 +238,24 @@ const _fmtRelogio = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit", minute: "2-digit", second: "2-digit",
   hour12: false,
 });
+// Um só tique por segundo para tudo que mostra hora (relógio e contagens
+// regressivas): todos mudam juntos, logo depois da virada do segundo. Cada
+// tique reagenda pelo relógio do aparelho, porque setInterval escorrega
+// alguns milissegundos por minuto e intervalos separados ficavam defasados
+// entre si (o segundo do relógio e o da contagem mudavam em momentos diferentes).
+const _porSegundo = [];
+function aCadaSegundo(fn) { _porSegundo.push(fn); }
+(function tique() {
+  for (const fn of _porSegundo) { try { fn(); } catch (e) { console.error(e); } }
+  setTimeout(tique, 1000 - (Date.now() % 1000) + 5);
+})();
+// Tempo que falta em dias/horas/min/s, arredondando os segundos para cima:
+// às 16:59:50 faltam 10 s para as 17:00:00, não 9 (o relógio e a contagem
+// precisam fechar a conta juntos).
+function partesAte(diff) {
+  const t = Math.ceil(diff / 1000);
+  return { d: Math.floor(t / 86400), h: Math.floor(t % 86400 / 3600), m: Math.floor(t % 3600 / 60), s: t % 60 };
+}
 function tickRelogio() {
   const el = document.getElementById("relogio-brt");
   if (!el) return;
@@ -250,16 +268,10 @@ function iniciarRelogio() {
   tickRelogio();
   // Alinha pra começar no próximo segundo cheio pra o relógio não
   // flutuar com drift de hundreds-of-ms. Depois intervalo fixo de 1s.
-  const msAteProximoSegundo = 1000 - (Date.now() % 1000);
-  setTimeout(() => {
-    tickRelogio();
-    setInterval(tickRelogio, 1000);
-    // Toda vez que o relógio tica, atualiza o "há X" do último dado.
-    // Barato (texto curto, mesma frequência). Separa o PROPÓSITO: relógio
-    // acima = hora LOCAL agora; último-dado = quando o TSE gerou o
-    // snapshot (que pode estar atrasado minutos).
-    setInterval(tickUltimoRelativo, 1000);
-  }, msAteProximoSegundo);
+  // No mesmo tique, o "há X" do último dado (quando o TSE gerou o
+  // boletim, que pode estar minutos atrás da hora atual).
+  aCadaSegundo(tickRelogio);
+  aCadaSegundo(tickUltimoRelativo);
 }
 
 // ============ Contraste de cores de partido como TEXTO ============
@@ -2743,10 +2755,7 @@ function atualizarContagemRegressiva() {
   const diff = alvo.getTime() - Date.now();
   const apurando = (state.ultimoSnapshot?.totais?.pct_apurado || 0) > 0;
   if (diff <= 0 || apurando) { el.classList.add("oculto"); return; }
-  const dias = Math.floor(diff / 86_400_000);
-  const horas = Math.floor((diff % 86_400_000) / 3_600_000);
-  const min = Math.floor((diff % 3_600_000) / 60_000);
-  const seg = Math.floor((diff % 60_000) / 1000);
+  const { d: dias, h: horas, m: min, s: seg } = partesAte(diff);
   el.classList.remove("oculto");
   el.innerHTML = `
     <svg class="cd-icone" width="14" height="14"><use href="#i-hourglass"/></svg>
@@ -2871,8 +2880,7 @@ function tickContagemTV() {
   const alvo = state.turno === 2 ? DIA_D_2T : DIA_D;
   const diff = alvo.getTime() - Date.now();
   if (diff <= 0 || !box.offsetParent) { box.querySelector(".tv-cd")?.remove(); return; }
-  const d = Math.floor(diff / 86_400_000), h = Math.floor(diff % 86_400_000 / 3_600_000),
-        m = Math.floor(diff % 3_600_000 / 60_000), sg = Math.floor(diff % 60_000 / 1000);
+  const { d, h, m, s: sg } = partesAte(diff);
   const p2 = n => String(n).padStart(2, "0");
   let el = box.querySelector(".tv-cd");
   if (!el) {
@@ -2892,8 +2900,7 @@ function tickDuelo() {
     el.textContent = "Apuração começando…";
     return;
   }
-  const d = Math.floor(diff / 86_400_000), h = Math.floor(diff % 86_400_000 / 3_600_000),
-        m = Math.floor(diff % 3_600_000 / 60_000), sg = Math.floor(diff % 60_000 / 1000);
+  const { d, h, m, s: sg } = partesAte(diff);
   const p2 = n => String(n).padStart(2, "0");
   el.innerHTML = (d ? `<b>${d}</b>${d === 1 ? " dia" : " dias"} ` : "")
     + `<b>${p2(h)}</b>h <b>${p2(m)}</b>min <b>${p2(sg)}</b>s`;
@@ -3969,7 +3976,7 @@ async function boot() {
   $("btn-ajuda")?.addEventListener("click", abrirAjuda);
 
   // Countdown regressivo enquanto TSE não abre a apuração
-  setInterval(() => { atualizarContagemRegressiva(); esconderColaSeFechado(); tickDuelo(); tickContagemTV(); }, 1000);
+  aCadaSegundo(() => { atualizarContagemRegressiva(); esconderColaSeFechado(); tickDuelo(); tickContagemTV(); });
   atualizarContagemRegressiva();
   esconderColaSeFechado();
 
