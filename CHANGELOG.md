@@ -4,6 +4,11 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### /sobre: guia de uso; avisos do navegador passam a funcionar (23/10)
+- Nova seção 2 "Como usar o site": computador (filtros, comparação, mapa por município, atalhos), celular (abas, avisos pelo Telegram), TV (quadro, controles escondidos), o que cada parte da tela mostra e as outras páginas (cola, seção, verificação, bot). Seções seguintes renumeradas (3 a 9), referências "item N" ajustadas, âncoras mantidas.
+- A pergunta "Quando o site diz que alguém foi eleito?" segue o texto novo do item 4.1.
+- O sino ("Alertas" no celular) só pedia permissão e nunca notificava. No computador, agora avisa eleito e virada quando o site está em outra aba ou minimizado. No celular, onde o navegador não mostra notificação de página aberta sem instalar o site, o botão leva ao bot do Telegram.
+
 ### Tela do eleito no mesmo instante do aviso (22/10)
 - Quando o aviso ao vivo traz um eleito, o site busca só o placar novo e abre a tela do eleito na hora; estimativa, regiões, mapa e gráficos atualizam depois, por trás dela. Antes esperava 3 ou 4 buscas em sequência. Medido localmente: 0,07 a 0,26 s do aviso até a tela (antes 0,2 a 0,5 s; em produção a diferença cresce com a latência de cada busca).
 - As buscas disparadas pelo aviso ao vivo ignoram o cache do navegador (as rotas de apuração mandam `max-age=3` + `stale-while-revalidate=15`): sem isso o placar podia ficar até ~18 s com o boletim anterior.

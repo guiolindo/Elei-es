@@ -72,13 +72,14 @@
   <nav class="toc">
     <strong>Nesta página:</strong>
     <a href="#faq">1. Perguntas frequentes</a>
-    <a href="#fontes">2. De onde vêm os dados</a>
-    <a href="#metodologia">3. Como o site faz as contas</a>
-    <a href="#termos">4. Termos de uso</a>
-    <a href="#privacidade">5. Privacidade</a>
-    <a href="#legal">6. Uso de dados, fotos e logos</a>
-    <a href="#responsabilidade">7. Responsabilidade</a>
-    <a href="#contato">8. Contato</a>
+    <a href="#guia">2. Como usar o site</a>
+    <a href="#fontes">3. De onde vêm os dados</a>
+    <a href="#metodologia">4. Como o site faz as contas</a>
+    <a href="#termos">5. Termos de uso</a>
+    <a href="#privacidade">6. Privacidade</a>
+    <a href="#legal">7. Uso de dados, fotos e logos</a>
+    <a href="#responsabilidade">8. Responsabilidade</a>
+    <a href="#contato">9. Contato</a>
   </nav>
 
   <!-- ===================== FAQ ===================== -->
@@ -96,7 +97,7 @@
 
   <details class="faq-item">
     <summary>Quando o site diz que alguém foi eleito?</summary>
-    <p>Só quando não há mais como o resultado mudar: mesmo que todos os votos que ainda faltam fossem para o segundo colocado, ele não alcançaria o primeiro. Para essa conta, o site supõe que todos os eleitores que ainda não foram contados votaram, o que nunca acontece. Por isso o aviso de eleito pode sair alguns minutos depois do necessário, mas nunca antes.</p>
+    <p>Quando o candidato está "matematicamente eleito": mesmo que todos os votos que ainda faltam fossem para o segundo colocado, ele não alcançaria o primeiro. É a mesma conta usada por qualquer veículo para anunciar o vencedor. O site a faz sem adivinhar quantas pessoas foram votar: considera que todos os eleitores das urnas que faltam votaram. A tela do eleito abre no mesmo instante em que o site recebe o arquivo do TSE que fecha a conta.</p>
   </details>
 
   <details class="faq-item">
@@ -111,7 +112,7 @@
 
   <details class="faq-item">
     <summary>O que é a estimativa para 100% apurado?</summary>
-    <p>É um cálculo do site, sem valor oficial, que tenta prever o resultado final enquanto a contagem ainda está no meio. A explicação completa, com as fórmulas, está no item 3.</p>
+    <p>É um cálculo do site, sem valor oficial, que tenta prever o resultado final enquanto a contagem ainda está no meio. A explicação completa, com as fórmulas, está no item 4.</p>
   </details>
 
   <details class="faq-item">
@@ -121,7 +122,7 @@
 
   <details class="faq-item">
     <summary>Vocês guardam meus dados?</summary>
-    <p>Quase nada. No bot, só o número que o Telegram dá à sua conversa e os avisos que você escolheu. No site, uma contagem de acessos que não permite saber quem você é. Não pedimos nome, e-mail nem telefone. Detalhes no item 5.</p>
+    <p>Quase nada. No bot, só o número que o Telegram dá à sua conversa e os avisos que você escolheu. No site, uma contagem de acessos que não permite saber quem você é. Não pedimos nome, e-mail nem telefone. Detalhes no item 6.</p>
   </details>
 
   <details class="faq-item">
@@ -129,8 +130,56 @@
     <p>Sim. Os resultados são públicos. Cite o TSE como fonte; mencionar este site é opcional.</p>
   </details>
 
+  <!-- ===================== GUIA ===================== -->
+  <h2 id="guia">2. Como usar o site</h2>
+  <p>O site tem três formatos: computador, celular e TV. Ele escolhe sozinho pelo aparelho, e os números são os mesmos nos três.</p>
+
+  <h3>2.1. No computador</h3>
+  <ul>
+    <li>No alto ficam os botões de 1º e 2º turno e a escolha do cargo e do lugar (Brasil ou um estado). Logo abaixo, comparecimento, abstenções, brancos e nulos e o horário do último dado do TSE; o quanto já foi apurado aparece no placar.</li>
+    <li>O sino liga avisos do navegador. Com o site aberto em outra aba ou com a janela minimizada, você recebe um aviso quando alguém for eleito ou quando houver virada.</li>
+    <li>O ícone do Telegram leva ao bot, que avisa mesmo com o site fechado.</li>
+    <li>Na lista de candidatos dá para buscar pelo nome, número ou partido, filtrar por partido e mudar a ordem. Marque dois ou mais e use "Comparar" para ver gráficos dos votos ao longo do tempo, da diferença entre eles e de quanto falta para a vitória ser garantida.</li>
+    <li>No mapa, clique num estado para ver o resultado de cada município.</li>
+    <li>Atalhos de teclado: <kbd>/</kbd> busca, <kbd>c</kbd> compara os marcados, <kbd>n</kbd> liga os avisos, <kbd>s</kbd> compartilha, <kbd>f</kbd> liga o modo TV, <kbd>?</kbd> mostra a ajuda e <kbd>Esc</kbd> fecha janelas.</li>
+  </ul>
+
+  <h3>2.2. No celular</h3>
+  <ul>
+    <li>A barra de baixo divide o site em abas: Placar, Mapa, Comparar, Eventos (viradas e eleitos, em ordem) e Mais (links e informações).</li>
+    <li>No alto ficam os atalhos para conferir sua seção, montar sua cola e receber avisos. No celular, os avisos chegam pelo bot do Telegram, porque o navegador do celular não mostra notificações de página aberta.</li>
+    <li>Os botões "Cargo" e "Local" trocam a disputa mostrada.</li>
+  </ul>
+
+  <h3>2.3. Na TV</h3>
+  <ul>
+    <li>Em smart TVs o modo TV liga sozinho. Em outro aparelho, use o botão "Modo TV" no fim da página ou a tecla <kbd>f</kbd>. Ele foi feito para ficar ligado a noite toda, sem ninguém mexer.</li>
+    <li>No 2º turno a tela vira um quadro como o de telejornal: placar dos dois candidatos no alto, mapa dos estados e resultado por região à esquerda, estimativa e gráfico à direita e uma faixa de notícias embaixo. Antes das 17h, aparece a contagem regressiva.</li>
+    <li>Os controles (turno, cargo, estado, sair) ficam escondidos. Aparecem com as setas ou o OK do controle remoto, ou com o mouse no alto da tela.</li>
+  </ul>
+
+  <h3>2.4. O que aparece na tela</h3>
+  <ul>
+    <li><strong>Placar.</strong> Porcentagem dos votos válidos e número de votos de cada candidato, a diferença entre eles e a barra do quanto já foi apurado. Votos válidos são os dados a candidatos, sem brancos e nulos, que é como o TSE calcula o resultado.</li>
+    <li><strong>Estimativa para 100% apurado.</strong> Cálculo do site, sem valor oficial, do resultado no fim da contagem. Aparece a partir de 10% apurado; a chance de vencer, a partir de 50% (ou de 30%, como "prévia", quando a vantagem é grande). O selo "empate técnico" aparece enquanto a margem de erro deixar os dois candidatos com chance. A partir de 90% apurado, mostra também o horário previsto para 99%. Detalhes no item 4.</li>
+    <li><strong>Por região.</strong> Porcentagem de cada candidato no Norte, Nordeste, Centro-Oeste, Sudeste, Sul e no exterior, só com as urnas já apuradas em cada região, e quanto cada uma já apurou.</li>
+    <li><strong>Mapa.</strong> Cada estado fica com a cor de quem está na frente nele. Cinza é estado sem votos apurados ainda.</li>
+    <li><strong>Evolução.</strong> Gráfico de como a porcentagem de cada candidato mudou ao longo da noite.</li>
+    <li><strong>Linha do tempo.</strong> Viradas e resultados decididos, com horário.</li>
+    <li><strong>Faixa de notícias (TV).</strong> Diferença de votos, comparecimento, estados encerrados e as outras disputas da noite, sempre com números do TSE.</li>
+    <li><strong>Vencedor.</strong> Quando um candidato está matematicamente eleito, abre uma tela cheia com a foto, o nome e a porcentagem. Ela fecha sozinha (15 segundos no computador e no celular, 30 na TV) ou no botão. Depois fica a faixa "Vencedor" no alto e o selo "Eleito" no placar. A tela aparece uma vez por aparelho.</li>
+  </ul>
+
+  <h3>2.5. Outras páginas</h3>
+  <ul>
+    <li><a href="/cola">Minha cola</a>: monte um cartão de 10 × 15 cm com os números dos seus candidatos na ordem da urna, para imprimir. Celular não entra na cabine de votação; papel pode.</li>
+    <li><a href="/urna">Minha seção</a>: escolha sua seção eleitoral e veja no TSE o boletim de urna, o papel que a urna imprime ao fim da votação com os votos daquela seção.</li>
+    <li><a href="/verificacao">Verificação</a>: como conferir que os números daqui são os mesmos dos arquivos do TSE, e como usar os dados do site em outros sistemas.</li>
+    <li>Bot do Telegram: avisos de eleito, viradas e boletins durante a apuração, e placar sob pedido. Veja a pergunta sobre o bot no item 1.</li>
+  </ul>
+
   <!-- ===================== FONTES ===================== -->
-  <h2 id="fontes">2. De onde vêm os dados</h2>
+  <h2 id="fontes">3. De onde vêm os dados</h2>
   <ul>
     <li><strong>Votos:</strong> os arquivos de resultados que o TSE publica em resultados.tse.jus.br, os mesmos usados pelo site do próprio TSE.</li>
     <li><strong>Candidatos</strong> (nome, número, partido, foto e situação da candidatura): o sistema de consulta de candidaturas do TSE, o DivulgaCandContas.</li>
@@ -139,10 +188,10 @@
   <p>Qualquer pessoa pode consultar essas fontes diretamente.</p>
 
   <!-- ===================== METODOLOGIA ===================== -->
-  <h2 id="metodologia">3. Como o site faz as contas</h2>
+  <h2 id="metodologia">4. Como o site faz as contas</h2>
   <p>Esta seção explica de verdade como funcionam o aviso de eleito, a estimativa do resultado final e o horário previsto. Cada parte começa com a explicação em palavras simples. Logo abaixo vêm as fórmulas e os números exatos usados, para quem quiser conferir.</p>
 
-  <h3>3.1. Aviso de eleito</h3>
+  <h3>4.1. Aviso de eleito</h3>
   <p><strong>Em palavras simples:</strong> é a mesma conta usada para anunciar alguém como "matematicamente eleito": o segundo colocado não alcança mais o primeiro nem que receba todos os votos que faltam. Não existe forma mais rápida de ter certeza.</p>
   <p>O site faz essa conta na versão que não depende de nenhuma suposição: considera que todos os eleitores das urnas que faltam vão votar, e todos no segundo colocado. Não precisa adivinhar quantas pessoas compareceram nem quantos votos serão brancos ou nulos. Se mesmo assim o líder continua na frente, está eleito.</p>
   <div class="formula">
@@ -157,7 +206,7 @@
     <li>Nenhum aviso sai antes de 20% das urnas apuradas. Se o TSE corrigir um arquivo e a quantidade de urnas apuradas diminuir, aquela atualização é ignorada.</li>
   </ul>
 
-  <h3>3.2. Estimativa para 100% apurado</h3>
+  <h3>4.2. Estimativa para 100% apurado</h3>
   <p><strong>Em palavras simples:</strong> a contagem não chega igual de todo o país. Alguns estados contam mais rápido que outros, e eles votam de forma diferente. Por isso o placar parcial pode enganar: com 30% apurado, quem está na frente pode estar só à frente nos lugares que contaram primeiro.</p>
   <p>A estimativa corrige isso. Para cada estado, ela pega os votos já contados ali e estima os que faltam usando duas pistas: como aquele estado votou no 1º turno e quanto o voto já mudou do 1º para o 2º turno nas urnas contadas. Depois soma todos os estados. É como completar um quebra-cabeça: as peças que faltam são estimadas a partir das que já estão na mesa e da foto da caixa (o 1º turno).</p>
   <p>A estimativa não usa pesquisas eleitorais nem eleições anteriores. Usa só a contagem oficial em andamento e o resultado do 1º turno de 2026.</p>
@@ -213,7 +262,7 @@
 
   <p><b>Governador:</b> como o estado é uma parte só, não há outros estados para medir a mudança δ. Então a referência é o 1º turno sem correção, com uma incerteza maior (σ<sub>p</sub> = √(0,025² + 0,04²) ≈ 4,7 pontos).</p>
 
-  <h3>3.3. Quanto a estimativa acerta</h3>
+  <h3>4.3. Quanto a estimativa acerta</h3>
   <p>O método foi testado de duas formas, sempre usando em cada momento só o que já estaria contado naquele instante, sem "espiar" o resultado final:</p>
   <ul>
     <li><strong>Com a apuração real de 2022 e 2018</strong>, refeita urna por urna a partir dos boletins de urna publicados pelo TSE. No 2º turno de presidente de 2022, a estimativa errou o resultado final por 0,8 ponto com metade das urnas apuradas e por 0,2 ponto com 90%. A margem de 95% conteve o resultado real em todos os momentos.</li>
@@ -226,7 +275,7 @@
     <li><strong>Perto do fim:</strong> nos cenários mais difíceis das simulações, com 90% apurado, a margem de 95% conteve o resultado em cerca de 9 de cada 10 casos, um pouco menos do que promete.</li>
   </ul>
 
-  <h3>3.4. Horário previsto para 99% apurado</h3>
+  <h3>4.4. Horário previsto para 99% apurado</h3>
   <p><strong>Em palavras simples:</strong> a apuração começa rápida e vai ficando mais lenta no fim, porque as últimas urnas costumam vir de lugares mais distantes. O site mede a velocidade dos últimos 15 minutos, supõe que ela continua caindo no mesmo ritmo e calcula quando a contagem chega a 99%.</p>
   <div class="formula">
     <p>fração que falta: F(t) = F<sub>0</sub> × e<sup>−k·t</sup> &nbsp;&nbsp;(cai sempre na mesma proporção por minuto)</p>
@@ -235,19 +284,19 @@
   </div>
   <p>O horário aparece a partir de 90% apurado, arredondado de 5 em 5 minutos. Testado com a apuração real de 2022, errou em média 10 minutos. O site não prevê o horário de 100% porque as últimas urnas atrasam sem padrão: em 2022, o 2º turno chegou a 99% às 20h e a 100% só depois da meia-noite.</p>
 
-  <h3>3.5. Deputados (1º turno)</h3>
+  <h3>4.5. Deputados (1º turno)</h3>
   <p>No 1º turno, as vagas de deputado foram calculadas pelas regras do Código Eleitoral: quociente eleitoral (votos válidos ÷ vagas, art. 106), quociente partidário (art. 107), votação mínima de 10% do quociente para cada eleito (art. 108) e distribuição das vagas que sobram pelas maiores médias (art. 109), tratando as federações de partidos como um partido só (Lei 14.208/2021).</p>
 
   <!-- ===================== TERMOS ===================== -->
-  <h2 id="termos">4. Termos de uso</h2>
+  <h2 id="termos">5. Termos de uso</h2>
 
-  <h3>4.1. Aceitação</h3>
+  <h3>5.1. Aceitação</h3>
   <p>Ao usar este site ou o bot do Telegram, você concorda com estes termos. Se não concordar, não use.</p>
 
-  <h3>4.2. O que você pode fazer</h3>
+  <h3>5.2. O que você pode fazer</h3>
   <p>Consultar, compartilhar e citar as informações do site para qualquer finalidade legal, inclusive jornalística, educacional, política, acadêmica ou pessoal.</p>
 
-  <h3>4.3. O que não é permitido</h3>
+  <h3>5.3. O que não é permitido</h3>
   <ul>
     <li>Usar programas para fazer consultas automáticas em quantidade que atrapalhe o funcionamento do site. Quem precisa de dados em grande volume deve buscá-los diretamente no TSE.</li>
     <li>Tentar derrubar, invadir ou explorar falhas do site.</li>
@@ -255,17 +304,17 @@
     <li>Montar ou alterar prints para atribuir ao site informações que ele não mostrou.</li>
   </ul>
 
-  <h3>4.4. Funcionamento</h3>
+  <h3>5.4. Funcionamento</h3>
   <p>O site é gratuito e oferecido como está. Não há garantia de que ficará no ar o tempo todo nem de que os números aparecerão no mesmo instante que no TSE. O serviço pode ser suspenso ou encerrado a qualquer momento.</p>
 
-  <h3>4.5. Mudanças nestes termos</h3>
+  <h3>5.5. Mudanças nestes termos</h3>
   <p>Estes termos podem mudar. Vale sempre a versão publicada nesta página.</p>
 
   <!-- ===================== PRIVACIDADE ===================== -->
-  <h2 id="privacidade">5. Privacidade</h2>
+  <h2 id="privacidade">6. Privacidade</h2>
   <p>Esta seção segue a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018).</p>
 
-  <h3>5.1. No site</h3>
+  <h3>6.1. No site</h3>
   <ul>
     <li>Não há cadastro, não usamos cookies e não usamos ferramentas de estatística ou de publicidade de outras empresas.</li>
     <li>Para contar quantas pessoas acessam, guardamos, a cada página aberta, o horário, a página, o site de onde você veio e o tipo de navegador. O seu endereço de internet (IP) é transformado num código embaralhado que não permite descobrir o endereço original nem quem você é. Esses registros são apagados depois de 90 dias.</li>
@@ -273,39 +322,39 @@
     <li>O seu navegador guarda, no seu aparelho, algumas preferências, como filtros escolhidos, o modo TV e quais avisos de vitória você já viu. Essas informações não são enviadas para nós.</li>
   </ul>
 
-  <h3>5.2. No bot do Telegram</h3>
+  <h3>6.2. No bot do Telegram</h3>
   <ul>
     <li>Guardamos o número que o Telegram dá à sua conversa com o bot. Ele não é o seu telefone nem o seu nome.</li>
     <li>Guardamos os avisos que você escolheu (disputa e tipo de aviso) e, se você usar, a pausa e o horário de silêncio.</li>
     <li>Não guardamos nome, e-mail, telefone, endereço, título de eleitor, CPF, foto de perfil nem mensagens.</li>
   </ul>
 
-  <h3>5.3. Por que podemos guardar esses dados</h3>
+  <h3>6.3. Por que podemos guardar esses dados</h3>
   <p>No bot, porque você pediu: é você quem começa a conversa e escolhe os avisos (consentimento, art. 7º, I, da LGPD). Você pode desistir a qualquer momento. No site, a contagem de acessos serve para entender o uso e proteger o serviço (legítimo interesse, art. 7º, IX), e não identifica ninguém.</p>
 
-  <h3>5.4. Compartilhamento</h3>
+  <h3>6.4. Compartilhamento</h3>
   <p>Não vendemos nem compartilhamos dados com ninguém. Eles ficam só no banco de dados do site, na empresa de hospedagem.</p>
 
-  <h3>5.5. Seus direitos</h3>
+  <h3>6.5. Seus direitos</h3>
   <ul>
     <li><strong>Ver o que está guardado:</strong> envie /minhas ao bot.</li>
     <li><strong>Apagar tudo:</strong> envie /apagar_tudo ao bot. Seus avisos e configurações são apagados na hora.</li>
-    <li><strong>Outros pedidos:</strong> pelo e-mail do item 8. No site não há como ligar os registros de acesso a uma pessoa, porque o endereço de internet fica guardado só na forma embaralhada.</li>
+    <li><strong>Outros pedidos:</strong> pelo e-mail do item 9. No site não há como ligar os registros de acesso a uma pessoa, porque o endereço de internet fica guardado só na forma embaralhada.</li>
   </ul>
 
   <!-- ===================== LEGAL ===================== -->
-  <h2 id="legal">6. Uso de dados, fotos e logos</h2>
+  <h2 id="legal">7. Uso de dados, fotos e logos</h2>
 
-  <h3>6.1. Resultados e candidaturas</h3>
+  <h3>7.1. Resultados e candidaturas</h3>
   <p>Os resultados e os dados de candidatos e partidos são públicos. O TSE os divulga com base na Lei de Acesso à Informação (Lei 12.527/2011) e na Lei das Eleições (Lei 9.504/1997), e eles podem ser consultados, reproduzidos e reutilizados citando o TSE como fonte.</p>
 
-  <h3>6.2. Fotos e nomes dos candidatos</h3>
+  <h3>7.2. Fotos e nomes dos candidatos</h3>
   <p>As fotos e os nomes de urna são os que o próprio TSE publica para consulta da população. São dados tornados públicos para dar transparência à eleição (LGPD, art. 7º, §§ 3º e 4º) e são usados aqui só para identificar cada candidatura.</p>
 
-  <h3>6.3. Logos e siglas dos partidos</h3>
+  <h3>7.3. Logos e siglas dos partidos</h3>
   <p>Os logos e as siglas aparecem só para identificar o partido de cada candidato, sem nenhum vínculo, apoio ou fim comercial. A Lei de Propriedade Industrial (Lei 9.279/1996, art. 132, IV) permite citar uma marca nessas condições. Os logos continuam pertencendo aos partidos.</p>
 
-  <h3>6.4. Leis aplicáveis</h3>
+  <h3>7.4. Leis aplicáveis</h3>
   <ul>
     <li>Constituição Federal: acesso à informação (art. 5º, XIV), eleição para presidente (art. 77) e liberdade de comunicação (art. 220).</li>
     <li>Código Eleitoral (Lei 4.737/1965) e Lei das Eleições (Lei 9.504/1997).</li>
@@ -317,7 +366,7 @@
   </ul>
 
   <!-- ===================== RESPONSABILIDADE ===================== -->
-  <h2 id="responsabilidade">7. Responsabilidade</h2>
+  <h2 id="responsabilidade">8. Responsabilidade</h2>
   <div class="aviso">
     Este site é uma ferramenta independente de acompanhamento. As informações vêm de dados públicos do TSE, mas não têm valor oficial e não substituem o resultado da Justiça Eleitoral. Não tome nenhuma decisão eleitoral, jurídica ou administrativa com base neste site. Consulte sempre o TSE.
   </div>
@@ -325,7 +374,7 @@
   <p>Se houver diferença entre este site e o resultado oficial, vale sempre o do TSE.</p>
 
   <!-- ===================== CONTATO ===================== -->
-  <h2 id="contato">8. Contato</h2>
+  <h2 id="contato">9. Contato</h2>
   <p>Para tirar dúvidas, avisar de algum erro ou fazer pedidos sobre seus dados, escreva para <a href="mailto:gui3423862@gmail.com">gui3423862@gmail.com</a>.</p>
   <p>Para apagar os seus dados do bot, não é preciso escrever: envie /apagar_tudo ao bot.</p>
   <p><small>Última atualização: 21 de outubro de 2026.</small></p>

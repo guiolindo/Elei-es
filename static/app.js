@@ -2691,6 +2691,7 @@ function conectarWS() {
         const cor = num ? corDoPartido(num) : "#f0b429";
         if (TIPOS_ELEITO.has(ev.tipo)) {
           celebrarSeNovo(ev);
+          notificarSistema(`${nome} eleito(a)`, `${rotuloDisputaAtual()} · os votos que faltam não mudam mais o resultado`);
         } else if (ev.tipo === "SEGUNDO_TURNO_DEFINIDO") {
           toast(`2º turno matematicamente definido`, "ok");
           // Nova UF com 2T de Gov → refresca o dropdown pra ela aparecer
@@ -2699,6 +2700,7 @@ function conectarWS() {
           // Antes caía num "✓ eleito(a)" genérico — virada não é vitória.
           const b = state.ficha[ev.sq_candidato_b]?.nome_urna || ev.sq_candidato_b;
           toast(`${nome} passou ${b}`, "warn");
+          notificarSistema(`${nome} passou ${b}`, `${rotuloDisputaAtual()} · virada no placar`);
         }
       }
       await carregarEventos();
@@ -3906,10 +3908,35 @@ function bootMobile() {
 }
 
 async function pedirNotificacoes() {
-  if (!("Notification" in window)) return toast("Navegador sem suporte a notificações.", "warn");
+  // Celular não mostra notificação de página aberta (precisaria de service
+  // worker e, no iPhone, instalar o site): lá os avisos vêm pelo bot.
+  if (ehCelular() || !("Notification" in window)) {
+    const tg = $("m-btn-telegram")?.href || $("btn-telegram")?.href;
+    if (tg && !tg.endsWith("#")) {
+      toast("No celular, os avisos chegam pelo bot do Telegram", "ok");
+      window.open(tg, "_blank", "noopener");
+    } else {
+      toast("Este navegador não mostra notificações. Deixe o site aberto para ver os avisos.", "warn");
+    }
+    return;
+  }
   const p = await Notification.requestPermission();
-  toast(p === "granted" ? "Notificações ativadas" : "Notificações não permitidas pelo navegador",
+  toast(p === "granted" ? "Notificações ativadas: aviso de eleito e de virada com o site aberto em outra aba"
+                        : "Notificações não permitidas pelo navegador",
         p === "granted" ? "ok" : "warn");
+}
+
+// Notificação do sistema quando o site está aberto mas em segundo plano
+// (outra aba, janela minimizada). Com a aba visível, quem avisa é a tela.
+function notificarSistema(titulo, corpo) {
+  if (!document.hidden || !("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const n = new Notification(titulo, { body: corpo, icon: "/static/logo.svg", tag: titulo });
+    n.onclick = () => { window.focus(); n.close(); };
+  } catch (e) { /* navegador recusou */ }
+}
+function rotuloDisputaAtual() {
+  return state.cargo === 1 ? "Presidente" : `Governador · ${NOMES_UF_EXT[state.abrangencia] || state.abrangencia}`;
 }
 
 // ============ boot ============
