@@ -18,7 +18,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.api import router, ws_router
 from app.config import get_settings
 from app.ws import broadcaster
-from poller.service import loop as poller_loop
+from poller.service import vigia as poller_vigia
 from poller.candidatos_tse import (
     sincronizar_candidatos, corrigir_partidos_orfaos, reavaliar_situacao_pelo_raw,
 )
@@ -181,7 +181,8 @@ async def lifespan(app: FastAPI):
     tasks: list[asyncio.Task] = []
     if not getattr(app.state, "poller_disabled", False):
         tasks.append(asyncio.create_task(_descobrir_cod_loop()))
-        tasks.append(asyncio.create_task(poller_loop(broadcaster=broadcaster)))
+        # O vigia roda o loop do coletor e o reinicia se travar.
+        tasks.append(asyncio.create_task(poller_vigia(broadcaster=broadcaster)))
         tasks.append(asyncio.create_task(_sync_candidatos_loop()))
         tasks.append(asyncio.create_task(_cleanup_snapshots_loop()))
     log.info("poller + descoberta + sync + cleanup iniciados (intervalo=%ss)", settings.poll_interval_seconds)

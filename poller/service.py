@@ -182,6 +182,7 @@ _poller_info: dict[str, Any] = {
     "alvos_total": 0,
     "ultimo": {"novos": 0, "dedup": 0, "falhas": 0,
                 "retrocesso": 0, "nao_publicado": 0},
+    "reinicios_vigia": 0,      # quantas vezes o vigia reiniciou um loop travado
 }
 
 
@@ -617,3 +618,53 @@ async def loop(broadcaster=None, alvos: list[AlvoColeta] | None = None) -> None:
         else:
             log.debug(msg)
         await asyncio.sleep(settings.poll_interval_seconds)
+
+
+# ============ Vigia do coletor ============
+# O teto de 20 s por alvo cobre um arquivo lento do TSE. O vigia cobre o
+# resto: qualquer trava que segure o loop inteiro (conexão pendurada fora
+# do teto, banco sem resposta, exceção que encerre a tarefa). Se o loop
+# não fecha um ciclo há mais de VIGIA_LIMITE_S (ou a tarefa morreu), ele é
+# cancelado e um novo começa do zero. Se nem assim volta (3 reinícios em
+# 15 min), encerra o processo: a Railway reinicia o serviço sozinha
+# (restartPolicyType ON_FAILURE em railway.json).
+VIGIA_LIMITE_S = 120           # ciclo normal: ~1–25 s + 20 s de intervalo
+VIGIA_LIMITE_DORMENTE_S = 420  # modo "off": um ciclo vazio a cada 300 s
+
+
+async def vigia(broadcaster=None, *, verificar_a_cada: float = 15.0,
+                limite_s: float = VIGIA_LIMITE_S, sair=None) -> None:
+    import os
+    sair = sair or (lambda: os._exit(1))
+    tarefa = asyncio.create_task(loop(broadcaster=broadcaster))
+    reinicios: list[float] = []
+    try:
+        while True:
+            await asyncio.sleep(verificar_a_cada)
+            ref = max((t for t in (_poller_info.get("ultimo_ciclo_em"), _poller_info.get("iniciado_em")) if t),
+                      default=None)
+            if ref is None and not tarefa.done():
+                continue  # loop acabou de nascer
+            limite = limite_s if _poller_info.get("alvos_total") else max(limite_s, VIGIA_LIMITE_DORMENTE_S)
+            parado = ref is not None and (datetime.now(timezone.utc) - ref).total_seconds() > limite
+            if not (tarefa.done() or parado):
+                continue
+            agora_m = time.monotonic()
+            reinicios = [t for t in reinicios if agora_m - t < 900]
+            if len(reinicios) >= 3:
+                log.critical("vigia: coletor travou de novo após 3 reinícios em 15 min; reiniciando o serviço")
+                sair()
+                return
+            log.error("vigia: coletor sem ciclo há mais de %ss (tarefa encerrada=%s); reiniciando o loop",
+                      int(limite), tarefa.done())
+            tarefa.cancel()
+            try:
+                await asyncio.wait_for(tarefa, timeout=5)
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                pass
+            reinicios.append(agora_m)
+            _poller_info["reinicios_vigia"] = _poller_info.get("reinicios_vigia", 0) + 1
+            _poller_info["ultimo_ciclo_em"] = None
+            tarefa = asyncio.create_task(loop(broadcaster=broadcaster))
+    finally:
+        tarefa.cancel()

@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Vigia do coletor (24/10)
+- `poller.service.vigia` roda o loop do coletor e o vigia a cada 15 s. Sem ciclo concluído há mais de 120 s (420 s no modo dormente) ou com a tarefa encerrada, cancela o loop e começa outro. Se travar 3 vezes em 15 min, encerra o processo e a Railway reinicia o serviço (restartPolicy ON_FAILURE). `/api/poller-status` ganhou `reinicios_vigia`.
+- Testes: loop travado é reiniciado 3 vezes e depois o processo sai; loop saudável não é tocado.
+
 ### Aviso diferente para quem abre o site já sem internet (24/10)
 - Abriu sem internet (página veio da cópia guardada, a conexão ao vivo nunca abriu): aviso em ~2 s, "Você abriu o site sem internet. Estes são os números guardados da sua última visita (boletim das HH:MM de DD/MM)…". Perdeu no meio: continua "Você está sem internet…" depois de ~8 s. A data aparece quando o boletim não é de hoje.
 
