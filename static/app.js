@@ -2714,6 +2714,7 @@ function conectarWS() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${proto}//${location.host}/ws/apuracao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=${state.turno}`);
   ws.onopen = () => {
+    state.wsJaAbriu = true;
     atualizarRotuloConexao(ws);
     state.wsRetry = 0;
     // Puxa snapshot E eventos assim que reconecta: o que aconteceu com a
@@ -4258,7 +4259,10 @@ function renderAvisoConexao() {
   const el = $("aviso-conexao");
   if (!el) return;
   const passou = Date.now() - _conexao.desde;
-  const mostrar = (_conexao.tipo === "sem-internet" && passou >= 8_000)
+  // Abriu a página já sem internet (veio da cópia guardada): avisa logo.
+  // Perdeu no meio: espera ~8 s, que muita queda de Wi-Fi volta sozinha.
+  const abriuSem = !state.wsJaAbriu;
+  const mostrar = (_conexao.tipo === "sem-internet" && passou >= (abriuSem ? 0 : 8_000))
     || (_conexao.tipo === "servidor" && passou >= 5 * 60_000);
   if (!mostrar) {
     if (!el.hidden && _conexao.mostrado && !_conexao.tipo) toast("Conexão de volta: números atualizados", "ok");
@@ -4266,9 +4270,15 @@ function renderAvisoConexao() {
     return;
   }
   const snap = state.ultimoSnapshot;
-  const quando = snap?.disponivel ? fmtHora(snap.gerado_em_tse || snap.coletado_em) : null;
+  const iso = snap?.disponivel ? (snap.gerado_em_tse || snap.coletado_em) : null;
+  const hoje = iso && new Date(iso).toLocaleDateString("pt-BR", { timeZone: TZ }) === new Date(agora()).toLocaleDateString("pt-BR", { timeZone: TZ });
+  const quando = iso ? `${fmtHora(iso)}${hoje ? "" : ` de ${new Date(iso).toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" })}`}` : null;
   const dados = quando ? ` Os números na tela são os do boletim das ${quando}.` : "";
-  el.innerHTML = _conexao.tipo === "sem-internet"
+  el.innerHTML = _conexao.tipo === "sem-internet" && abriuSem
+    ? `<b>Você abriu o site sem internet.</b> ${quando
+        ? `Estes são os números guardados da sua última visita (boletim das ${quando}).`
+        : "Ainda não há números guardados neste aparelho."} Assim que a internet voltar, o site atualiza sozinho.`
+    : _conexao.tipo === "sem-internet"
     ? `<b>Você está sem internet.</b>${dados} O site atualiza sozinho quando a conexão voltar.`
     : `<b>O site está fora do ar no momento.</b>${dados} Ele volta sozinho, sem precisar recarregar. O resultado oficial está em resultados.tse.jus.br.`;
   el.hidden = false; _conexao.mostrado = true;
@@ -4287,6 +4297,7 @@ async function vigiarConexao() {
   renderAvisoConexao();
 }
 setInterval(vigiarConexao, 5000);
+setTimeout(vigiarConexao, 1500);  // quem abre já sem internet vê o aviso logo
 window.addEventListener("offline", vigiarConexao);
 window.addEventListener("online", () => { vigiarConexao(); if (state.ws?.readyState !== 1) conectarWS(); });
 

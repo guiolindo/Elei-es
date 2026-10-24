@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Aviso diferente para quem abre o site já sem internet (24/10)
+- Abriu sem internet (página veio da cópia guardada, a conexão ao vivo nunca abriu): aviso em ~2 s, "Você abriu o site sem internet. Estes são os números guardados da sua última visita (boletim das HH:MM de DD/MM)…". Perdeu no meio: continua "Você está sem internet…" depois de ~8 s. A data aparece quando o boletim não é de hoje.
+
 ### Sem internet, aviso de conexão, controles da TV e fotos novas do README (24/10)
 - Service worker (`/sw.js`, escopo raiz): rede primeiro em tudo; a cópia guardada (página, scripts, mapa, últimos números da API) só é usada quando a rede falha. Quem já abriu o site uma vez abre de novo sem internet, com os últimos números, e ele volta a atualizar sozinho. Admin, /api/hora e /api/versao nunca vêm da cópia. Para desligar: trocar o sw.js por um que chame `registration.unregister()`.
 - Aviso de conexão: com a conexão ao vivo caída, o site testa o servidor (/api/hora) e a internet (gstatic.com/generate_204). Sem internet: "Você está sem internet. Os números na tela são os do boletim das HH:MM…" em ~10 s. Internet ok e servidor fora: "O site está fora do ar no momento…" só depois de 5 min (deploy derruba por alguns minutos e a página recarrega sozinha quando volta). Na volta, o aviso some e aparece "Conexão de volta". CSP: `connect-src` inclui https://www.gstatic.com.
