@@ -310,6 +310,13 @@ def create_app() -> FastAPI:
         except OSError:
             return FileResponse(caminho)
 
+    # Service worker na raiz (escopo "/"): servido de /static ele só
+    # controlaria /static/*. Sem cache HTTP, para uma troca valer na hora.
+    @app.get("/sw.js")
+    async def service_worker():
+        return FileResponse("static/sw.js", media_type="application/javascript",
+                            headers={"Cache-Control": "no-cache"})
+
     @app.get("/")
     async def index():
         return _servir_html_com_versao("static/index.html")

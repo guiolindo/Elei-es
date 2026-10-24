@@ -4,6 +4,12 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Sem internet, aviso de conexão, controles da TV e fotos novas do README (24/10)
+- Service worker (`/sw.js`, escopo raiz): rede primeiro em tudo; a cópia guardada (página, scripts, mapa, últimos números da API) só é usada quando a rede falha. Quem já abriu o site uma vez abre de novo sem internet, com os últimos números, e ele volta a atualizar sozinho. Admin, /api/hora e /api/versao nunca vêm da cópia. Para desligar: trocar o sw.js por um que chame `registration.unregister()`.
+- Aviso de conexão: com a conexão ao vivo caída, o site testa o servidor (/api/hora) e a internet (gstatic.com/generate_204). Sem internet: "Você está sem internet. Os números na tela são os do boletim das HH:MM…" em ~10 s. Internet ok e servidor fora: "O site está fora do ar no momento…" só depois de 5 min (deploy derruba por alguns minutos e a página recarrega sozinha quando volta). Na volta, o aviso some e aparece "Conexão de volta". CSP: `connect-src` inclui https://www.gstatic.com.
+- Modo TV: qualquer movimento do mouse mostra os controles (antes só no alto da tela); o cursor some junto com eles. Tremidas de menos de 6 px não contam.
+- README: fotos refeitas com o painel por região, vitória projetada, vencedor em tela cheia (TV, computador, celular) e o aviso de dado parado/conexão; /sobre explica o funcionamento sem conexão e a consulta ao gstatic.com.
+
 ### Segurança: piso do Starlette e token admin em tempo constante (24/10)
 - `starlette>=1.3.1` no pyproject: garante as correções da CVE-2026-48710 (BadHost, Host header) e da CVE-2026-54283 (formulário urlencoded sem limite). O site não era vulnerável na prática: as rotas /admin são protegidas por dependência (não por prefixo de caminho) e não há rota de formulário; o piso evita que um build futuro resolva uma versão antiga.
 - Comparação do X-Admin-Token com `hmac.compare_digest`.

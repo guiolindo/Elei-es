@@ -13,9 +13,10 @@ Domingo, 25 de outubro de 2026, a partir das 17h (horário de Brasília): 2º tu
 ### O que o site mostra
 
 - **Placar ao vivo** com os números oficiais do TSE, atualizados a cada 20 segundos.
-- **Aviso de eleito** só quando não há mais como o resultado mudar, e um troféu na tela, até para quem estava com o celular bloqueado.
-- **Estimativa do resultado final** (não oficial): calculada estado por estado a partir do 1º turno, com margem de erro, chance de vencer, aviso de empate técnico e de possível virada.
-- **Mapa** de quem lidera em cada estado e em cada município, e o gráfico da evolução da contagem.
+- **Aviso de eleito** só quando não há mais como o resultado mudar, com a foto do eleito em tela cheia, até para quem estava com o celular bloqueado.
+- **Estimativa do resultado final** (não oficial): calculada estado por estado a partir do 1º turno, com margem de erro, chance de vencer, aviso de empate técnico, de possível virada e de "vitória projetada" quando a tendência já define o vencedor.
+- **Resultado por região** (Norte, Nordeste, Centro-Oeste, Sudeste, Sul e exterior), **mapa** de quem lidera em cada estado e em cada município, e o gráfico da evolução da contagem.
+- **Funciona com a internet ruim**: se a conexão cair, o site avisa e mostra os últimos números; volta sozinho quando a internet voltar.
 - **Modo TV**: tela cheia no formato de telejornal, com letreiro de últimas notícias da apuração (viradas, governadores, comparecimento).
 - **Conferir minha seção**: o boletim da urna onde você votou.
 
@@ -25,10 +26,14 @@ Não é o TSE nem de nenhum partido. O resultado oficial é sempre o de [resulta
 
 **Modo TV** (tela cheia, para deixar ligado na TV ou no computador)
 
-| Antes da apuração | Vitória definida |
+| Antes da apuração | Vitória projetada |
 |---|---|
-| <img src="docs/img/tv-antes.png" alt="Modo TV antes da apuração, com contagem regressiva" width="420"> | <img src="docs/img/tv-trofeu.png" alt="Troféu de vitória no modo TV" width="420"> |
-| Contagem regressiva, mapa e letreiro esperando as 17h. | O troféu aparece quando os votos que faltam não mudam mais o resultado. |
+| <img src="docs/img/tv-antes.png" alt="Modo TV antes da apuração, com contagem regressiva" width="420"> | <img src="docs/img/tv-projetada.png" alt="Modo TV com o selo vitória projetada na estimativa" width="420"> |
+| Contagem regressiva, mapa, regiões e letreiro esperando as 17h. | Com mais de 99% de chance pela tendência, a estimativa avisa (não oficial). |
+
+<img src="docs/img/tv-trofeu.png" alt="Modo TV: vencedor em tela cheia" width="100%">
+
+<sub>Quando os votos que faltam não mudam mais o resultado, o eleito ocupa a tela.</sub>
 
 <img src="docs/img/tv-eleito.png" alt="Modo TV depois da vitória: eleito marcado no placar e no letreiro" width="100%">
 
@@ -38,15 +43,19 @@ Não é o TSE nem de nenhum partido. O resultado oficial é sempre o de [resulta
 
 <img src="docs/img/computador-placar.png" alt="Placar e estimativa no computador" width="100%">
 
-| Mapa por estado | Evolução da apuração |
+| Por região | Mapa por estado |
 |---|---|
-| <img src="docs/img/computador-mapa.png" alt="Mapa com quem lidera em cada estado" width="420"> | <img src="docs/img/computador-grafico.png" alt="Gráfico da evolução dos votos válidos" width="420"> |
+| <img src="docs/img/computador-regioes.png" alt="Resultado por região" width="420"> | <img src="docs/img/computador-mapa.png" alt="Mapa com quem lidera em cada estado" width="420"> |
+
+| Evolução da apuração | Vencedor |
+|---|---|
+| <img src="docs/img/computador-grafico.png" alt="Gráfico da evolução dos votos válidos" width="420"> | <img src="docs/img/computador-vitoria.png" alt="Vencedor em tela cheia no computador" width="420"> |
 
 **Celular**
 
 | Antes da apuração | Durante | Vitória |
 |---|---|---|
-| <img src="docs/img/celular-antes.png" alt="Celular antes da apuração" width="250"> | <img src="docs/img/celular-placar.png" alt="Celular durante a apuração" width="250"> | <img src="docs/img/celular-trofeu.png" alt="Troféu no celular" width="250"> |
+| <img src="docs/img/celular-antes.png" alt="Celular antes da apuração" width="250"> | <img src="docs/img/celular-placar.png" alt="Celular durante a apuração" width="250"> | <img src="docs/img/celular-trofeu.png" alt="Vencedor em tela cheia no celular" width="250"> |
 
 ### Avisos no Telegram
 

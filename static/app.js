@@ -3784,8 +3784,16 @@ function esconderControlesTV() {
   }
   document.body.classList.remove("tv-controles");
 }
+// Qualquer movimento do mouse mostra os controles (antes só no alto da
+// tela, e quem mexia no meio achava que não havia nada para clicar).
+// Ignora tremidas de poucos pixels (mouse parado na mesa, controle com
+// giroscópio), senão a barra nunca sumiria.
+let _tvMouse = null;
 document.addEventListener("mousemove", (e) => {
-  if (e.clientY < Math.max(70, innerHeight * 0.12)) mostrarControlesTV();
+  const ant = _tvMouse;
+  _tvMouse = { x: e.clientX, y: e.clientY };
+  if (ant && Math.abs(e.clientX - ant.x) + Math.abs(e.clientY - ant.y) < 6) return;
+  mostrarControlesTV(e.clientY < innerHeight * 0.2 ? 6000 : 4000);
 });
 // Toque em qualquer ponto da tela mostra os controles (com "Sair do modo
 // TV"): no celular não há mouse pra levar ao topo.
@@ -4215,6 +4223,72 @@ async function boot() {
 }
 
 boot().then(restaurarRolagem).catch(e => { console.error(e); toast("Erro: " + e.message, "danger"); });
+
+// Sem internet: o service worker (static/sw.js) guarda a página e os
+// últimos números, para o site abrir e esperar a conexão voltar.
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
+// ============ Aviso de conexão ============
+// Quando a conexão ao vivo cai, descobre de quem é o problema:
+//  - da pessoa (sem internet): avisa em ~10 s;
+//  - do site (internet ok, servidor não responde): só depois de 5 min,
+//    porque um deploy derruba o servidor por alguns minutos e a página
+//    se atualiza sozinha quando ele volta (checarVersao no onopen do WS).
+// "Tem internet?" = o servidor do Google responde (generate_204).
+const _conexao = { desde: 0, tipo: null, mostrado: false };
+function _comTempo(promessa, ms) {
+  return Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error("tempo")), ms))]);
+}
+async function diagnosticarConexao() {
+  if (!navigator.onLine) return "sem-internet";
+  try {
+    const r = await _comTempo(fetch("/api/hora", { cache: "no-store" }), 6000);
+    if (r.ok) return null;
+  } catch (e) { /* segue para o teste de internet */ }
+  try {
+    await _comTempo(fetch("https://www.gstatic.com/generate_204", { mode: "no-cors", cache: "no-store" }), 6000);
+    return "servidor";
+  } catch (e) {
+    return "sem-internet";
+  }
+}
+function renderAvisoConexao() {
+  const el = $("aviso-conexao");
+  if (!el) return;
+  const passou = Date.now() - _conexao.desde;
+  const mostrar = (_conexao.tipo === "sem-internet" && passou >= 8_000)
+    || (_conexao.tipo === "servidor" && passou >= 5 * 60_000);
+  if (!mostrar) {
+    if (!el.hidden && _conexao.mostrado && !_conexao.tipo) toast("Conexão de volta: números atualizados", "ok");
+    el.hidden = true; _conexao.mostrado = false;
+    return;
+  }
+  const snap = state.ultimoSnapshot;
+  const quando = snap?.disponivel ? fmtHora(snap.gerado_em_tse || snap.coletado_em) : null;
+  const dados = quando ? ` Os números na tela são os do boletim das ${quando}.` : "";
+  el.innerHTML = _conexao.tipo === "sem-internet"
+    ? `<b>Você está sem internet.</b>${dados} O site atualiza sozinho quando a conexão voltar.`
+    : `<b>O site está fora do ar no momento.</b>${dados} Ele volta sozinho, sem precisar recarregar. O resultado oficial está em resultados.tse.jus.br.`;
+  el.hidden = false; _conexao.mostrado = true;
+}
+async function vigiarConexao() {
+  const caiu = (state.ws && state.ws.readyState !== 1)
+    || (state.erroApiEm && Date.now() - state.erroApiEm < 30_000) || !navigator.onLine;
+  if (!caiu || document.hidden) {
+    if (!caiu) { _conexao.tipo = null; _conexao.desde = 0; }
+    renderAvisoConexao();
+    return;
+  }
+  const tipo = await diagnosticarConexao();
+  if (tipo !== _conexao.tipo) _conexao.desde = Date.now();
+  _conexao.tipo = tipo;
+  renderAvisoConexao();
+}
+setInterval(vigiarConexao, 5000);
+window.addEventListener("offline", vigiarConexao);
+window.addEventListener("online", () => { vigiarConexao(); if (state.ws?.readyState !== 1) conectarWS(); });
 
 // ============ Atualização automática de versão ============
 // A página nasce com a versão do front num <meta> (app/main.py). Se um
