@@ -1966,6 +1966,9 @@ async function atualizarMapa() {
       if (r.ok) {
         const j = await r.json();
         state.secoesUF = j.secoes || {};
+        // Quem lidera em cada estado (para o recorde de estados do eleito).
+        state.lideresUF = Object.fromEntries(Object.entries(j.ufs || {})
+          .filter(([uf]) => uf !== "ZZ").map(([uf, d]) => [uf, d.sq_candidato]));
         for (const [uf, d] of Object.entries(j.ufs || {})) {
           const partidoNum = state.ficha?.[d.sq_candidato]?.partido;
           dadosPorUF[uf] = {
@@ -3660,6 +3663,10 @@ const RECORDES_2T = {
   abstencaoPct: { valor: 21.50, ano: 2010 },
   comparecimento: { valor: 124252796, ano: 2022 },
   margemPontos: { valor: 1.80, votos: 2139645, ano: 2022 },
+  // Unidades da federação (26 estados + DF) em que o eleito venceu. Menor
+  // número desde 1989: Lula 2022, 13 (somado dos boletins de urna; Collor
+  // 1989: 23; Dilma 2010: 16; Dilma 2014: 15; Bolsonaro 2018: 16).
+  menosEstadosEleito: { valor: 13, quem: "Lula", ano: 2022 },
 };
 state.lider1T = undefined;
 async function carregarLider1T() {
@@ -3722,6 +3729,14 @@ function recordesDaEleicao() {
       if (pontos < R.margemPontos.valor)
         out.push(`Diferença de ${dec(pontos, 2)} ponto${pontos >= 2 ? "s" : ""} (${fmtNum(cands[0].votos - cands[1].votos)} votos): o 2º turno mais apertado desde 1989. O recorde era de ${R.margemPontos.ano}: ${dec(R.margemPontos.valor, 2)} ponto (${fmtNum(R.margemPontos.votos)} votos).`);
     }
+  }
+  // Eleito com menos estados (só com 100%: os estados ainda viram até o fim).
+  const eleitoC = cands.find(c => state.eleitos.has(c.sq_candidato));
+  const lideres = Object.values(state.lideresUF || {});
+  if (eleitoC && t.pct_apurado >= 100 && lideres.length === 27) {
+    const n = lideres.filter(sq => sq === eleitoC.sq_candidato).length;
+    if (n < R.menosEstadosEleito.valor)
+      out.push(`${nome(eleitoC.sq_candidato)} foi eleito vencendo em ${n} das 27 unidades da federação: o menor número para um eleito desde 1989. O recorde era de ${R.menosEstadosEleito.quem}, em ${R.menosEstadosEleito.ano}: ${R.menosEstadosEleito.valor}.`);
   }
   // Curiosidade: em todos os 2º turnos desde 1989, quem liderou o 1º turno venceu.
   const eleito = cands.find(c => state.eleitos.has(c.sq_candidato));

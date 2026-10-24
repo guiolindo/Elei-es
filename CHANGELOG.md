@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Recorde: eleito com menos estados (24/10)
+- Com 100% apurado e o eleito definido: se ele vencer em menos de 13 das 27 unidades da federação, aparece o recorde (antes: Lula 2022, 13; somado dos boletins de urna). Referências conferidas: Collor 1989 23, Dilma 2010 16, Dilma 2014 15, Bolsonaro 2018 16 (boletins), Lula 2022 13 (boletins).
+
 ### Recordes: só quem lidera é "o mais votado da história"; dois recordes novos (24/10)
 - Se os dois candidatos passarem os 60.345.999 votos de Lula em 2022, só quem está na frente aparece como o mais votado da história; o outro aparece se virar o placar.
 - Com o eleito definido: o outro candidato pode ter "mais votos que qualquer candidato a presidente que não foi eleito" (antes: Bolsonaro 2022, 58.206.354).
