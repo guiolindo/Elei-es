@@ -4,6 +4,11 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Recordes: só quem lidera é "o mais votado da história"; dois recordes novos (24/10)
+- Se os dois candidatos passarem os 60.345.999 votos de Lula em 2022, só quem está na frente aparece como o mais votado da história; o outro aparece se virar o placar.
+- Com o eleito definido: o outro candidato pode ter "mais votos que qualquer candidato a presidente que não foi eleito" (antes: Bolsonaro 2022, 58.206.354).
+- Votos válidos num 2º turno (antes: 2022, 118.552.353).
+
 ### Recordes desta eleição (24/10)
 - Presidente, 2º turno, Brasil: seção "Recordes desta eleição" (computador e aba Placar do celular) e itens "RECORDE" no letreiro da TV. Contagens (que só crescem) aparecem assim que passam o recorde: votos de um candidato (Lula 2022, 60.345.999), comparecimento (2022, 124.252.796), abstenções (2022, 32.200.558), nulos (2018, 8.608.105), brancos (2018, 2.486.593), brancos + nulos (2018, 11.094.698). Com 100% apurado: abstenção % (2010, 21,50%), brancos + nulos % (2018, 9,57%) e menor diferença (2022, 1,80 ponto). Curiosidade ao sair o eleito: primeira vez desde 1989 que o 2º do 1º turno vence o 2º turno.
 - Referências de 2018 e 2022 somadas dos boletins de urna do TSE (batem com o oficial); 2010 do resultado oficial.

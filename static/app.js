@@ -3650,6 +3650,8 @@ function renderRegioes() {
 // fim, por isso só com 100% apurado.
 const RECORDES_2T = {
   votosCandidato: { valor: 60345999, quem: "Lula", ano: 2022 },
+  votosNaoEleito: { valor: 58206354, quem: "Bolsonaro", ano: 2022 },
+  votosValidos: { valor: 118552353, ano: 2022 },
   nulos: { valor: 8608105, ano: 2018 },
   brancos: { valor: 2486593, ano: 2018 },
   brancosNulos: { valor: 11094698, ano: 2018 },
@@ -3678,14 +3680,25 @@ function recordesDaEleicao() {
   const nome = sq => state.ficha[sq]?.nome_urna || "";
   const cands = (snap.candidatos || []).filter(c => (state.ficha[c.sq_candidato]?.situacao || "ativo") === "ativo")
     .sort((a, b) => b.votos - a.votos);
-  for (const c of cands) {
-    if (c.votos > R.votosCandidato.valor) {
-      const n = nome(c.sq_candidato);
-      const dono = /\bLULA\b/i.test(n) ? "do próprio Lula, em 2022" : `de ${R.votosCandidato.quem}, em ${R.votosCandidato.ano}`;
-      out.push(`${n} já tem ${fmtNum(c.votos)} votos, mais que qualquer candidato a presidente na história. O recorde anterior era ${dono}: ${fmtNum(R.votosCandidato.valor)}.`);
-    }
+  // "Mais votado da história" só para quem está na frente: se os dois
+  // passarem o recorde, o de trás não é o mais votado (aparece se virar).
+  const [c1, c2] = cands;
+  if (c1 && (!c2 || c1.votos > c2.votos) && c1.votos > R.votosCandidato.valor) {
+    const n = nome(c1.sq_candidato);
+    const dono = /\bLULA\b/i.test(n) ? "do próprio Lula, em 2022" : `de ${R.votosCandidato.quem}, em ${R.votosCandidato.ano}`;
+    out.push(`${n} já tem ${fmtNum(c1.votos)} votos, mais que qualquer candidato a presidente na história. O recorde anterior era ${dono}: ${fmtNum(R.votosCandidato.valor)}.`);
+  }
+  // Com o eleito definido, o outro pode ter a maior votação de quem não se
+  // elegeu (antes de definido, "não eleito" ainda não se sabe).
+  const eleitoSq = cands.find(c => state.eleitos.has(c.sq_candidato))?.sq_candidato;
+  const naoEleito = eleitoSq && cands.find(c => c.sq_candidato !== eleitoSq);
+  if (naoEleito && naoEleito.votos > R.votosNaoEleito.valor) {
+    out.push(`${nome(naoEleito.sq_candidato)} tem ${fmtNum(naoEleito.votos)} votos, mais que qualquer candidato a presidente que não foi eleito. O recorde anterior era de ${R.votosNaoEleito.quem}, em ${R.votosNaoEleito.ano}: ${fmtNum(R.votosNaoEleito.valor)}.`);
   }
   const bn = (t.votos_brancos || 0) + (t.votos_nulos || 0);
+  const validos = cands.reduce((soma, c) => soma + (c.votos || 0), 0);
+  if (validos > R.votosValidos.valor)
+    out.push(`${fmtNum(validos)} votos válidos (dados a um candidato): o maior número num 2º turno. O recorde era de ${R.votosValidos.ano}: ${fmtNum(R.votosValidos.valor)}.`);
   if (t.comparecimento > R.comparecimento.valor)
     out.push(`${fmtNum(t.comparecimento)} eleitores já votaram: o maior comparecimento num 2º turno. O recorde era de ${R.comparecimento.ano}: ${fmtNum(R.comparecimento.valor)}.`);
   if (t.abstencoes > R.abstencoes.valor)
