@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Segurança: piso do Starlette e token admin em tempo constante (24/10)
+- `starlette>=1.3.1` no pyproject: garante as correções da CVE-2026-48710 (BadHost, Host header) e da CVE-2026-54283 (formulário urlencoded sem limite). O site não era vulnerável na prática: as rotas /admin são protegidas por dependência (não por prefixo de caminho) e não há rota de formulário; o piso evita que um build futuro resolva uma versão antiga.
+- Comparação do X-Admin-Token com `hmac.compare_digest`.
+
 ### "Vitória projetada" na estimativa (23/10)
 - Quando a estimativa dá mais de 99% de chance a um candidato (com 50% apurado ou mais, fora da prévia) e a margem de 95% já não inclui 50%, a caixa da estimativa mostra o selo verde "vitória projetada": "se a tendência continuar, X será eleito (mais de 99% de chance, não oficial)". Aparece no site, no celular, na TV e no letreiro. O aviso de eleito do motor não muda: só quando a conta fecha.
 - Testado nos 28 segundos turnos de 2018 e 2022 refeitos urna por urna: nunca apontou o perdedor; presidente 2022 com 90% apurado.

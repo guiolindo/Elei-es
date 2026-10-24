@@ -25,7 +25,8 @@ def _exigir_admin(x_admin_token: str | None = Header(default=None)) -> None:
     esperado = (get_settings().admin_token or "").strip()
     if not esperado:
         return  # sem token configurado → aberto (só em dev)
-    if not x_admin_token or x_admin_token.strip() != esperado:
+    import hmac  # comparação em tempo constante: não vaza o token pelo tempo de resposta
+    if not x_admin_token or not hmac.compare_digest(x_admin_token.strip().encode(), esperado.encode()):
         raise HTTPException(status_code=401, detail="admin token inválido")
 
 
