@@ -2403,6 +2403,8 @@ async function refreshApuracao(fresco = false) {
   try { renderDuelo(); } catch(e) {}
   await atualizarRegioes(fresco);
   try { renderRegioes(); } catch(e) { console.error(e); }
+  if (regioesAplicavel()) await carregarLider1T();
+  try { renderRecordes(); } catch(e) { console.error(e); }
   if (quadroTVAtivo()) await atualizarResumo2T();
   try { aplicarQuadroTV(); } catch(e) { console.error(e); }
 }
@@ -3555,6 +3557,9 @@ function renderTickerQuadro(ativos, v, comecou, pct, t) {
       itens.push(`Lidera: ${partes.join(" · ")}`);
     }
     itens.push(...itensOutrasDisputas());
+    // Recordes logo depois do placar: entram e ficam enquanto valerem.
+    const rec = recordesDaEleicao().map(x => `<b class="tvq-recorde">Recorde</b> ${x}`);
+    itens.splice(Math.min(2, itens.length), 0, ...rec);
   } else {
     itens.push(agora() >= DIA_D_2T.getTime()
       ? "Urnas fechadas às 17h: aguardando o 1º boletim do TSE"
@@ -3634,6 +3639,90 @@ function renderRegioes() {
     const htv = `<div class="tvq-rot">Por região</div>` + cab + regs.map(r => linha(r, true)).join("");
     if (tv.innerHTML !== htv) tv.innerHTML = htv;
   }
+}
+
+// ============ Recordes e curiosidades (presidente, 2º turno, Brasil) ============
+// Comparação com os 2º turnos para presidente desde 1989. 2018 e 2022 somados
+// dos boletins de urna do TSE (batem com o resultado oficial: Lula 2022 =
+// 60.345.999); 2010 do resultado oficial. Os demais anos ficam abaixo desses
+// em todos os itens. Contagens só crescem durante a apuração, então o recorde
+// em número aparece assim que é passado; porcentagens e diferença mudam até o
+// fim, por isso só com 100% apurado.
+const RECORDES_2T = {
+  votosCandidato: { valor: 60345999, quem: "Lula", ano: 2022 },
+  nulos: { valor: 8608105, ano: 2018 },
+  brancos: { valor: 2486593, ano: 2018 },
+  brancosNulos: { valor: 11094698, ano: 2018 },
+  brancosNulosPct: { valor: 9.57, ano: 2018 },
+  abstencoes: { valor: 32200558, ano: 2022 },
+  abstencaoPct: { valor: 21.50, ano: 2010 },
+  comparecimento: { valor: 124252796, ano: 2022 },
+  margemPontos: { valor: 1.80, votos: 2139645, ano: 2022 },
+};
+state.lider1T = undefined;
+async function carregarLider1T() {
+  if (state.lider1T !== undefined) return;
+  state.lider1T = null;
+  try {
+    const j = await get("/api/apuracao/atual?cargo=1&abrangencia=BR&turno=1");
+    const top = [...(j.candidatos || [])].sort((a, b) => b.votos - a.votos)[0];
+    state.lider1T = top?.sq_candidato || null;
+  } catch (e) { state.lider1T = undefined; }
+}
+function recordesDaEleicao() {
+  if (!(state.turno === 2 && state.cargo === 1 && state.abrangencia === "BR")) return [];
+  const snap = state.ultimoSnapshot;
+  const t = snap?.totais;
+  if (!snap?.disponivel || !t || !(t.pct_apurado > 0)) return [];
+  const R = RECORDES_2T, out = [];
+  const nome = sq => state.ficha[sq]?.nome_urna || "";
+  const cands = (snap.candidatos || []).filter(c => (state.ficha[c.sq_candidato]?.situacao || "ativo") === "ativo")
+    .sort((a, b) => b.votos - a.votos);
+  for (const c of cands) {
+    if (c.votos > R.votosCandidato.valor) {
+      const n = nome(c.sq_candidato);
+      const dono = /\bLULA\b/i.test(n) ? "do próprio Lula, em 2022" : `de ${R.votosCandidato.quem}, em ${R.votosCandidato.ano}`;
+      out.push(`${n} já tem ${fmtNum(c.votos)} votos, mais que qualquer candidato a presidente na história. O recorde anterior era ${dono}: ${fmtNum(R.votosCandidato.valor)}.`);
+    }
+  }
+  const bn = (t.votos_brancos || 0) + (t.votos_nulos || 0);
+  if (t.comparecimento > R.comparecimento.valor)
+    out.push(`${fmtNum(t.comparecimento)} eleitores já votaram: o maior comparecimento num 2º turno. O recorde era de ${R.comparecimento.ano}: ${fmtNum(R.comparecimento.valor)}.`);
+  if (t.abstencoes > R.abstencoes.valor)
+    out.push(`${fmtNum(t.abstencoes)} abstenções: o maior número de eleitores que não votaram num 2º turno. O recorde era de ${R.abstencoes.ano}: ${fmtNum(R.abstencoes.valor)}.`);
+  if (t.votos_nulos > R.nulos.valor)
+    out.push(`${fmtNum(t.votos_nulos)} votos nulos: recorde num 2º turno. O anterior era de ${R.nulos.ano}: ${fmtNum(R.nulos.valor)}.`);
+  if (t.votos_brancos > R.brancos.valor)
+    out.push(`${fmtNum(t.votos_brancos)} votos em branco: recorde num 2º turno. O anterior era de ${R.brancos.ano}: ${fmtNum(R.brancos.valor)}.`);
+  if (bn > R.brancosNulos.valor)
+    out.push(`Brancos e nulos somam ${fmtNum(bn)}: recorde num 2º turno. O anterior era de ${R.brancosNulos.ano}: ${fmtNum(R.brancosNulos.valor)}.`);
+  if (t.pct_apurado >= 100 && t.comparecimento > 0) {
+    const apto = t.eleitorado_apto_totalizado || t.eleitorado_apto || 0;
+    const abstPct = apto ? t.abstencoes / apto * 100 : 0;
+    if (abstPct > R.abstencaoPct.valor)
+      out.push(`Abstenção de ${dec(abstPct, 2)}%: a maior proporção num 2º turno desde 1989. O recorde era de ${R.abstencaoPct.ano}: ${dec(R.abstencaoPct.valor, 2)}%.`);
+    const bnPct = bn / t.comparecimento * 100;
+    if (bnPct > R.brancosNulosPct.valor)
+      out.push(`Brancos e nulos foram ${dec(bnPct, 2)}% dos votos: a maior proporção num 2º turno desde 1989 (${R.brancosNulosPct.ano}: ${dec(R.brancosNulosPct.valor, 2)}%).`);
+    if (cands.length >= 2) {
+      const pontos = cands[0].pct_validos - cands[1].pct_validos;
+      if (pontos < R.margemPontos.valor)
+        out.push(`Diferença de ${dec(pontos, 2)} ponto${pontos >= 2 ? "s" : ""} (${fmtNum(cands[0].votos - cands[1].votos)} votos): o 2º turno mais apertado desde 1989. O recorde era de ${R.margemPontos.ano}: ${dec(R.margemPontos.valor, 2)} ponto (${fmtNum(R.margemPontos.votos)} votos).`);
+    }
+  }
+  // Curiosidade: em todos os 2º turnos desde 1989, quem liderou o 1º turno venceu.
+  const eleito = cands.find(c => state.eleitos.has(c.sq_candidato));
+  if (eleito && state.lider1T && eleito.sq_candidato !== state.lider1T)
+    out.push(`Pela primeira vez desde 1989, quem ficou em 2º lugar no 1º turno vence o 2º turno.`);
+  return out;
+}
+function renderRecordes() {
+  const secao = $("recordes-secao"), lista = $("recordes-lista");
+  if (!secao || !lista) return;
+  const itens = recordesDaEleicao();
+  secao.hidden = !itens.length;
+  const html = itens.map(x => `<li>${x}</li>`).join("");
+  if (lista.innerHTML !== html) lista.innerHTML = html;
 }
 
 // Resumo de todas as disputas do 2º turno (/api/apuracao/resumo-2t), para

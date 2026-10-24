@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Recordes desta eleição (24/10)
+- Presidente, 2º turno, Brasil: seção "Recordes desta eleição" (computador e aba Placar do celular) e itens "RECORDE" no letreiro da TV. Contagens (que só crescem) aparecem assim que passam o recorde: votos de um candidato (Lula 2022, 60.345.999), comparecimento (2022, 124.252.796), abstenções (2022, 32.200.558), nulos (2018, 8.608.105), brancos (2018, 2.486.593), brancos + nulos (2018, 11.094.698). Com 100% apurado: abstenção % (2010, 21,50%), brancos + nulos % (2018, 9,57%) e menor diferença (2022, 1,80 ponto). Curiosidade ao sair o eleito: primeira vez desde 1989 que o 2º do 1º turno vence o 2º turno.
+- Referências de 2018 e 2022 somadas dos boletins de urna do TSE (batem com o oficial); 2010 do resultado oficial.
+
 ### Vigia do coletor (24/10)
 - `poller.service.vigia` roda o loop do coletor e o vigia a cada 15 s. Sem ciclo concluído há mais de 120 s (420 s no modo dormente) ou com a tarefa encerrada, cancela o loop e começa outro. Se travar 3 vezes em 15 min, encerra o processo e a Railway reinicia o serviço (restartPolicy ON_FAILURE). `/api/poller-status` ganhou `reinicios_vigia`.
 - Testes: loop travado é reiniciado 3 vezes e depois o processo sai; loop saudável não é tocado.

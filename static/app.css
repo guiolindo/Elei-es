@@ -3034,6 +3034,7 @@ body.pre-apuracao .hero .stats, body.pre-apuracao #countdown { display: none !im
 @media (max-width: 768px) {
   main.page.m-tab-placar > .duelo:not([hidden]) { display: flex; }
   main.page.m-tab-placar > .regioes-secao:not([hidden]) { display: block; }
+  main.page.m-tab-placar > .recordes-secao:not([hidden]) { display: block; }
   body.pre-apuracao .m-stats { display: none !important; }
   .duelo { margin: 6px 0 18px; padding: 20px 12px 18px; gap: 14px; }
   .duelo-foto { width: 76px; height: 76px; font-size: 24px; border-width: 3px; }
@@ -3724,3 +3725,12 @@ body.tv-quadro .aviso-conexao {
   width: min(1100px, 70vw); font-size: calc(26 * min(calc(100vw / 1920), calc(100vh / 1080))); padding: .6em 1em;
 }
 @media (prefers-reduced-motion: reduce) { .aviso-conexao { animation: none; } }
+/* Recordes e curiosidades */
+.recordes-secao { margin: 8px 0 28px; }
+.recordes-secao[hidden] { display: none !important; }
+.recordes-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.recordes-lista li { position: relative; padding: 12px 16px 12px 44px; border-radius: 12px; line-height: 1.45;
+  background: var(--panel, #161b26); border: 1px solid rgba(240,180,41,.28); }
+.recordes-lista li::before { content: "★"; position: absolute; left: 16px; top: 11px; color: #f0b429; font-size: 16px; }
+.tvq-recorde { display: inline-block; margin-right: .4em; padding: 0 .35em; border-radius: .2em;
+  background: #f0b429; color: #1a1204; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
