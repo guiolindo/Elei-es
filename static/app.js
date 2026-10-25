@@ -3918,8 +3918,11 @@ function passoTicker(agora) {
   const dt = _ticker.ultimo ? Math.min(100, agora - _ticker.ultimo) : 0;
   _ticker.ultimo = agora;
   const escala = ($("tv-quadro")?.firstElementChild?.offsetWidth || 1920) / 1920;
+  // Com "reduzir movimento" ligado (Brave, algumas TVs e celulares ligam
+  // sozinhos) o letreiro parava no 1º item e o resto nunca aparecia. Ele é
+  // o conteúdo, não enfeite: anda sempre, só mais devagar nesse caso.
   const reduzido = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!reduzido) _ticker.x -= (110 * escala) * dt / 1000;
+  _ticker.x -= ((reduzido ? 55 : 110) * escala) * dt / 1000;
   // Faixa mudou de largura (abriu agora, janela redimensionada) e a cópia
   // ficou curta: remonta já, sem esperar a volta, pra não abrir buraco.
   const larg = fita.parentElement?.clientWidth || 0;

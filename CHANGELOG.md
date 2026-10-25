@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Letreiro da TV anda com "reduzir movimento" ligado (25/10)
+- Com prefers-reduced-motion (Brave, algumas TVs e celulares) o letreiro ficava parado no 1º item. Agora anda sempre, a metade da velocidade nesse caso.
+
 ### Tela do eleito fica 2 minutos (25/10)
 - Antes 15 s (computador e celular) e 30 s (TV); agora 2 min em todos. Continua fechando pelo botão, ✕ ou Esc.
 
