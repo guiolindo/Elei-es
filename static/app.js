@@ -2352,7 +2352,9 @@ function seloModoAdmin() {
     document.body.appendChild(el);
   }
   const h = new Date(adm.ate).toLocaleString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  el.textContent = `MODO ADMIN · estimativa sem limite de % · até ${h}`;
+  el.textContent = "ADM";
+  el.title = `Modo admin: estimativa sem limite de %, até ${h}. Clique para desativar.`;
+  el.setAttribute("aria-label", el.title);
 }
 
 async function refreshApuracao(fresco = false) {
