@@ -2349,8 +2349,12 @@ function seloModoAdmin() {
     el.id = "selo-admin"; el.className = "selo-admin"; el.type = "button";
     el.title = "Desativar o modo admin neste aparelho";
     el.addEventListener("click", () => { if (confirm("Desativar o modo admin neste aparelho?")) { sairModoAdmin(); refreshApuracao(true); } });
-    document.body.appendChild(el);
   }
+  // Celular: no topo, ao lado do nome do site (embaixo cobria o texto).
+  const marca = document.querySelector(".m-brand");
+  const destino = marca && marca.offsetParent ? marca : document.body;
+  if (el.parentElement !== destino) destino.appendChild(el);
+  el.classList.toggle("no-topo", destino === marca);
   const h = new Date(adm.ate).toLocaleString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   el.textContent = "ADM";
   el.title = `Modo admin: estimativa sem limite de %, até ${h}. Clique para desativar.`;

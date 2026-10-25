@@ -3779,5 +3779,5 @@ body.tv-quadro .aviso-conexao {
   padding: 4px 6px; border-radius: 5px; opacity: .55;
 }
 .selo-admin:hover, .selo-admin:focus-visible { opacity: 1; }
-@media (max-width: 768px) { .selo-admin { bottom: calc(72px + env(safe-area-inset-bottom)); } }
+.selo-admin.no-topo { position: static; flex: none; margin-left: 2px; opacity: .8; }
 body.tv-quadro .selo-admin { left: auto; right: 8px; top: 8px; bottom: auto; }
