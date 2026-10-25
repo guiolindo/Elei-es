@@ -354,6 +354,10 @@ def create_app() -> FastAPI:
     async def urna_page():
         return _servir_html_com_versao("static/urna.html")
 
+    @app.get("/admin")
+    async def admin_page():
+        return _servir_html_com_versao("static/admin.html")
+
     @app.get("/admin/visitas")
     async def visitas_page():
         return _servir_html_com_versao("static/admin-visitas.html")

@@ -140,16 +140,20 @@ def estimar_deriva(antes: list[Estrato], agora: list[Estrato]) -> tuple[float, f
     return math.sqrt(max(num2 / den, 0.0)), abs(num1 / den)
 
 
-def projetar_2t(estratos: list[Estrato], antes: list[Estrato] | None = None) -> Projecao | None:
+def projetar_2t(estratos: list[Estrato], antes: list[Estrato] | None = None,
+                sem_limites: bool = False) -> Projecao | None:
     """None quando não há base suficiente (nada apurado, < FRACAO_MIN_PROJECAO
-    ou 100% apurado — aí o resultado é o oficial, não projeção)."""
+    ou 100% apurado — aí o resultado é o oficial, não projeção).
+
+    sem_limites (só o modo admin do site): projeta com qualquer fração > 0 e
+    sempre devolve a chance, sem prévia. O público nunca vê isso."""
     soma_e = sum(e.eleitorado for e in estratos if e.eleitorado > 0)
     soma_ec = sum(min(e.eleitorado_tot, e.eleitorado) for e in estratos if e.eleitorado > 0)
     soma_vc = sum(e.validos for e in estratos)
     if soma_e <= 0 or soma_ec <= 0 or soma_vc <= 0:
         return None
     fracao = soma_ec / soma_e
-    if fracao < FRACAO_MIN_PROJECAO or fracao >= 1.0:
+    if fracao >= 1.0 or (fracao < FRACAO_MIN_PROJECAO and not sem_limites):
         return None
 
     drift_a, tau_nat = DRIFT_A, TAU_NAT
@@ -226,7 +230,7 @@ def projetar_2t(estratos: list[Estrato], antes: list[Estrato] | None = None) -> 
     else:
         pa = 1.0 if S > 0.5 else (0.0 if S < 0.5 else 0.5)
     lo, hi = max(0.0, S - 1.96 * sd), min(1.0, S + 1.96 * sd)
-    na_previa = FRACAO_MIN_PREVIA <= fracao < FRACAO_MIN_PROBABILIDADE
+    na_previa = FRACAO_MIN_PREVIA <= fracao < FRACAO_MIN_PROBABILIDADE and not sem_limites
     previa_forte = na_previa and max(pa, 1 - pa) >= LIMIAR_PREVIA
     return Projecao(
         pct_a=100 * S, pct_b=100 * (1 - S),
@@ -235,7 +239,7 @@ def projetar_2t(estratos: list[Estrato], antes: list[Estrato] | None = None) -> 
         p_vitoria_a=pa, p_vitoria_b=1 - pa,
         votos_a=int(round(proj_a)), votos_b=int(round(proj_v - proj_a)),
         fracao_apurada=fracao,
-        exibir_probabilidade=fracao >= FRACAO_MIN_PROBABILIDADE or previa_forte,
+        exibir_probabilidade=sem_limites or fracao >= FRACAO_MIN_PROBABILIDADE or previa_forte,
         probabilidade_previa=previa_forte,
         disputa_indefinida=na_previa and not previa_forte,
     )

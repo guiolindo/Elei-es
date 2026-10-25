@@ -2324,7 +2324,39 @@ async function carregarEventos() {
 }
 
 // ============ ciclo ============
+// Modo admin (/admin): token guardado neste navegador por 24 h. Com ele a
+// estimativa e a chance aparecem desde o 1º boletim (o servidor confere o
+// token). Selo fixo na tela para não confundir com o modo normal.
+function modoAdmin() {
+  try {
+    const a = JSON.parse(localStorage.getItem("elei-es:admin") || "null");
+    if (a?.token && a.ate > Date.now()) return a;
+    if (a) localStorage.removeItem("elei-es:admin");
+  } catch (e) {}
+  return null;
+}
+function sairModoAdmin() {
+  try { localStorage.removeItem("elei-es:admin"); } catch (e) {}
+  document.getElementById("selo-admin")?.remove();
+  toast("Modo admin desativado", "warn");
+}
+function seloModoAdmin() {
+  const adm = modoAdmin();
+  let el = document.getElementById("selo-admin");
+  if (!adm) { el?.remove(); return; }
+  if (!el) {
+    el = document.createElement("button");
+    el.id = "selo-admin"; el.className = "selo-admin"; el.type = "button";
+    el.title = "Desativar o modo admin neste aparelho";
+    el.addEventListener("click", () => { if (confirm("Desativar o modo admin neste aparelho?")) { sairModoAdmin(); refreshApuracao(true); } });
+    document.body.appendChild(el);
+  }
+  const h = new Date(adm.ate).toLocaleString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  el.textContent = `MODO ADMIN · estimativa sem limite de % · até ${h}`;
+}
+
 async function refreshApuracao(fresco = false) {
+  seloModoAdmin();
   try {
     const novo = await get(`/api/apuracao/atual?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=${state.turno}`, { fresco });
     // Guarda snapshot anterior pra calcular tendência (só se realmente mudou)
@@ -2365,10 +2397,20 @@ async function refreshApuracao(fresco = false) {
   // ou com 100% o backend devolve disponivel=false.
   // Abaixo de 10% o backend não projeta: nem pergunta (o quadro mostra a espera).
   // Se a busca falhar, fica a estimativa anterior (só some quando o backend
-  // disser que não há).
-  if (projecaoAplicavel() && (state.ultimoSnapshot?.totais?.pct_apurado || 0) >= 10) {
+  // disser que não há). Modo admin: pergunta desde o 1º boletim.
+  const adm = modoAdmin();
+  const pctAgora = state.ultimoSnapshot?.totais?.pct_apurado || 0;
+  if (projecaoAplicavel() && (pctAgora >= 10 || (adm && pctAgora > 0))) {
     try {
-      const pj = await get(`/api/apuracao/projecao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=2`, { fresco });
+      const pj = adm
+        ? await (async () => {
+            const r = await fetch(`/api/apuracao/projecao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=2&admin=1`,
+              { cache: "no-store", headers: { "X-Admin-Token": adm.token } });
+            if (r.status === 401) { sairModoAdmin(); throw new Error("token"); }
+            if (!r.ok) throw new Error(String(r.status));
+            return r.json();
+          })()
+        : await get(`/api/apuracao/projecao?cargo=${state.cargo}&abrangencia=${state.abrangencia}&turno=2`, { fresco });
       state.projecao = pj.disponivel ? pj : null;
     } catch (e) { /* mantém a anterior */ }
   } else {

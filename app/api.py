@@ -573,6 +573,8 @@ async def apuracao_projecao(
     cargo: int = Query(..., description="1 (Presidente) ou 3 (Governador)"),
     abrangencia: str = Query("BR"),
     turno: int = Query(2, ge=2, le=2),
+    admin: bool = Query(False, description="Modo admin: estimativa e chance desde o início (exige X-Admin-Token)"),
+    x_admin_token: str | None = Header(default=None),
     sess: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Projeção do resultado final do 2º turno com intervalo de 95% e
@@ -594,7 +596,9 @@ async def apuracao_projecao(
     else:
         return {"disponivel": False, "motivo": "cargo_sem_2t"}
 
-    chave = (cargo, abr, turno)
+    if admin:
+        _exigir_admin(x_admin_token)
+    chave = (cargo, abr, turno, admin)
     hit = _CACHE_PROJECAO.get(chave)
     if hit and monotonic() - hit[0] < _CACHE_PROJECAO_TTL:
         return hit[1]
@@ -682,7 +686,7 @@ async def apuracao_projecao(
         lista_agora.append(e_agora)
         lista_antes.append(_estrato(antes[a], prior) if a in antes else e_agora)
 
-    proj = projetar_2t(lista_agora, lista_antes if antes else None)
+    proj = projetar_2t(lista_agora, lista_antes if antes else None, sem_limites=admin)
     if proj is None:
         out = {"disponivel": False, "motivo": "apuracao_insuficiente_ou_completa"}
     else:

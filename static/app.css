@@ -3771,3 +3771,10 @@ body.tv-quadro .aviso-conexao {
 .tvq-lado.eleito .tvq-foto-box::after { bottom: calc(12 * var(--u)); font-size: calc(22 * var(--u)); padding: calc(3 * var(--u)) calc(14 * var(--u)); }
 .tvq-nome { font-size: calc(46 * var(--u)); line-height: .98; }
 .tvq-part { font-size: calc(22 * var(--u)); margin-top: calc(10 * var(--u)); }
+/* Modo admin: selo fixo (não aparece para visitantes) */
+.selo-admin {
+  position: fixed; left: 12px; bottom: 12px; z-index: 400; border: 0; cursor: pointer;
+  background: #b91c1c; color: #fff; font: 800 12px Inter, sans-serif; letter-spacing: .06em;
+  padding: 8px 12px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.5);
+}
+@media (max-width: 768px) { .selo-admin { bottom: calc(80px + env(safe-area-inset-bottom)); } }
