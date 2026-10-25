@@ -3744,14 +3744,17 @@ body.tv-quadro .aviso-conexao {
   grid-template-columns: minmax(0, 1fr) calc(440 * var(--u)) minmax(0, 1fr); }
 .tvq-centro { align-self: center; }
 .tvq-lado { gap: calc(24 * var(--u)); align-items: center; }
+.tvq-placar { overflow: hidden; }
+/* Altura fixa (a da faixa do placar): a foto nunca empurra a linha de baixo. */
 .tvq-foto-box {
-  align-self: stretch; width: calc(180 * var(--u)); overflow: hidden;
+  align-self: end; width: calc(180 * var(--u)); height: calc(222 * var(--u)); overflow: hidden; position: relative;
   display: flex; align-items: flex-end; justify-content: center;
   background: radial-gradient(ellipse 85% 75% at 50% 62%, color-mix(in srgb, var(--cor) 55%, transparent) 0%, transparent 70%);
   border-bottom: calc(5 * var(--u)) solid var(--cor);
 }
 .tvq-foto {
-  width: 100%; height: calc(100% - calc(8 * var(--u))); border: 0; border-radius: 0; background: none;
+  position: absolute; left: 0; right: 0; top: calc(8 * var(--u)); bottom: 0;
+  width: 100%; height: calc(100% - calc(8 * var(--u))); max-height: none; border: 0; border-radius: 0; background: none;
   object-fit: cover; object-position: 50% 14%;
   /* União de duas máscaras: elipse em volta da cabeça + faixa de baixo (tronco). */
   -webkit-mask-image: radial-gradient(closest-side at 50% 40%, #000 62%, transparent 100%), linear-gradient(to top, #000 30%, transparent 58%);

@@ -6,6 +6,7 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ### TV: placar com retrato dos candidatos (25/10)
 - A foto deixou de ser um círculo de 120 px: agora é um retrato que ocupa a altura do placar (180 × ~230 a 1920), saindo de um brilho na cor do partido e apoiado numa faixa da mesma cor, como nas transmissões. O fundo claro da foto do TSE some num recorte suave em volta da cabeça; tronco e ombros ficam. Sem foto: iniciais grandes sobre o brilho. Selo "ELEITO" sobre a faixa.
+- Retrato com altura fixa, apoiado na linha de baixo do placar (antes a foto passava da linha e parecia layout quebrado).
 - Coluna do meio um pouco mais estreita para caber nomes como "FLAVIO BOLSONARO" em duas linhas, inclusive em 1366×768.
 
 ### Recorde: eleito com menos estados (24/10)
