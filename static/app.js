@@ -3459,6 +3459,8 @@ function renderTVQuadro() {
           <span class="tvq-meio">50% dos válidos</span></div>`
       + lado(ativos[1], 1);
     placar.dataset.chave = chave;
+    placar.style.setProperty("--cor-a", corPartido(ativos[0].partido));
+    placar.style.setProperty("--cor-b", corPartido(ativos[1].partido));
     placar.querySelectorAll(".tvq-foto").forEach((img, i) =>
       anexarFotoComRetry(img, ativos[i].nome_urna, ativos[i].partido));
     // Logo que não carrega some; a sigla escrita continua ao lado.

@@ -4,6 +4,11 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### TV: retrato em cartão nítido e brilho do partido no placar (25/10)
+- A foto do TSE fica inteira e nítida num cartão de cantos arredondados, com véu na cor do partido subindo da base, faixa da mesma cor e sombra; sai o recorte borrado em volta da cabeça, que com as fotos reais deixava um retângulo claro desfocado.
+- Placar com brilho suave na cor de cada partido saindo de cada lado.
+- Modo admin: o "ADM" some enquanto a barra de controles da TV está aberta (cobria o relógio).
+
 ### Modo admin: estimativa sem limite de % (25/10)
 - Página `/admin`: com o ADMIN_TOKEN, o navegador guarda o modo admin por 24 h. Nele a estimativa e a chance de vencer aparecem desde o 1º boletim (sem esperar 10%/30%/50%), via `/api/apuracao/projecao?admin=1` com `X-Admin-Token` (o servidor confere; token errado = 401 e o modo sai sozinho). Selo vermelho fixo "MODO ADMIN" na tela; clicar desativa. Visitantes não são afetados (cache separado por modo).
 - `projetar_2t(..., sem_limites=True)` e testes.

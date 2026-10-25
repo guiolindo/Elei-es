@@ -3735,39 +3735,45 @@ body.tv-quadro .aviso-conexao {
 .tvq-recorde { display: inline-block; margin-right: .4em; padding: 0 .35em; border-radius: .2em;
   background: #f0b429; color: #1a1204; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 /* ======================================================================
-   TV · placar com retrato (25/10): foto alta de cada lado, como nas
-   transmissões, saindo de um brilho na cor do partido e apoiada numa
-   faixa da mesma cor. A foto do TSE é pequena e de fundo claro: o fundo
-   em volta da cabeça some num recorte suave; ombros e tronco ficam.
+   TV · placar com retrato (25/10): retrato nítido em cartão, como nas
+   transmissões. A foto oficial do TSE (fundo claro, 3×4) fica inteira, sem
+   recorte borrado; um véu na cor do partido sobe da base e uma faixa da
+   mesma cor fecha o cartão. Cantos de cima arredondados e sombra leve.
    ====================================================================== */
 .tvq-placar { padding: 0 calc(28 * var(--u)); align-items: stretch;
-  grid-template-columns: minmax(0, 1fr) calc(440 * var(--u)) minmax(0, 1fr); }
+  grid-template-columns: minmax(0, 1fr) calc(440 * var(--u)) minmax(0, 1fr); overflow: hidden; }
 .tvq-centro { align-self: center; }
-.tvq-lado { gap: calc(24 * var(--u)); align-items: center; }
-.tvq-placar { overflow: hidden; }
-/* Altura fixa (a da faixa do placar): a foto nunca empurra a linha de baixo. */
+.tvq-lado { gap: calc(26 * var(--u)); align-items: center; }
 .tvq-foto-box {
-  align-self: end; width: calc(180 * var(--u)); height: calc(222 * var(--u)); overflow: hidden; position: relative;
-  display: flex; align-items: flex-end; justify-content: center;
-  background: radial-gradient(ellipse 85% 75% at 50% 62%, color-mix(in srgb, var(--cor) 55%, transparent) 0%, transparent 70%);
-  border-bottom: calc(5 * var(--u)) solid var(--cor);
+  align-self: end; position: relative; overflow: hidden;
+  width: calc(170 * var(--u)); height: calc(212 * var(--u));
+  border-radius: calc(10 * var(--u)) calc(10 * var(--u)) 0 0;
+  border-bottom: calc(6 * var(--u)) solid var(--cor);
+  background: linear-gradient(180deg, #1b2740, #0c1528);
+  box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0,0,0,.55), inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.08);
+}
+/* Véu na cor do partido subindo da base (acima da foto). */
+.tvq-foto-box::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(to top, color-mix(in srgb, var(--cor) 70%, transparent) 0%, color-mix(in srgb, var(--cor) 18%, transparent) 22%, transparent 42%),
+              linear-gradient(to bottom, rgba(0,0,0,.18), transparent 25%);
+  box-shadow: inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.10);
+  border-radius: inherit;
 }
 .tvq-foto {
-  position: absolute; left: 0; right: 0; top: calc(8 * var(--u)); bottom: 0;
-  width: 100%; height: calc(100% - calc(8 * var(--u))); max-height: none; border: 0; border-radius: 0; background: none;
-  object-fit: cover; object-position: 50% 14%;
-  /* União de duas máscaras: elipse em volta da cabeça + faixa de baixo (tronco). */
-  -webkit-mask-image: radial-gradient(closest-side at 50% 40%, #000 62%, transparent 100%), linear-gradient(to top, #000 30%, transparent 58%);
-  -webkit-mask-composite: source-over;
-  mask-image: radial-gradient(closest-side at 50% 40%, #000 62%, transparent 100%), linear-gradient(to top, #000 30%, transparent 58%);
-  mask-composite: add;
+  position: absolute; inset: 0; width: 100%; height: 100%; max-height: none;
+  border: 0; border-radius: 0; background: none;
+  object-fit: cover; object-position: 50% 18%;
+  filter: contrast(1.04) saturate(1.05);
+  -webkit-mask-image: none; mask-image: none;
 }
-/* Sem foto: iniciais grandes sobre o brilho, sem o círculo antigo. */
+/* Sem foto: iniciais grandes sobre o cartão na cor do partido. */
 .tvq-foto.cand-foto-fallback {
-  -webkit-mask-image: none; mask-image: none; background: none !important;
-  display: grid; place-items: center; font: 800 calc(88 * var(--u)) var(--tvq-cond);
+  background: radial-gradient(ellipse at 50% 35%, color-mix(in srgb, var(--cor) 70%, #0c1528), #0c1528) !important;
+  display: grid; place-items: center; font: 800 calc(84 * var(--u)) var(--tvq-cond);
   color: rgba(255,255,255,.95); text-shadow: 0 calc(4 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.45);
 }
+.tvq-lado.eleito .tvq-foto-box::after { z-index: 2; }
 .tvq-lado.eleito .tvq-foto-box::after { bottom: calc(12 * var(--u)); font-size: calc(22 * var(--u)); padding: calc(3 * var(--u)) calc(14 * var(--u)); }
 .tvq-nome { font-size: calc(46 * var(--u)); line-height: .98; }
 .tvq-part { font-size: calc(22 * var(--u)); margin-top: calc(10 * var(--u)); }
@@ -3781,3 +3787,10 @@ body.tv-quadro .aviso-conexao {
 .selo-admin:hover, .selo-admin:focus-visible { opacity: 1; }
 .selo-admin.no-topo { position: static; flex: none; margin-left: 2px; opacity: .8; }
 body.tv-quadro .selo-admin { left: auto; right: 8px; top: 8px; bottom: auto; }
+body.tv-quadro.tv-controles .selo-admin { opacity: 0; pointer-events: none; }
+/* Placar da TV: cada lado ganha um brilho suave na cor do seu partido. */
+.tvq-placar {
+  background:
+    radial-gradient(ellipse 38% 140% at 0% 50%, color-mix(in srgb, var(--cor-a, transparent) 22%, transparent), transparent 70%),
+    radial-gradient(ellipse 38% 140% at 100% 50%, color-mix(in srgb, var(--cor-b, transparent) 22%, transparent), transparent 70%);
+}
