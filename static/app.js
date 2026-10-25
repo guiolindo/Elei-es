@@ -375,8 +375,10 @@ function tempoRelativo(tsIso) {
 function classeStaleness(tsIso) {
   if (!tsIso) return "stale-sem";
   const diffS = (agora() - new Date(tsIso).getTime()) / 1000;
-  if (diffS < 60) return "stale-fresh";
-  if (diffS < 300) return "stale-warn";
+  // Verde: chegando normal (o TSE solta boletim a cada 1–2 min). Amarelo:
+  // alguns minutos parado. Vermelho: 30 min ou mais (como a trava do 1º turno).
+  if (diffS < 120) return "stale-fresh";
+  if (diffS < 1800) return "stale-warn";
   return "stale-stale";
 }
 
@@ -489,6 +491,7 @@ function tickUltimoRelativo() {
       else if (semConexao) txt = "Reconectando…";
       if (vivo.textContent !== txt) vivo.textContent = txt;
       vivo.classList.toggle("parado", txt !== "AO VIVO");
+      vivo.classList.toggle("parado-longo", andando && minParado >= 30);
     }
   }
 }
@@ -3470,6 +3473,7 @@ function renderTVQuadro() {
   const porSq = new Map((snap.candidatos || []).map(c => [c.sq_candidato, c]));
   const v = ativos.map(c => porSq.get(c.sq_candidato) || { votos: 0, pct_validos: 0 });
   const liderIdx = comecou && v[0].votos !== v[1].votos ? (v[0].votos > v[1].votos ? 0 : 1) : -1;
+  placar.classList.toggle("tvq-espera", !comecou);  // só visual: sem número ainda
   placar.querySelectorAll(".tvq-lado").forEach((el, i) => {
     el.classList.toggle("lider", i === liderIdx);
     el.classList.toggle("eleito", state.eleitos.has(ativos[i].sq_candidato));

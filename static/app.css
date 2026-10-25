@@ -3343,6 +3343,7 @@ body.tv-quadro .tvq[hidden] { display: none; }
 }
 .tvq-vivo[hidden] { display: none; }
 .tvq-vivo.parado { background: #b45309; text-transform: uppercase; }
+.tvq-vivo.parado.parado-longo { background: #b91c1c; }
 .tvq-vivo.parado::before { animation: none; opacity: .8; }
 .tvq-vivo::before {
   content: ""; width: calc(10 * var(--u)); height: calc(10 * var(--u)); border-radius: 50%; background: #fff;
@@ -3792,4 +3793,107 @@ body.tv-quadro.tv-controles .selo-admin { opacity: 0; pointer-events: none; }
   background:
     radial-gradient(ellipse 38% 140% at 0% 50%, color-mix(in srgb, var(--cor-a, transparent) 22%, transparent), transparent 70%),
     radial-gradient(ellipse 38% 140% at 100% 50%, color-mix(in srgb, var(--cor-b, transparent) 22%, transparent), transparent 70%);
+}
+/* ======================================================================
+   TV · acabamento (25/10)
+   Só visual, só dentro do quadro da TV (.tvq) e da vitória em tela cheia.
+   ====================================================================== */
+/* Retrato no formato da foto do TSE (3×4): a foto entra inteira, sem
+   recorte nas laterais, apoiada na linha de baixo do placar. */
+.tvq-foto-box { width: calc(162 * var(--u)); height: calc(216 * var(--u)); }
+.tvq-foto { object-position: 50% 0; }
+/* Barra dividida: fio escuro onde as duas cores se encontram e um brilho
+   discreto em cima (por cima só da barra, nunca das fotos). */
+.tvq-split { box-shadow: inset 0 0 0 calc(1 * var(--u)) rgba(255,255,255,.08); }
+.tvq-split::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0) 55%, rgba(0,0,0,.14));
+}
+.tvq-split::after { z-index: 2; box-shadow: 0 0 calc(6 * var(--u)) rgba(0,0,0,.6); }
+.tvq-split i + i { box-shadow: inset calc(2 * var(--u)) 0 0 rgba(7,11,20,.85); }
+.tvq-dif { line-height: 1; }
+/* Antes do 1º boletim: sem traço colorido no lugar do número (parecia uma
+   barra na cor do partido). O centro já diz quando a apuração começa. */
+.tvq-placar.tvq-espera .tvq-valores { visibility: hidden; }
+/* Por região: nomes numa linha só ("CENTRO-OESTE") e textos com o mínimo
+   de 18 para ler de longe. */
+.tvq-regioes .reg-cab, .tvq-regioes .reg-linha { grid-template-columns: calc(136 * var(--u)) calc(62 * var(--u)) 1fr calc(62 * var(--u)); }
+.tvq-regioes .reg-nome { white-space: nowrap; }
+.tvq-regioes .reg-nome small { font-size: calc(18 * var(--u)); }
+.tvq-regioes .reg-cab { font-size: calc(18 * var(--u)); letter-spacing: .04em; }
+/* Letreiro: etiqueta "ÚLTIMAS" com a ponta cortada em diagonal. */
+.tvq-tag { padding-right: calc(14 * var(--u)); }
+.tvq-tag::after {
+  content: ""; position: absolute; top: 0; bottom: 0; right: calc(-14 * var(--u)); width: calc(28 * var(--u));
+  background: inherit; transform: skewX(-14deg); z-index: -1;
+}
+.tvq-ticker { background: linear-gradient(180deg, #0d1528, #0a1020); }
+/* Crédito no vão entre os painéis e o letreiro, sem encostar na borda. */
+.tvq-fonte { bottom: calc(68 * var(--u)); font-size: calc(14 * var(--u)); line-height: 1; letter-spacing: .02em; }
+/* Região sem dado: traço neutro, não na cor do partido. */
+.tvq-regioes .reg-vazia .reg-pct { color: var(--tvq-sub) !important; opacity: .6; }
+/* Vitória em tela cheia (tela deitada): fio vertical na cor do vencedor
+   ao lado do texto, como as placas de resultado da TV. */
+@media (min-aspect-ratio: 1001/1000) {
+  .mvt-texto { padding-left: calc(40 * var(--u)); }
+  .mvt-texto::before {
+    content: ""; position: absolute; left: 0; top: calc(4 * var(--u)); bottom: calc(4 * var(--u));
+    width: calc(6 * var(--u)); border-radius: calc(3 * var(--u)); background: var(--cor-vencedor);
+    transform-origin: 50% 0; animation: mvt-fio .7s .15s ease-out both;
+  }
+}
+@keyframes mvt-fio { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .mvt-texto::before { animation: none !important; } }
+/* Contagem regressiva: espaços na escala do quadro (eram fixos em px e,
+   em 1366×768, o título encostava no rótulo e o rodapé saía do painel). */
+body.tv-quadro .tvq-slot .status-coleta { padding: calc(10 * var(--u)) calc(16 * var(--u)); gap: calc(12 * var(--u)); }
+body.tv-quadro .tvq-slot .status-coleta-grid:empty { display: none; }
+body.tv-quadro .tvq-slot .tv-cd { margin-top: calc(10 * var(--u)); }
+/* ======================================================================
+   TV · visual de transmissão (25/10, 2ª etapa)
+   - Cada candidato ganha um painel próprio na cor do partido (degradê do
+     lado de fora para o centro), nome e % em branco, selo "À FRENTE".
+   - Painéis de baixo com título em aba e fio dourado no topo.
+   - "2º TURNO" em selo dourado no cabeçalho.
+   Nada de cor por cima das fotos.
+   ====================================================================== */
+.tvq-placar { background: none; column-gap: calc(18 * var(--u)); padding: calc(12 * var(--u)) calc(28 * var(--u)) 0; }
+.tvq-lado {
+  position: relative; border-radius: calc(10 * var(--u)) calc(10 * var(--u)) 0 0;
+  padding-right: calc(22 * var(--u));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cor) 46%, #0b1222) 0%, color-mix(in srgb, var(--cor) 20%, #0b1222) 55%, rgba(11,18,34,.35) 100%);
+  box-shadow: inset 0 calc(1 * var(--u)) 0 rgba(255,255,255,.08);
+}
+.tvq-lado.dir {
+  padding-right: 0; padding-left: calc(22 * var(--u));
+  background: linear-gradient(270deg, color-mix(in srgb, var(--cor) 46%, #0b1222) 0%, color-mix(in srgb, var(--cor) 20%, #0b1222) 55%, rgba(11,18,34,.35) 100%);
+}
+.tvq-lado .tvq-foto-box { box-shadow: none; border-radius: calc(10 * var(--u)) 0 0 0; }
+.tvq-lado.dir .tvq-foto-box { border-radius: 0 calc(10 * var(--u)) 0 0; }
+.tvq-lado .tvq-pct, .tvq-lado.lider .tvq-pct { color: #fff; text-shadow: 0 calc(3 * var(--u)) calc(14 * var(--u)) rgba(0,0,0,.35); }
+.tvq-lado .tvq-votos { color: rgba(255,255,255,.78); }
+.tvq-lado .tvq-part { color: rgba(255,255,255,.8); }
+.tvq-lado .tvq-numero { background: rgba(0,0,0,.35); }
+/* Selo "À FRENTE" sobre a % de quem lidera */
+.tvq-lado .tvq-valores { position: relative; }
+.tvq-lado.lider:not(.eleito) .tvq-valores::before {
+  content: "À FRENTE"; position: absolute; top: calc(-30 * var(--u)); left: 0;
+  font: 800 calc(17 * var(--u))/1 var(--tvq-cond); letter-spacing: .14em; color: #0b1222;
+  background: #fff; padding: calc(4 * var(--u)) calc(9 * var(--u)); border-radius: calc(3 * var(--u));
+}
+.tvq-lado.dir.lider:not(.eleito) .tvq-valores::before { left: auto; right: 0; }
+.tvq-placar.tvq-espera .tvq-lado .tvq-valores::before { display: none; }
+/* Cabeçalho: "2º TURNO" em selo */
+.tvq-titulo b { background: var(--tvq-ouro); color: #17130b; padding: calc(2 * var(--u)) calc(10 * var(--u)); border-radius: calc(4 * var(--u)); margin-right: calc(4 * var(--u)); }
+/* Painéis: fio dourado no topo, fundo com leve degradê, título em aba */
+.tvq-painel {
+  background: linear-gradient(180deg, #101a2e 0%, #0b1324 100%);
+  border-color: #1f2c47; box-shadow: 0 calc(8 * var(--u)) calc(24 * var(--u)) rgba(0,0,0,.35);
+}
+.tvq-painel::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc(3 * var(--u)); z-index: 4;
+  background: linear-gradient(90deg, var(--tvq-ouro), rgba(240,180,41,.15) 60%, transparent);
+}
+.tvq-painel > .tvq-rot, .tvq-est > .tvq-rot, .tvq-regioes .tvq-rot {
+  color: #dfe6f2; font-size: calc(19 * var(--u)); letter-spacing: .16em;
 }
