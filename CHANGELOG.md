@@ -4,6 +4,10 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### TV: placar com retrato dos candidatos (25/10)
+- A foto deixou de ser um círculo de 120 px: agora é um retrato que ocupa a altura do placar (180 × ~230 a 1920), saindo de um brilho na cor do partido e apoiado numa faixa da mesma cor, como nas transmissões. O fundo claro da foto do TSE some num recorte suave em volta da cabeça; tronco e ombros ficam. Sem foto: iniciais grandes sobre o brilho. Selo "ELEITO" sobre a faixa.
+- Coluna do meio um pouco mais estreita para caber nomes como "FLAVIO BOLSONARO" em duas linhas, inclusive em 1366×768.
+
 ### Recorde: eleito com menos estados (24/10)
 - Com 100% apurado e o eleito definido: se ele vencer em menos de 13 das 27 unidades da federação, aparece o recorde (antes: Lula 2022, 13; somado dos boletins de urna). Referências conferidas: Collor 1989 23, Dilma 2010 16, Dilma 2014 15, Bolsonaro 2018 16 (boletins), Lula 2022 13 (boletins).
 

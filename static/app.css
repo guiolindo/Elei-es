@@ -3734,3 +3734,37 @@ body.tv-quadro .aviso-conexao {
 .recordes-lista li::before { content: "★"; position: absolute; left: 16px; top: 11px; color: #f0b429; font-size: 16px; }
 .tvq-recorde { display: inline-block; margin-right: .4em; padding: 0 .35em; border-radius: .2em;
   background: #f0b429; color: #1a1204; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+/* ======================================================================
+   TV · placar com retrato (25/10): foto alta de cada lado, como nas
+   transmissões, saindo de um brilho na cor do partido e apoiada numa
+   faixa da mesma cor. A foto do TSE é pequena e de fundo claro: o fundo
+   em volta da cabeça some num recorte suave; ombros e tronco ficam.
+   ====================================================================== */
+.tvq-placar { padding: 0 calc(28 * var(--u)); align-items: stretch;
+  grid-template-columns: minmax(0, 1fr) calc(440 * var(--u)) minmax(0, 1fr); }
+.tvq-centro { align-self: center; }
+.tvq-lado { gap: calc(24 * var(--u)); align-items: center; }
+.tvq-foto-box {
+  align-self: stretch; width: calc(180 * var(--u)); overflow: hidden;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: radial-gradient(ellipse 85% 75% at 50% 62%, color-mix(in srgb, var(--cor) 55%, transparent) 0%, transparent 70%);
+  border-bottom: calc(5 * var(--u)) solid var(--cor);
+}
+.tvq-foto {
+  width: 100%; height: calc(100% - calc(8 * var(--u))); border: 0; border-radius: 0; background: none;
+  object-fit: cover; object-position: 50% 14%;
+  /* União de duas máscaras: elipse em volta da cabeça + faixa de baixo (tronco). */
+  -webkit-mask-image: radial-gradient(closest-side at 50% 40%, #000 62%, transparent 100%), linear-gradient(to top, #000 30%, transparent 58%);
+  -webkit-mask-composite: source-over;
+  mask-image: radial-gradient(closest-side at 50% 40%, #000 62%, transparent 100%), linear-gradient(to top, #000 30%, transparent 58%);
+  mask-composite: add;
+}
+/* Sem foto: iniciais grandes sobre o brilho, sem o círculo antigo. */
+.tvq-foto.cand-foto-fallback {
+  -webkit-mask-image: none; mask-image: none; background: none !important;
+  display: grid; place-items: center; font: 800 calc(88 * var(--u)) var(--tvq-cond);
+  color: rgba(255,255,255,.95); text-shadow: 0 calc(4 * var(--u)) calc(18 * var(--u)) rgba(0,0,0,.45);
+}
+.tvq-lado.eleito .tvq-foto-box::after { bottom: calc(12 * var(--u)); font-size: calc(22 * var(--u)); padding: calc(3 * var(--u)) calc(14 * var(--u)); }
+.tvq-nome { font-size: calc(46 * var(--u)); line-height: .98; }
+.tvq-part { font-size: calc(22 * var(--u)); margin-top: calc(10 * var(--u)); }
