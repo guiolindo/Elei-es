@@ -3169,7 +3169,7 @@ function abrirModalVitoria(sq_candidato, cor = "#f0b429") {
                       6: "Deputado(a) Federal", 7: "Deputado(a) Estadual" }[state.cargo] || "";
   const onde = state.abrangencia === "BR" ? "" : ` · ${NOMES_UF_EXT[state.abrangencia] || state.abrangencia}`;
   const selo = state.turno === 2 ? "Eleito no 2º turno" : "Eleito";
-  const duracao = naTV ? 30 : 15;
+  const duracao = 120;  // 2 min em todos os aparelhos
   document.querySelectorAll(".modal-vitoria").forEach(el => el.remove());
   const el = document.createElement("div");
   el.className = "modal-vitoria mv-tv";

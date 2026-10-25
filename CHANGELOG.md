@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Tela do eleito fica 2 minutos (25/10)
+- Antes 15 s (computador e celular) e 30 s (TV); agora 2 min em todos. Continua fechando pelo botão, ✕ ou Esc.
+
 ### TV: visual de transmissão e cores do "dado parado" (25/10)
 - Placar: painel de cada candidato na cor do partido (degradê de fora para o centro, nada sobre a foto), nome e % em branco, selo "À FRENTE"; foto inteira 3×4; "2º TURNO" em selo dourado; painéis com fio dourado, degradê e sombra; regiões com "CENTRO-OESTE" numa linha; "ÚLTIMAS" com ponta diagonal; contagem regressiva sem aperto em 1366; fio na cor do vencedor na tela do eleito; sem os traços coloridos no lugar da % antes do 1º boletim.
 - Hora do último dado: verde até 2 min, amarelo de 2 a 30 min, vermelho a partir de 30 min (antes 1 e 5 min). Selo da TV: "Sem dado novo do TSE há N min" a partir de 5 min em âmbar, vermelho a partir de 30 min.
