@@ -2340,6 +2340,13 @@ function sairModoAdmin() {
   document.getElementById("selo-admin")?.remove();
   toast("Modo admin desativado", "warn");
 }
+// Textos de espera da estimativa: no modo admin ela sai no 1º boletim.
+function textoInicioEstimativa() {
+  return modoAdmin() ? "Modo admin: começa no 1º boletim do TSE" : "Começa com 10% apurado";
+}
+function textoInicioChance() {
+  return modoAdmin() ? "chance desde o 1º boletim (admin)" : "chance a partir de 30% apurado";
+}
 function seloModoAdmin() {
   const adm = modoAdmin();
   let el = document.getElementById("selo-admin");
@@ -2558,8 +2565,8 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
     const fin = (state.candidatos || []).filter(c => (c.situacao || "ativo") === "ativo")
       .sort((x, y) => (x.numero || 0) - (y.numero || 0));
     const quando = pct > 0
-      ? `Começa com 10% apurado · agora ${dec(pct, 1)}%`
-      : "Começa com 10% apurado";
+      ? `${textoInicioEstimativa()} · agora ${dec(pct, 1)}%`
+      : textoInicioEstimativa();
     linhas.innerHTML = `<div class="tv2t-proj-espera">
         <span>${quando}</span>
         <span class="tv2t-proj-barra" aria-hidden="true"><span style="width:${Math.min(100, pct * 10)}%;background:var(--muted)"></span></span>
@@ -2568,7 +2575,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
         return `<div class="tv2t-proj-linha tv2t-proj-pendente" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
           <span class="tv2t-proj-nome">${c.nome_urna}</span>
           <span class="tv2t-proj-pct" aria-label="Estimativa ainda não disponível">≈ —</span>
-          <span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 30% apurado</span>
+          <span class="tv2t-proj-chance tv2t-proj-mudo">${textoInicioChance()}</span>
         </div>`;
       }).join("") + `<p class="proj-horario">${textoHorario99()}</p>`;
     aviso.textContent = "";
@@ -2601,7 +2608,7 @@ function renderBlocoProjecao(box, linhas, aviso, mostrar) {
     } else if (pj.disputa_indefinida) {
       chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">disputa indefinida</span>`;
     } else {
-      chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">chance a partir de 30% apurado</span>`;
+      chance = `<span class="tv2t-proj-chance tv2t-proj-mudo">${textoInicioChance()}</span>`;
     }
     return `<div class="tv2t-proj-linha" style="--cor:${cor};--cor-txt:${corLegivel(cor)}">
       <span class="tv2t-proj-nome">${nome}</span>
@@ -3501,8 +3508,8 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
     return `<div class="tvq-est-l"><span class="tvq-est-n" style="border-color:${cor}">${c.nome_urna}</span>${val}${chance}</div>`;
   };
   if (!pj?.disponivel) {
-    box.innerHTML = tit + `<p class="tvq-est-espera">Começa com 10% apurado${pct > 0 ? ` · agora ${dec(pct, 1)}%` : ""}</p>`
-      + ativos.map(c => linha(c, `<span class="tvq-est-p tvq-mudo">≈ —</span>`, `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 30% apurado</span></span>`)).join("")
+    box.innerHTML = tit + `<p class="tvq-est-espera">${textoInicioEstimativa()}${pct > 0 ? ` · agora ${dec(pct, 1)}%` : ""}</p>`
+      + ativos.map(c => linha(c, `<span class="tvq-est-p tvq-mudo">≈ —</span>`, `<span class="tvq-est-c tvq-mudo">—<span>${textoInicioChance()}</span></span>`)).join("")
       + `<p class="tvq-est-hora">${textoHorario99()}</p>`;
     return;
   }
@@ -3525,7 +3532,7 @@ function renderEstimativaQuadro(ativos, pct, decidido) {
         : `<span class="tvq-est-c">${chanceCurta(e.p_vitoria)}<span>chance de vencer</span></span>`)
       : pj.disputa_indefinida
         ? `<span class="tvq-est-c tvq-mudo tvq-indef">indefinida<span>chance de vencer</span></span>`
-        : `<span class="tvq-est-c tvq-mudo">—<span>chance a partir de 30% apurado</span></span>`;
+        : `<span class="tvq-est-c tvq-mudo">—<span>${textoInicioChance()}</span></span>`;
     return linha(c, `<span class="tvq-est-p">≈${dec(e.pct, 1)}%<small>± ${dec(m, 1)}</small></span>`, chance);
   }).join("") + (textoHorario99() ? `<p class="tvq-est-hora">${textoHorario99()}</p>` : "");
 }
