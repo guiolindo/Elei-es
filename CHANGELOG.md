@@ -4,6 +4,9 @@ Histórico de mudanças relevantes. Formato inspirado em Keep a Changelog. Datas
 
 ## [Unreleased]
 
+### Histórico do gráfico não é mais apagado (26/10)
+- A limpeza do banco mantinha só os 200 boletins mais recentes por disputa; no 2º turno foram 284 e o gráfico perdeu o trecho das 17h07 às ~20h. Presidente (Brasil e exterior) e governador agora ficam fora da poda; só os arquivos de presidente por UF continuam limitados.
+
 ### Letreiro da TV anda com "reduzir movimento" ligado (25/10)
 - Com prefers-reduced-motion (Brave, algumas TVs e celulares) o letreiro ficava parado no 1º item. Agora anda sempre, a metade da velocidade nesse caso.
 

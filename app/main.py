@@ -121,6 +121,14 @@ async def _cleanup_snapshots_loop():
                 )).all()
                 total_apagado = 0
                 for cargo, abr, turno in chaves:
+                    # Histórico que vira gráfico (presidente Brasil/exterior e
+                    # governador) nunca é apagado: arquivos pequenos, e no 2º
+                    # turno de 2026 a noite teve 284 boletins; com o limite de
+                    # 200 o gráfico perdeu o começo da apuração (17h–20h).
+                    # Só os arquivos de presidente por UF (grandes, com
+                    # municípios, usados só pelo último valor) são podados.
+                    if abr in ("BR", "ZZ") or cargo == 3:
+                        continue
                     corte = (await sess.execute(
                         select(Snapshot.coletado_em)
                         .where(Snapshot.cod_cargo == cargo, Snapshot.abrangencia == abr,
