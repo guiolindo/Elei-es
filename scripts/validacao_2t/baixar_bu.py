@@ -11,7 +11,8 @@ Um zip por vez, apagado depois de lido (os do 1º turno têm todos os cargos).
 """
 import csv, io, json, os, subprocess, sys, urllib.request, zipfile
 
-PACOTE = {"2022": "resultados-2022-boletim-de-urna", "2018": "resultados-2018-boletim-de-urna"}
+PACOTE = {"2022": "resultados-2022-boletim-de-urna", "2018": "resultados-2018-boletim-de-urna",
+          "2026": "resultados-2026-boletim-de-urna"}
 
 
 def urls(ano):
@@ -36,6 +37,11 @@ def processar(zip_path, saida, campos_vistos):
                 if s is None:
                     s = secoes[k] = {"recebido": row.get("DT_BU_RECEBIDO", ""),
                                      "encerramento": row.get("DT_ENCERRAMENTO", ""),
+                                     "abertura": row.get("DT_ABERTURA", ""),
+                                     "emissao": row.get("DT_EMISSAO_BU", ""),
+                                     "tipo_urna": row.get("DS_TIPO_URNA", ""),
+                                     "agregadas": row.get("DS_SECOES_AGREGADAS", ""),
+                                     "sem_biometria": row.get("QT_ELEI_BIOM_SEM_HABILITACAO", ""),
                                      "aptos": int(row["QT_APTOS"]),
                                      "comparecimento": int(row["QT_COMPARECIMENTO"]),
                                      "votos": {}}
@@ -46,10 +52,12 @@ def processar(zip_path, saida, campos_vistos):
     with open(saida, "a", newline="") as out:
         w = csv.writer(out)
         if novo:
-            w.writerow(["cargo", "uf", "municipio", "zona", "secao", "recebido", "encerramento", "aptos", "comparecimento", "votos_json"])
+            w.writerow(["cargo", "uf", "municipio", "zona", "secao", "recebido", "encerramento", "aptos", "comparecimento", "votos_json",
+                        "abertura", "emissao", "tipo_urna", "agregadas", "sem_biometria"])
         for (cargo, uf, mun, zona, sec), s in secoes.items():
             w.writerow([cargo, uf, mun, zona, sec, s["recebido"], s["encerramento"], s["aptos"], s["comparecimento"],
-                        json.dumps(s["votos"], separators=(",", ":"))])
+                        json.dumps(s["votos"], separators=(",", ":")),
+                        s["abertura"], s["emissao"], s["tipo_urna"], s["agregadas"], s["sem_biometria"]])
     return len(secoes)
 
 
