@@ -33,7 +33,7 @@ COLS = ["uf", "municipio", "zona", "secao", "motivo", "status",
         "comparecimento_bu", "votos_log", "primeiro_voto", "ultimo_voto",
         "votos_apos_17", "votos_apos_18", "votos_apos_19",
         "sem_biometria_log", "sem_biometria_apos_17", "menor_intervalo_s", "intervalos_menor_15s",
-        "reinicios_vota", "erros_log", "encerramento_log"]
+        "reinicios_vota", "erros_log", "encerramento_log", "urnas_no_log"]
 
 
 def hashes_vsc(vsc):
@@ -86,8 +86,26 @@ def recontagem_rdv(rdv):
 
 
 def analisa_log(jez, fuso=0, dia="25/10/2026"):
-    z = zipfile.ZipFile(io.BytesIO(jez))
-    txt = z.read(z.namelist()[0]).decode("latin-1")
+    # Com troca de urna no meio da votação, o .jez traz o logd.dat da urna final
+    # e, compactado dentro dele, o da urna anterior: junta os dois.
+    linhas = []
+
+    def ler(blob, nivel=0):
+        z = zipfile.ZipFile(io.BytesIO(blob))
+        for nome in z.namelist():
+            dado = z.read(nome)
+            if nome.endswith(".jez") and nivel < 2:
+                try:
+                    ler(dado, nivel + 1)
+                except zipfile.BadZipFile:
+                    pass
+            elif nome.endswith(".dat"):
+                linhas.extend(dado.decode("latin-1").splitlines())
+    ler(jez)
+    linhas = list(dict.fromkeys(linhas))  # os logs aninhados podem repetir linhas uns dos outros
+    urnas = len({l.split("\t")[2] for l in linhas if l.count("\t") >= 4})
+    linhas.sort(key=lambda l: (l[6:10], l[3:5], l[0:2], l[11:19]))
+    txt = "\n".join(linhas)
     votos, sem_bio = [], []
     bio_atual = False; hab_bio = True; erros = reinicios = 0; enc = ""
     for linha in txt.splitlines():
@@ -125,7 +143,7 @@ def analisa_log(jez, fuso=0, dia="25/10/2026"):
         sem_biometria_apos_17=sum(h(t) >= 17 * 60 for t in sem_bio),
         menor_intervalo_s=int(min(gaps)) if gaps else "",
         intervalos_menor_15s=sum(g < 15 for g in gaps),
-        reinicios_vota=reinicios, erros_log=erros, encerramento_log=enc)
+        reinicios_vota=reinicios, erros_log=erros, encerramento_log=enc, urnas_no_log=urnas)
 
 
 async def secao(cli, sem, alvo, w, f):
