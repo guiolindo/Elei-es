@@ -63,9 +63,10 @@ def recontagem_rdv(rdv):
     def walk(n):
         for t, v in n:
             if isinstance(v, list):
-                # bloco de um cargo: [81] cargo, [02] qtd escolhas, [30] lista de votos
-                if any(x[0] == 0x81 for x in v) and any(x[0] == 0x30 for x in v):
-                    cargo = num([x for x in v if x[0] == 0x81][0][1])
+                # bloco de um cargo: [81] cargo (ou [82] consulta), [02] qtd escolhas, [30] lista de votos
+                if any(x[0] in (0x81, 0x82) for x in v) and any(x[0] == 0x30 for x in v):
+                    cod = [x for x in v if x[0] in (0x81, 0x82)][0]
+                    cargo = num(cod[1]) + (100 if cod[0] == 0x82 else 0)
                     votos = [x for x in v if x[0] == 0x30][0][1]
                     if votos and all(isinstance(y[1], list) and y[1] and y[1][0][0] == 0x0a for y in votos):
                         c = por_cargo.setdefault(cargo, Counter())

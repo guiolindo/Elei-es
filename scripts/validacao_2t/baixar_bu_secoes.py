@@ -65,7 +65,9 @@ def decodifica(dat):
         for _, rv in [x for x in eleicao if x[0] == 0x30][0][1]:
             comp = [num(x[1]) for x in rv if x[0] == 0x02][0]
             for _, tvc in [x for x in rv if x[0] == 0x30][0][1]:
-                cargo = num([x for x in tvc if x[0] == 0x81][0][1])
+                # codigoCargo: [1] cargo constitucional ou [2] consulta popular (gravada como 100 + nº)
+                cod = [x for x in tvc if x[0] in (0x81, 0x82)][0]
+                cargo = num(cod[1]) + (100 if cod[0] == 0x82 else 0)
                 votos = {}
                 for _, vv in [x for x in tvc if x[0] == 0x30][0][1]:
                     tipo = num([x for x in vv if x[0] == 0x81][0][1])
@@ -85,8 +87,11 @@ async def get(cli, url, binario=False):
     for tent in range(8):
         try:
             r = await cli.get(url)
-            if r.status_code == 200:
+            # O Akamai às vezes devolve 200 com uma página HTML de bloqueio
+            if r.status_code == 200 and not r.content.lstrip().startswith(b"<"):
                 return r.content if binario else r.json()
+            if r.status_code == 200:
+                await asyncio.sleep(10 + 10 * tent); continue
             if r.status_code == 404:
                 return None
             if r.status_code == 429:
