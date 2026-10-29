@@ -105,18 +105,21 @@ async def secao(cli, sem, uf, mu, zn, ns, w, f, erros):
             if not aux or not aux.get("hashes"):
                 erros.append((uf, mu, zn, ns, "sem aux")); return
             h = aux["hashes"][-1]
-            nm = next((a["nm"] for a in h.get("arq", []) if a.get("tp") == "bu" or a["nm"].endswith("-bu.dat")), None)
+            # bu: urna; busa: Sistema de Apuração (cédula, urna com defeito, mídia ilegível)
+            arq = {a.get("tp"): a["nm"] for a in h.get("arq", [])}
+            nm = arq.get("bu") or arq.get("busa")
             if not nm:
                 erros.append((uf, mu, zn, ns, f"sem bu ({h.get('st')})")); return
             dat = await get(cli, f"{pre}/{h['hash']}/{nm}", binario=True)
             d = decodifica(dat)
             dr = h.get("dr", ""); hr = h.get("hr", "")
             rec = f"{dr[6:10]}-{dr[3:5]}-{dr[0:2]} {hr}" if dr else ""
-            sb = d["ident"][2] if len(d["ident"]) >= 3 else ""
+            sa = nm.endswith("-busa.dat")
+            sb = d["ident"][2] if len(d["ident"]) >= 3 and not sa else ""
             for cargo, aptos, comp, votos in d["cargos"]:
                 w.writerow([cargo, uf.upper(), int(mu), int(zn), int(ns), rec, d["encerramento"], aptos, comp,
                             json.dumps(votos, separators=(",", ":")), d["abertura"], d["emissao"],
-                            "Apurada", "#NULO#", sb])
+                            "SA" if sa else "Apurada", "#NULO#", sb])
             f.flush()
         except Exception as e:
             erros.append((uf, mu, zn, ns, repr(e)[:120]))
